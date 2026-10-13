@@ -1,6 +1,5 @@
 from uuid import uuid4
 
-import httpx
 import pytest
 from sqlalchemy import create_engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -10,35 +9,6 @@ from app.db import engine, get_session
 from app.main import app
 from app.models import WaterBody
 from app.seed import seed_demo
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
-@pytest.fixture
-def session():
-    # Every test rolls back its own transaction, including demo deletions.
-    with engine.connect() as connection:
-        transaction = connection.begin()
-        with Session(bind=connection) as db:
-            db.execute(delete(WaterBody))
-            def override_session():
-                yield db
-            app.dependency_overrides[get_session] = override_session
-            try:
-                yield db
-            finally:
-                app.dependency_overrides.clear()
-        if transaction.is_active:
-            transaction.rollback()
-
-
-@pytest.fixture
-async def client(session):
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as value:
-        yield value
 
 
 @pytest.mark.anyio
@@ -112,7 +82,7 @@ def test_database_rejects_invalid_objects(session, name, kind):
 
 
 def test_migration_and_postgis_are_present(session):
-    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
     assert session.scalar(text("SELECT postgis_version()"))
 
 

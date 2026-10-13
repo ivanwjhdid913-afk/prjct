@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './styles.css';
+import ObservationPoints from './ObservationPoints';
 
 const kinds = { river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
 type WaterBody = { id: string; name: string; kind: keyof typeof kinds; is_synthetic: boolean };
@@ -24,6 +25,10 @@ function isWaterPage(value: unknown): value is WaterPage {
 }
 
 export default function App() {
+  const [waterBodyId, setWaterBodyId] = useState(() => location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null);
+  const returnTarget = useRef<HTMLButtonElement | null>(null);
+  const returnId = useRef<string | null>(null);
+  const catalogScroll = useRef(0);
   const [view, setView] = useState<ViewState>({ status: 'loading' });
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -31,6 +36,16 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>({ q: '', kind: '' });
   const requestId = useRef(0);
   const limit = 50;
+
+  useEffect(() => {
+    function navigate() {
+      const id = location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null;
+      setWaterBodyId(id);
+      if (!id) window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
+    }
+    window.addEventListener('hashchange', navigate);
+    return () => window.removeEventListener('hashchange', navigate);
+  }, []);
 
   function requestList(nextFilters = filters, nextOffset = offset) {
     // Invalidate synchronously, before the next effect starts its request.
@@ -82,7 +97,10 @@ export default function App() {
 
   return (
     <>
-      <a className="skip-link" href="#content">К списку объектов</a>
+      <a className="skip-link" href="#content" onClick={event => {
+        event.preventDefault();
+        document.getElementById('content')?.focus();
+      }}>К списку объектов</a>
       <header className="masthead">
         <div className="brand">
           <svg className="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
@@ -93,6 +111,7 @@ export default function App() {
         <span className="edition">Учебный проект</span>
       </header>
       <main id="content" tabIndex={-1}>
+        {waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
         <section className="introduction" aria-labelledby="page-title">
           <p className="eyebrow">Реестр / Водные объекты</p>
           <h1 id="page-title">Водные объекты<span className="title-dot">.</span></h1>
@@ -158,7 +177,12 @@ export default function App() {
             </div> : <ul className="water-list" aria-label="Водные объекты">
               {view.data.items.map((item, index) => <li className="water-row" key={item.id}>
                 <span className="row-number" aria-hidden="true">{String(offset + index + 1).padStart(2, '0')}</span>
-                <div className="object-name"><h3>{item.name}</h3>
+                <div className="object-name"><h3><button className="object-link" ref={element => { if (item.id === returnId.current) returnTarget.current = element; }} onClick={(event) => {
+                  returnTarget.current = event.currentTarget;
+                  returnId.current = item.id;
+                  catalogScroll.current = window.scrollY;
+                  location.hash = `water-body/${item.id}`;
+                }}>{item.name}</button></h3>
                   {item.is_synthetic && <span className="synthetic">Синтетические данные</span>}
                 </div>
                 <span className={`kind ${item.kind}`}>{kinds[item.kind]}</span>
@@ -173,6 +197,7 @@ export default function App() {
             </div>
           </>}
         </section>
+        </>}
         <footer className="page-footer"><span>Наблюдения за водой</span><span>Реестр объектов · Локальная версия</span></footer>
       </main>
     </>

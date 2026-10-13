@@ -70,6 +70,48 @@ h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
 .skeleton { height: 40px; margin-top: 16px; background: #f0f3ee; border-radius: 4px; max-width: 85%; }
 .skeleton:nth-child(3) { max-width: 70%; }
 .page-footer { display: flex; justify-content: space-between; gap: 20px; padding: 28px 0 36px; color: var(--muted); font-size: 12px; }
+.object-link { border: 0; border-radius: 2px; padding: 4px 0; font: inherit; text-align: left; text-decoration: underline; text-decoration-color: #9aafa5; text-underline-offset: 5px; overflow-wrap: anywhere; }
+.observations { padding-top: 32px; }
+.back-link { margin-bottom: 28px; }
+.observation-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 28px; }
+.observation-heading h1 { font-size: clamp(32px, 4vw, 48px); }
+.observation-heading button { flex-shrink: 0; }
+.point-notice { padding: 20px 24px; background: #f2f5e9; border-left: 3px solid #68764e; margin-bottom: 24px; }
+.point-notice p { margin: 8px 0 0; line-height: 1.6; max-width: 85ch; color: #526045; }
+.map-panel { border: 1px solid var(--line); background: var(--surface); }
+.point-map { height: 400px; isolation: isolate; background: #e8ece7; }
+.map-empty { padding: 48px 24px; color: var(--muted); line-height: 1.6; }
+.map-warning { padding: 16px 24px; border-top: 1px solid var(--line); background: #fbf4e9; }
+.map-warning p { margin: 8px 0 12px; line-height: 1.5; }
+.map-caption { padding: 14px 24px; margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.point-marker { display: grid; place-items: center; background: transparent; border: 0; }
+.point-marker span { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid #fff; border-radius: 50%; background: var(--accent); color: white; font: 600 14px 'Segoe UI', sans-serif; box-shadow: 0 1px 5px #0006; }
+.point-marker.selected span { width: 36px; height: 36px; outline: 3px solid var(--ink); outline-offset: 2px; }
+.point-map .leaflet-control-attribution { color: var(--ink); background: white; }
+.point-map .leaflet-control-attribution a { color: #175a86; }
+.point-map .leaflet-control-zoom a { width: 44px; height: 44px; line-height: 44px; }
+.point-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-top: 28px; align-items: start; }
+.points-panel, .point-detail { min-width: 0; }
+.point-count { color: var(--muted); font-size: 14px; margin: 12px 0 20px; }
+.points-list { list-style: none; padding: 0; margin: 0; }
+.points-list li + li { margin-top: 8px; }
+.points-list button { width: 100%; display: flex; text-align: left; gap: 16px; padding: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+.points-list button[aria-pressed="true"] { border: 2px solid var(--accent); padding: 15px; background: #edf3f1; }
+.point-number { color: var(--muted); font: 14px Consolas, monospace; min-width: 20px; padding-top: 4px; }
+.point-meta { display: block; color: var(--muted); font-size: 13px; margin-top: 5px; }
+.point-detail { border-top: 3px solid var(--accent); background: var(--surface); padding: 24px; line-height: 1.6; overflow-wrap: anywhere; }
+.point-detail .eyebrow { margin-bottom: 8px; }
+.point-detail h3 { font-size: 20px; margin: 24px 0 16px; }
+.point-detail dt { color: var(--muted); font-size: 13px; margin-top: 18px; }
+.point-detail dd { margin: 4px 0 0; }
+.coordinate { display: block; font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .observation-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .point-workspace { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .point-map { height: 320px; }
+  .point-notice, .point-detail, .map-warning { padding: 20px; }
+  .map-caption { padding: 14px 20px; }
+}
 @media (max-width: 600px) {
   .masthead { padding: 16px 20px; }
   .brand { font-size: 14px; gap: 7px; }
