@@ -8,3 +8,11 @@ __pycache__/
 .venv/
 .idea/
 .vscode/
+.pytest_cache/
+*.egg-info/
+.cache/
+test-results/
+playwright-report/
+backups/
+uploads/
+*.pyc
