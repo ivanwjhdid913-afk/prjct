@@ -25,6 +25,7 @@ class WaterBodyView(BaseModel):
 class WaterBodyPage(BaseModel):
     items: list[WaterBodyView]
     total: int
+    catalog_total: int
     limit: int
     offset: int
 
@@ -34,15 +35,25 @@ def list_water_bodies(
     session: Annotated[Session, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    q: Annotated[str, Query(max_length=120, pattern=r"^[^\x00]*$")] = "",
+    kind: Literal["river", "lake", "reservoir"] | None = None,
 ):
     try:
-        total = session.scalar(select(func.count()).select_from(WaterBody))
+        conditions = []
+        if search := q.strip():
+            conditions.append(WaterBody.name.icontains(search, autoescape=True))
+        if kind is not None:
+            conditions.append(WaterBody.kind == kind)
+        count = select(func.count()).select_from(WaterBody)
+        catalog_total = session.scalar(count)
+        total = session.scalar(count.where(*conditions)) if conditions else catalog_total
         objects = session.scalars(
-            select(WaterBody).order_by(WaterBody.name, WaterBody.id).limit(limit).offset(offset)
+            select(WaterBody).where(*conditions).order_by(WaterBody.name, WaterBody.id).limit(limit).offset(offset)
         ).all()
         return WaterBodyPage(
             items=[WaterBodyView.model_validate(item) for item in objects],
             total=total,
+            catalog_total=catalog_total,
             limit=limit,
             offset=offset,
         )

@@ -34,6 +34,16 @@ h1 { font-size: clamp(34px, 5vw, 60px); line-height: 1.08; letter-spacing: -2px;
 .register-heading .eyebrow { margin-bottom: 8px; }
 h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
 .refresh { font-size: 14px; }
+.filters { padding: 0 32px 24px; display: grid; grid-template-columns: minmax(180px, 1fr) 180px auto; gap: 12px 16px; align-items: end; }
+.filters label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.filters input, .filters select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid #8fa198; border-radius: 6px; font: inherit; font-size: 16px; background: var(--surface); color: var(--ink); }
+.filters input::placeholder { color: var(--muted); }
+.filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-actions button { font-size: 14px; }
+.filter-actions .primary { margin: 0; }
+.filters p { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.filters .applied-filters { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 1000px) { .filters { grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr); } .filter-actions { grid-column: 1 / -1; } }
 .notice { margin: 0 32px 20px; display: flex; align-items: flex-start; gap: 13px; background: #f2f5e9; padding: 17px 20px; border-radius: 4px; }
 .notice-symbol { width: 20px; height: 20px; border: 1px solid #68764e; border-radius: 50%; flex-shrink: 0; font-family: Georgia, serif; text-align: center; font-weight: bold; font-size: 14px; margin-top: 2px; }
 .notice strong { font-size: 14px; font-weight: 650; }
@@ -72,6 +82,7 @@ h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }
   .desktop-break { display: none; }
   .register-heading { padding: 24px 20px; align-items: flex-start; flex-direction: column; gap: 16px; }
   .notice { margin: 0 20px 12px; padding: 16px; }
+  .filters { padding: 0 20px 24px; grid-template-columns: minmax(0, 1fr); }
   .water-list { padding: 0 20px; }
   .water-row { grid-template-columns: 24px 1fr; column-gap: 12px; row-gap: 10px; }
   .kind { grid-column: 2; justify-self: start; }

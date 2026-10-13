@@ -45,7 +45,7 @@ async def client(session):
 async def test_empty_database_returns_empty_page(client):
     response = await client.get("/api/v1/water-bodies")
     assert response.status_code == 200
-    assert response.json() == {"items": [], "total": 0, "limit": 50, "offset": 0}
+    assert response.json() == {"items": [], "total": 0, "catalog_total": 0, "limit": 50, "offset": 0}
 
 
 @pytest.mark.anyio
@@ -114,3 +114,94 @@ def test_database_rejects_invalid_objects(session, name, kind):
 def test_migration_and_postgis_are_present(session):
     assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
     assert session.scalar(text("SELECT postgis_version()"))
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("query", ["реК", "  РЕК  ", "\tРеК\n", "УЧЕБНАЯ РЕКА"])
+async def test_search_is_case_insensitive_and_trims_cyrillic(client, session, query):
+    seed_demo(session)
+    response = await client.get("/api/v1/water-bodies", params={"q": query})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["catalog_total"] == 3
+    assert data["items"][0]["kind"] == "river"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("query", ["", "   \t\n"])
+async def test_empty_search_does_not_filter(client, session, query):
+    seed_demo(session)
+    data = (await client.get("/api/v1/water-bodies", params={"q": query})).json()
+    assert data["total"] == 3
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("kind", ["river", "lake", "reservoir"])
+async def test_each_kind_and_combined_search(client, session, kind):
+    seed_demo(session)
+    session.add(WaterBody(name="Другой синтетический пример", kind=kind, is_synthetic=True))
+    session.flush()
+    by_kind = (await client.get("/api/v1/water-bodies", params={"kind": kind})).json()
+    assert by_kind["total"] == 2
+    assert all(row["kind"] == kind for row in by_kind["items"])
+    combined = (await client.get("/api/v1/water-bodies", params={"kind": kind, "q": "УЧЕБ"})).json()
+    assert combined["total"] == 1
+    assert combined["catalog_total"] == 4
+    assert combined["items"][0]["kind"] == kind
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("query", ["%", "_", "/", "\\"])
+async def test_search_metacharacters_are_literal(client, session, query):
+    session.add_all([
+        WaterBody(name=f"Учебный {query} объект", kind="lake", is_synthetic=True),
+        WaterBody(name="Учебный X объект", kind="lake", is_synthetic=True),
+    ])
+    session.flush()
+    data = (await client.get("/api/v1/water-bodies", params={"q": query})).json()
+    assert data["total"] == 1
+    assert data["items"][0]["name"] == f"Учебный {query} объект"
+
+
+@pytest.mark.anyio
+async def test_cyrillic_yo_is_case_insensitive(client, session):
+    session.add(WaterBody(name="Синтетическое озеро Ёлочное", kind="lake", is_synthetic=True))
+    session.add(WaterBody(name="Другой синтетический объект", kind="lake", is_synthetic=True))
+    session.flush()
+    assert (await client.get("/api/v1/water-bodies", params={"q": "ёлОЧ"})).json()["total"] == 1
+
+
+@pytest.mark.anyio
+async def test_filtered_pagination_searches_entire_database(client, session):
+    session.add_all([WaterBody(name=f"А пример {i:03}", kind="river", is_synthetic=True) for i in range(60)])
+    session.add_all([WaterBody(name=f"Я озеро {i:03}", kind="lake", is_synthetic=True) for i in range(3)])
+    session.flush()
+    params = {"q": "ОЗЕРО", "kind": "lake", "limit": 2}
+    first = (await client.get("/api/v1/water-bodies", params=params)).json()
+    second = (await client.get("/api/v1/water-bodies", params={**params, "offset": 2})).json()
+    assert first["catalog_total"] == second["catalog_total"] == 63
+    assert first["total"] == second["total"] == 3
+    assert len(first["items"]) == 2 and len(second["items"]) == 1
+    assert len({row["id"] for row in first["items"] + second["items"]}) == 3
+
+
+@pytest.mark.anyio
+async def test_no_matches_is_distinct_from_empty_catalog(client, session):
+    seed_demo(session)
+    data = (await client.get("/api/v1/water-bodies", params={"q": "РЕКА", "kind": "lake"})).json()
+    assert data["items"] == [] and data["total"] == 0 and data["catalog_total"] == 3
+    session.execute(delete(WaterBody))
+    empty = (await client.get("/api/v1/water-bodies", params={"q": "РЕКА", "kind": "lake"})).json()
+    assert empty["items"] == [] and empty["catalog_total"] == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("params", [{"q": "я" * 121}, {"q": "\x00"}, {"kind": "ocean"}, {"kind": ""}, {"kind": "River"}])
+async def test_invalid_search_parameters_are_rejected(client, params):
+    assert (await client.get("/api/v1/water-bodies", params=params)).status_code == 422
+
+
+@pytest.mark.anyio
+async def test_maximum_search_length_is_accepted(client):
+    assert (await client.get("/api/v1/water-bodies", params={"q": "я" * 120})).status_code == 200

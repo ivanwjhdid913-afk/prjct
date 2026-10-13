@@ -18,7 +18,7 @@ test('shows loading, then the real database records', async ({ page }) => {
 
 test('shows an empty response', async ({ page }) => {
   await page.route('**/api/v1/water-bodies*', (route) => route.fulfill({
-    json: { items: [], total: 0, limit: 50, offset: 0 },
+    json: { items: [], total: 0, catalog_total: 0, limit: 50, offset: 0 },
   }));
   await page.goto('/');
   await expect(page.getByText('В списке пока нет объектов')).toBeVisible();
@@ -51,7 +51,7 @@ test('pages through the list without labeling unmarked records synthetic', async
     const offset = Number(new URL(route.request().url()).searchParams.get('offset'));
     return route.fulfill({ json: {
       items: [{ id: `test-${offset}`, name: `Контрольная запись ${offset}`, kind: 'river', is_synthetic: false }],
-      total: 51, limit: 50, offset,
+      total: 51, catalog_total: 51, limit: 50, offset,
     } });
   });
   await page.goto('/');
@@ -69,7 +69,7 @@ test('returns to the first page when the list shrinks during refresh', async ({ 
     const offset = Number(new URL(route.request().url()).searchParams.get('offset'));
     return route.fulfill({ json: {
       items: shrunk && offset > 0 ? [] : [{ id: `test-${offset}`, name: `Оставшийся пример ${offset}`, kind: 'lake', is_synthetic: true }],
-      total: shrunk ? 1 : 51, limit: 50, offset,
+      total: shrunk ? 1 : 51, catalog_total: shrunk ? 1 : 51, limit: 50, offset,
     } });
   });
   await page.goto('/');
