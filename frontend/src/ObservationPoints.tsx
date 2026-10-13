@@ -46,6 +46,7 @@ function PointMap({ points, selectedId, onSelect }: { points: Point[]; selectedI
     if (!host.current || !points.some(point => point.geometry)) return;
     setTileError(false);
     const map = L.map(host.current, { scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false, zoomControl: false });
+    map.attributionControl.setPrefix(false);
     mapRef.current = map;
     L.control.zoom({ zoomInTitle: 'Увеличить масштаб', zoomOutTitle: 'Уменьшить масштаб' }).addTo(map);
     const locations: L.LatLngTuple[] = points.flatMap(point => point.geometry ? [[point.geometry.coordinates[1], point.geometry.coordinates[0]]] : []);
