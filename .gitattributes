@@ -1,0 +1,3 @@
+# Preserve the pinned source bytes; geometry rebuilds identically on Windows/Linux.
+backend/data/raw/*.osm -text
+backend/data/*.geojson text eol=lf

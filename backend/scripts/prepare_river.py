@@ -103,7 +103,7 @@ def prepare() -> dict:
         "geometry": {"type": "LineString", "coordinates": continuation},
     }
     for filename, value in (("river_reach.geojson", feature), ("river_downstream.geojson", buffer_feature)):
-        (DATA / filename).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (DATA / filename).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return {"length_m": reach_length, "verified_downstream_m": buffer_length, "vertices": len(main)}
 
 

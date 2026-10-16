@@ -59,6 +59,7 @@ def test_prepared_dataset_reproduces_offline_without_touching_saved_files(tmp_pa
     module.DATA = tmp_path
     module.prepare()
     for name in ('river_reach.geojson', 'river_downstream.geojson'):
+        assert b'\r' not in (tmp_path / name).read_bytes()
         assert (tmp_path / name).read_bytes() == (root / 'data' / name).read_bytes()
     reach = json.loads((tmp_path / 'river_reach.geojson').read_text(encoding='utf-8'))
     downstream = json.loads((tmp_path / 'river_downstream.geojson').read_text(encoding='utf-8'))
