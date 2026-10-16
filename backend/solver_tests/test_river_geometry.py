@@ -1,5 +1,7 @@
 """Geometry invariants independent of API and database."""
 import importlib.util
+import json
+from pathlib import Path
 
 import pytest
 
@@ -47,3 +49,20 @@ def test_distances_outside_line_are_not_clamped():
     for distance in (-1, route.length_m + 1, float('nan')):
         with pytest.raises(ValueError):
             route.point_at(distance)
+
+
+def test_prepared_dataset_reproduces_offline_without_touching_saved_files(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location('prepare_river', root / 'scripts' / 'prepare_river.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.DATA = tmp_path
+    module.prepare()
+    for name in ('river_reach.geojson', 'river_downstream.geojson'):
+        assert (tmp_path / name).read_bytes() == (root / 'data' / name).read_bytes()
+    reach = json.loads((tmp_path / 'river_reach.geojson').read_text(encoding='utf-8'))
+    downstream = json.loads((tmp_path / 'river_downstream.geojson').read_text(encoding='utf-8'))
+    assert reach['geometry']['coordinates'][-1] == downstream['geometry']['coordinates'][0]
+    assert reach['properties']['verified_downstream_m'] == downstream['properties']['length_m']
+    assert reach['properties']['osm_node_ids'][0] == 7903804464
+    assert reach['properties']['osm_node_ids'][-1] == 335793095

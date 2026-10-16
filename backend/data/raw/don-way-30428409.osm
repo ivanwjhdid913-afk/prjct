@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (1317 spike-07.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+ <node id="335793027" visible="true" version="7" changeset="91091413" timestamp="2020-09-18T07:08:01Z" user="IsleofSkye9" uid="10529618" lat="53.0053650" lon="39.1435683"/>
+ <node id="335793028" visible="true" version="5" changeset="5639056" timestamp="2010-08-30T18:43:37Z" user="Wiseman" uid="215339" lat="53.0092894" lon="39.1388499"/>
+ <node id="335793029" visible="true" version="5" changeset="5639056" timestamp="2010-08-30T18:45:29Z" user="Wiseman" uid="215339" lat="53.0109291" lon="39.1376053"/>
+ <node id="335793031" visible="true" version="5" changeset="5639056" timestamp="2010-08-30T18:45:29Z" user="Wiseman" uid="215339" lat="53.0142985" lon="39.1366183"/>
+ <node id="335793033" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0162814" lon="39.1373515"/>
+ <node id="335793034" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0179496" lon="39.1392675"/>
+ <node id="335793037" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0188115" lon="39.1419006"/>
+ <node id="335793040" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0181561" lon="39.1456619"/>
+ <node id="335793043" visible="true" version="6" changeset="8977506" timestamp="2011-08-10T15:21:59Z" user="DanX" uid="321862" lat="53.0161884" lon="39.1505558"/>
+ <node id="335793045" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0150938" lon="39.1523719"/>
+ <node id="335793048" visible="true" version="6" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0152388" lon="39.1545454"/>
+ <node id="335793050" visible="true" version="6" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0160650" lon="39.1561761"/>
+ <node id="335793052" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0172009" lon="39.1582361"/>
+ <node id="335793055" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0186208" lon="39.1588369"/>
+ <node id="335793057" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0222558" lon="39.1581702"/>
+ <node id="335793059" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0296686" lon="39.1575923"/>
+ <node id="335793061" visible="true" version="5" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0315554" lon="39.1586262"/>
+ <node id="335793064" visible="true" version="5" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0318038" lon="39.1591519"/>
+ <node id="335793066" visible="true" version="5" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0342232" lon="39.1669089"/>
+ <node id="335793068" visible="true" version="5" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0368103" lon="39.1724074"/>
+ <node id="335793071" visible="true" version="5" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0387037" lon="39.1728473"/>
+ <node id="335793073" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:58Z" user="Wiseman" uid="215339" lat="53.0417199" lon="39.1723552"/>
+ <node id="335793075" visible="true" version="5" changeset="9182016" timestamp="2011-09-01T07:13:54Z" user="dik_man" uid="241531" lat="53.0455483" lon="39.1731478"/>
+ <node id="335793077" visible="true" version="6" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0500720" lon="39.1673434"/>
+ <node id="335793080" visible="true" version="6" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0514135" lon="39.1647094"/>
+ <node id="335793082" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:58Z" user="Wiseman" uid="215339" lat="53.0528134" lon="39.1642871"/>
+ <node id="335793085" visible="true" version="5" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0541994" lon="39.1642374"/>
+ <node id="335793088" visible="true" version="5" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0558373" lon="39.1682875"/>
+ <node id="335793090" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:57Z" user="Wiseman" uid="215339" lat="53.0566052" lon="39.1720977"/>
+ <node id="335793092" visible="true" version="5" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0576848" lon="39.1754973"/>
+ <node id="335793095" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:57Z" user="Wiseman" uid="215339" lat="53.0584623" lon="39.1799942"/>
+ <node id="335793097" visible="true" version="5" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0598416" lon="39.1854966"/>
+ <node id="335793099" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:57Z" user="Wiseman" uid="215339" lat="53.0609124" lon="39.1878048"/>
+ <node id="335793102" visible="true" version="5" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0623787" lon="39.1872400"/>
+ <node id="335793104" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0629759" lon="39.1862065"/>
+ <node id="335793107" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0671045" lon="39.1785443"/>
+ <node id="335793109" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0702761" lon="39.1746497"/>
+ <node id="335793111" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0738601" lon="39.1738826"/>
+ <node id="335793113" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0807742" lon="39.1718280"/>
+ <node id="335793116" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0904772" lon="39.1709161"/>
+ <node id="335793118" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0934184" lon="39.1752452"/>
+ <node id="335793121" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0947199" lon="39.1780937"/>
+ <node id="335793123" visible="true" version="4" changeset="4550721" timestamp="2010-04-28T16:17:56Z" user="Wiseman" uid="215339" lat="53.0961796" lon="39.1804233"/>
+ <node id="335793126" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0979668" lon="39.1811621"/>
+ <node id="335793129" visible="true" version="5" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0997577" lon="39.1807115"/>
+ <node id="335793131" visible="true" version="6" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.1010332" lon="39.1800463"/>
+ <node id="335793133" visible="true" version="6" changeset="90753852" timestamp="2020-09-11T11:02:12Z" user="CalleLaRonda" uid="10811018" lat="53.1045051" lon="39.1772407"/>
+ <node id="335793136" visible="true" version="7" changeset="90753852" timestamp="2020-09-11T11:02:12Z" user="CalleLaRonda" uid="10811018" lat="53.1100362" lon="39.1705472"/>
+ <node id="335793138" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1158400" lon="39.1652727"/>
+ <node id="335793140" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1171472" lon="39.1653264"/>
+ <node id="335793143" visible="true" version="5" changeset="4550721" timestamp="2010-04-28T16:17:55Z" user="Wiseman" uid="215339" lat="53.1183809" lon="39.1667304"/>
+ <node id="335793145" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1227296" lon="39.1719890"/>
+ <node id="335793148" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1241299" lon="39.1720802"/>
+ <node id="335793150" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1297308" lon="39.1736358"/>
+ <node id="335793152" visible="true" version="6" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1309829" lon="39.1734803"/>
+ <node id="663167972" visible="true" version="3" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1135990" lon="39.1667211"/>
+ <node id="663167982" visible="true" version="3" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1209461" lon="39.1701329"/>
+ <node id="663167983" visible="true" version="2" changeset="4550721" timestamp="2010-04-28T16:17:55Z" user="Wiseman" uid="215339" lat="53.1191216" lon="39.1677669"/>
+ <node id="663168016" visible="true" version="3" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1249154" lon="39.1722357"/>
+ <node id="663168017" visible="true" version="3" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1262223" lon="39.1732818"/>
+ <node id="710670923" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0889856" lon="39.1702938"/>
+ <node id="710670924" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0861407" lon="39.1703635"/>
+ <node id="710670925" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0830668" lon="39.1710609"/>
+ <node id="710670926" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0798252" lon="39.1724879"/>
+ <node id="710670927" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:57Z" user="Wiseman" uid="215339" lat="53.0770544" lon="39.1729560"/>
+ <node id="710670928" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0751782" lon="39.1737002"/>
+ <node id="710670930" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:57Z" user="Wiseman" uid="215339" lat="53.0721815" lon="39.1736856"/>
+ <node id="710670931" visible="true" version="2" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0657700" lon="39.1803735"/>
+ <node id="710670932" visible="true" version="2" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0614310" lon="39.1878945"/>
+ <node id="710670934" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:58Z" user="Wiseman" uid="215339" lat="53.0550576" lon="39.1654029"/>
+ <node id="710670935" visible="true" version="2" changeset="9170938" timestamp="2011-08-30T20:10:05Z" user="dik_man" uid="241531" lat="53.0522013" lon="39.1641124"/>
+ <node id="710670936" visible="true" version="3" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0488402" lon="39.1688293"/>
+ <node id="710670937" visible="true" version="3" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0467086" lon="39.1719568"/>
+ <node id="710670938" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:58Z" user="Wiseman" uid="215339" lat="53.0437066" lon="39.1729131"/>
+ <node id="710670940" visible="true" version="2" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0400390" lon="39.1724288"/>
+ <node id="710670941" visible="true" version="2" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0379102" lon="39.1730887"/>
+ <node id="710670942" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:58Z" user="Wiseman" uid="215339" lat="53.0372559" lon="39.1729990"/>
+ <node id="710670943" visible="true" version="2" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0331393" lon="39.1633737"/>
+ <node id="710670944" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0306236" lon="39.1578928"/>
+ <node id="710670946" visible="true" version="2" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0181072" lon="39.1587925"/>
+ <node id="710670947" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0149032" lon="39.1532579"/>
+ <node id="710670948" visible="true" version="1" changeset="4550721" timestamp="2010-04-28T16:17:59Z" user="Wiseman" uid="215339" lat="53.0186208" lon="39.1438165"/>
+ <node id="889210607" visible="true" version="1" changeset="5639056" timestamp="2010-08-30T18:43:37Z" user="Wiseman" uid="215339" lat="53.0076627" lon="39.1409527"/>
+ <node id="889211603" visible="true" version="1" changeset="5639056" timestamp="2010-08-30T18:45:29Z" user="Wiseman" uid="215339" lat="53.0125687" lon="39.1368758"/>
+ <node id="1328128662" visible="true" version="1" changeset="8461576" timestamp="2011-06-17T05:08:50Z" user="Scaurr0ck" uid="351275" lat="53.0073353" lon="39.1421333"/>
+ <node id="1328128663" visible="true" version="1" changeset="8461576" timestamp="2011-06-17T05:08:51Z" user="Scaurr0ck" uid="351275" lat="53.0067320" lon="39.1427540"/>
+ <node id="1418032921" visible="true" version="1" changeset="9167351" timestamp="2011-08-30T13:22:16Z" user="DanX" uid="321862" lat="53.0507259" lon="39.1663409"/>
+ <node id="1418587240" visible="true" version="1" changeset="9170938" timestamp="2011-08-30T20:10:04Z" user="dik_man" uid="241531" lat="53.0517305" lon="39.1643366"/>
+ <node id="1496359076" visible="true" version="1" changeset="9781618" timestamp="2011-11-09T14:16:55Z" user="dik_man" uid="241531" lat="53.1073689" lon="39.1734712"/>
+ <node id="1496359384" visible="true" version="1" changeset="9781618" timestamp="2011-11-09T14:17:03Z" user="dik_man" uid="241531" lat="53.1129475" lon="39.1673858"/>
+ <node id="2081920308" visible="true" version="1" changeset="14399053" timestamp="2012-12-25T09:19:24Z" user="Виктория48" uid="1067857" lat="53.0451985" lon="39.1732364"/>
+ <node id="2081920364" visible="true" version="2" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0448478" lon="39.1732174"/>
+ <node id="7447568834" visible="true" version="1" changeset="84125907" timestamp="2020-04-26T01:10:49Z" user="k-dmitriy" uid="2995841" lat="53.0312167" lon="39.1582721"/>
+ <node id="7896528153" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1166578" lon="39.1651708"/>
+ <node id="7896528154" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1169025" lon="39.1652083"/>
+ <node id="7896528155" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1173596" lon="39.1654819"/>
+ <node id="7896528156" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1221952" lon="39.1715759"/>
+ <node id="7896528157" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1224817" lon="39.1718388"/>
+ <node id="7896528158" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1229067" lon="39.1720265"/>
+ <node id="7896528159" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1245227" lon="39.1721445"/>
+ <node id="7896528160" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1252952" lon="39.1724986"/>
+ <node id="7896528161" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1256493" lon="39.1728687"/>
+ <node id="7896528162" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1259905" lon="39.1731852"/>
+ <node id="7896528163" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1281794" lon="39.1733515"/>
+ <node id="7896528164" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1286043" lon="39.1733837"/>
+ <node id="7896528165" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1306143" lon="39.1736734"/>
+ <node id="7896528166" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1307688" lon="39.1736305"/>
+ <node id="7896528167" visible="true" version="1" changeset="90753762" timestamp="2020-09-11T11:00:39Z" user="CalleLaRonda" uid="10811018" lat="53.1308831" lon="39.1735688"/>
+ <node id="7896593059" visible="true" version="1" changeset="90753852" timestamp="2020-09-11T11:02:12Z" user="CalleLaRonda" uid="10811018" lat="53.1039125" lon="39.1777933"/>
+ <node id="7896593060" visible="true" version="1" changeset="90753852" timestamp="2020-09-11T11:02:12Z" user="CalleLaRonda" uid="10811018" lat="53.1055163" lon="39.1760874"/>
+ <node id="7903804453" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0651253" lon="39.1816717"/>
+ <node id="7903804454" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0655604" lon="39.1807383"/>
+ <node id="7903804455" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0689321" lon="39.1760713"/>
+ <node id="7903804456" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0696380" lon="39.1752291"/>
+ <node id="7903804457" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0713559" lon="39.1739041"/>
+ <node id="7903804458" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0718845" lon="39.1737163"/>
+ <node id="7903804459" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0742759" lon="39.1739094"/>
+ <node id="7903804460" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0747915" lon="39.1738397"/>
+ <node id="7903804461" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0758357" lon="39.1734105"/>
+ <node id="7903804462" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0764544" lon="39.1731530"/>
+ <node id="7903804463" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0800540" lon="39.1724181"/>
+ <node id="7903804464" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0802087" lon="39.1723162"/>
+ <node id="7903804465" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0804069" lon="39.1721204"/>
+ <node id="7903804466" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0805954" lon="39.1719300"/>
+ <node id="7903804467" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0813494" lon="39.1716376"/>
+ <node id="7903804468" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0824176" lon="39.1713828"/>
+ <node id="7903804469" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0826077" lon="39.1713077"/>
+ <node id="7903804470" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0845329" lon="39.1705620"/>
+ <node id="7903804471" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0848390" lon="39.1705030"/>
+ <node id="7903804472" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0894817" lon="39.1703421"/>
+ <node id="7903804473" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0899005" lon="39.1705084"/>
+ <node id="7903804474" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0915661" lon="39.1723806"/>
+ <node id="7903804475" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0928386" lon="39.1742581"/>
+ <node id="7903804476" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0950935" lon="39.1788393"/>
+ <node id="7903804477" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0955477" lon="39.1795528"/>
+ <node id="7903804478" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0966365" lon="39.1807812"/>
+ <node id="7903804479" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0973484" lon="39.1810495"/>
+ <node id="7903804480" visible="true" version="1" changeset="90838484" timestamp="2020-09-14T04:13:07Z" user="CalleLaRonda" uid="10811018" lat="53.0986014" lon="39.1810870"/>
+ <node id="7903859452" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0413679" lon="39.1723162"/>
+ <node id="7903859453" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0459862" lon="39.1728580"/>
+ <node id="7903859454" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0463184" lon="39.1724878"/>
+ <node id="7903859455" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0478115" lon="39.1703260"/>
+ <node id="7903859456" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0508169" lon="39.1661578"/>
+ <node id="7903859457" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0508846" lon="39.1659111"/>
+ <node id="7903859458" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0510233" lon="39.1654068"/>
+ <node id="7903859459" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0511555" lon="39.1651279"/>
+ <node id="7903859460" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0520068" lon="39.1641462"/>
+ <node id="7903859461" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0523260" lon="39.1641086"/>
+ <node id="7903859462" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0525098" lon="39.1642106"/>
+ <node id="7903859463" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0526807" lon="39.1642857"/>
+ <node id="7903859464" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0531837" lon="39.1641462"/>
+ <node id="7903859465" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0536126" lon="39.1640925"/>
+ <node id="7903859466" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0539930" lon="39.1641515"/>
+ <node id="7903859467" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0544219" lon="39.1644305"/>
+ <node id="7903859468" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0546605" lon="39.1647577"/>
+ <node id="7903859469" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0553376" lon="39.1660720"/>
+ <node id="7903859470" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0555955" lon="39.1670161"/>
+ <node id="7903859471" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0569980" lon="39.1734052"/>
+ <node id="7903859472" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0567852" lon="39.1727775"/>
+ <node id="7903859473" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0578105" lon="39.1760927"/>
+ <node id="7903859474" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0578782" lon="39.1767311"/>
+ <node id="7903859475" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0580587" lon="39.1781312"/>
+ <node id="7903859476" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0602091" lon="39.1865587"/>
+ <node id="7903859477" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0606250" lon="39.1873956"/>
+ <node id="7903859478" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0611602" lon="39.1878730"/>
+ <node id="7903859479" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0617243" lon="39.1877979"/>
+ <node id="7903859480" visible="true" version="1" changeset="90839318" timestamp="2020-09-14T04:34:26Z" user="CalleLaRonda" uid="10811018" lat="53.0621499" lon="39.1874653"/>
+ <node id="7903901229" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0160838" lon="39.1507727"/>
+ <node id="7903901230" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0149349" lon="39.1528380"/>
+ <node id="7903901231" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0150221" lon="39.1539645"/>
+ <node id="7903901232" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0174779" lon="39.1584921"/>
+ <node id="7903901233" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0177781" lon="39.1586584"/>
+ <node id="7903901234" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0276066" lon="39.1576391"/>
+ <node id="7903901235" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0340555" lon="39.1663885"/>
+ <node id="7903901236" visible="true" version="2" changeset="90842832" timestamp="2020-09-14T05:47:28Z" user="NihombashiRiver" uid="9847941" lat="53.0371457" lon="39.1729210"/>
+ <node id="7903901237" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0375651" lon="39.1730779"/>
+ <node id="7903901238" visible="true" version="1" changeset="90840895" timestamp="2020-09-14T05:07:43Z" user="CalleLaRonda" uid="10811018" lat="53.0383037" lon="39.1730297"/>
+ <node id="12898716969" visible="true" version="1" changeset="167381243" timestamp="2025-06-09T07:07:22Z" user="Негуляев" uid="9122668" lat="53.0149614" lon="39.1527604"/>
+ <way id="30428409" visible="true" version="32" changeset="174598683" timestamp="2025-11-13T10:48:47Z" user="Руслан Т" uid="12947635">
+  <nd ref="335793152"/>
+  <nd ref="7896528167"/>
+  <nd ref="7896528166"/>
+  <nd ref="7896528165"/>
+  <nd ref="335793150"/>
+  <nd ref="7896528164"/>
+  <nd ref="7896528163"/>
+  <nd ref="663168017"/>
+  <nd ref="7896528162"/>
+  <nd ref="7896528161"/>
+  <nd ref="7896528160"/>
+  <nd ref="663168016"/>
+  <nd ref="7896528159"/>
+  <nd ref="335793148"/>
+  <nd ref="7896528158"/>
+  <nd ref="335793145"/>
+  <nd ref="7896528157"/>
+  <nd ref="7896528156"/>
+  <nd ref="663167982"/>
+  <nd ref="663167983"/>
+  <nd ref="335793143"/>
+  <nd ref="7896528155"/>
+  <nd ref="335793140"/>
+  <nd ref="7896528154"/>
+  <nd ref="7896528153"/>
+  <nd ref="335793138"/>
+  <nd ref="663167972"/>
+  <nd ref="1496359384"/>
+  <nd ref="335793136"/>
+  <nd ref="1496359076"/>
+  <nd ref="7896593060"/>
+  <nd ref="335793133"/>
+  <nd ref="7896593059"/>
+  <nd ref="335793131"/>
+  <nd ref="335793129"/>
+  <nd ref="7903804480"/>
+  <nd ref="335793126"/>
+  <nd ref="7903804479"/>
+  <nd ref="7903804478"/>
+  <nd ref="335793123"/>
+  <nd ref="7903804477"/>
+  <nd ref="7903804476"/>
+  <nd ref="335793121"/>
+  <nd ref="335793118"/>
+  <nd ref="7903804475"/>
+  <nd ref="7903804474"/>
+  <nd ref="335793116"/>
+  <nd ref="7903804473"/>
+  <nd ref="7903804472"/>
+  <nd ref="710670923"/>
+  <nd ref="710670924"/>
+  <nd ref="7903804471"/>
+  <nd ref="7903804470"/>
+  <nd ref="710670925"/>
+  <nd ref="7903804469"/>
+  <nd ref="7903804468"/>
+  <nd ref="7903804467"/>
+  <nd ref="335793113"/>
+  <nd ref="7903804466"/>
+  <nd ref="7903804465"/>
+  <nd ref="7903804464"/>
+  <nd ref="7903804463"/>
+  <nd ref="710670926"/>
+  <nd ref="710670927"/>
+  <nd ref="7903804462"/>
+  <nd ref="7903804461"/>
+  <nd ref="710670928"/>
+  <nd ref="7903804460"/>
+  <nd ref="7903804459"/>
+  <nd ref="335793111"/>
+  <nd ref="710670930"/>
+  <nd ref="7903804458"/>
+  <nd ref="7903804457"/>
+  <nd ref="335793109"/>
+  <nd ref="7903804456"/>
+  <nd ref="7903804455"/>
+  <nd ref="335793107"/>
+  <nd ref="710670931"/>
+  <nd ref="7903804454"/>
+  <nd ref="7903804453"/>
+  <nd ref="335793104"/>
+  <nd ref="335793102"/>
+  <nd ref="7903859480"/>
+  <nd ref="7903859479"/>
+  <nd ref="710670932"/>
+  <nd ref="7903859478"/>
+  <nd ref="335793099"/>
+  <nd ref="7903859477"/>
+  <nd ref="7903859476"/>
+  <nd ref="335793097"/>
+  <nd ref="335793095"/>
+  <nd ref="7903859475"/>
+  <nd ref="7903859474"/>
+  <nd ref="7903859473"/>
+  <nd ref="335793092"/>
+  <nd ref="7903859471"/>
+  <nd ref="7903859472"/>
+  <nd ref="335793090"/>
+  <nd ref="335793088"/>
+  <nd ref="7903859470"/>
+  <nd ref="7903859469"/>
+  <nd ref="710670934"/>
+  <nd ref="7903859468"/>
+  <nd ref="7903859467"/>
+  <nd ref="335793085"/>
+  <nd ref="7903859466"/>
+  <nd ref="7903859465"/>
+  <nd ref="7903859464"/>
+  <nd ref="335793082"/>
+  <nd ref="7903859463"/>
+  <nd ref="7903859462"/>
+  <nd ref="7903859461"/>
+  <nd ref="710670935"/>
+  <nd ref="7903859460"/>
+  <nd ref="1418587240"/>
+  <nd ref="335793080"/>
+  <nd ref="7903859459"/>
+  <nd ref="7903859458"/>
+  <nd ref="7903859457"/>
+  <nd ref="7903859456"/>
+  <nd ref="1418032921"/>
+  <nd ref="335793077"/>
+  <nd ref="710670936"/>
+  <nd ref="7903859455"/>
+  <nd ref="710670937"/>
+  <nd ref="7903859454"/>
+  <nd ref="7903859453"/>
+  <nd ref="335793075"/>
+  <nd ref="2081920308"/>
+  <nd ref="2081920364"/>
+  <nd ref="710670938"/>
+  <nd ref="335793073"/>
+  <nd ref="7903859452"/>
+  <nd ref="710670940"/>
+  <nd ref="335793071"/>
+  <nd ref="7903901238"/>
+  <nd ref="710670941"/>
+  <nd ref="7903901237"/>
+  <nd ref="710670942"/>
+  <nd ref="7903901236"/>
+  <nd ref="335793068"/>
+  <nd ref="335793066"/>
+  <nd ref="7903901235"/>
+  <nd ref="710670943"/>
+  <nd ref="335793064"/>
+  <nd ref="335793061"/>
+  <nd ref="7447568834"/>
+  <nd ref="710670944"/>
+  <nd ref="335793059"/>
+  <nd ref="7903901234"/>
+  <nd ref="335793057"/>
+  <nd ref="335793055"/>
+  <nd ref="710670946"/>
+  <nd ref="7903901233"/>
+  <nd ref="7903901232"/>
+  <nd ref="335793052"/>
+  <nd ref="335793050"/>
+  <nd ref="335793048"/>
+  <nd ref="7903901231"/>
+  <nd ref="710670947"/>
+  <nd ref="7903901230"/>
+  <nd ref="12898716969"/>
+  <nd ref="335793045"/>
+  <nd ref="7903901229"/>
+  <nd ref="335793043"/>
+  <nd ref="335793040"/>
+  <nd ref="710670948"/>
+  <nd ref="335793037"/>
+  <nd ref="335793034"/>
+  <nd ref="335793033"/>
+  <nd ref="335793031"/>
+  <nd ref="889211603"/>
+  <nd ref="335793029"/>
+  <nd ref="335793028"/>
+  <nd ref="889210607"/>
+  <nd ref="1328128662"/>
+  <nd ref="1328128663"/>
+  <nd ref="335793027"/>
+  <tag k="boat" v="no"/>
+  <tag k="int_name" v="Don"/>
+  <tag k="name" v="Дон"/>
+  <tag k="name:pl" v="Don"/>
+  <tag k="name:ru" v="Дон"/>
+  <tag k="source" v="yahoo"/>
+  <tag k="waterway" v="river"/>
+ </way>
+</osm>
