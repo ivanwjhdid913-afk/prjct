@@ -128,6 +128,10 @@ def calculate(parameters: SimulationRequest) -> SimulationResult:
                                 geometry={'type': 'LineString', 'coordinates': line.slice(start, line.length_m)},
                                 segment_geometries=line.segments(start, line.length_m))
     except ValueError as error:
+        if parameters.reach_id and str(error).startswith('Слишком большой размер вычислений'):
+            raise HTTPException(422, 'Слишком большой размер вычислений: длина определяется руслом. '
+                                'Сократите длительность или задайте другую комбинацию параметров потока; '
+                                'значения не изменены автоматически. Сетка:' + str(error).split('Сетка:')[-1]) from None
         raise HTTPException(422, str(error)) from None
     finally:
         calculation_lock.release()

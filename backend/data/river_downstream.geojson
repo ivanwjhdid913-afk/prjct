@@ -21,7 +21,7 @@
     "verification_source_url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
     "id": "don-olkhovets-downstream-check",
     "name": "Проверенное продолжение ниже расчётного участка",
-    "length_m": 1370.2497612700113,
+    "length_m": 1370.249761,
     "osm_node_ids": [
       335793095,
       7903859475,

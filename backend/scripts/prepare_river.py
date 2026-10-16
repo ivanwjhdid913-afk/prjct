@@ -52,7 +52,9 @@ def prepare() -> dict:
     main, continuation = coordinates(main_ids), coordinates(tail_ids)
     assert len(set(main_ids + tail_ids[1:])) == len(main_ids + tail_ids) - 1
     assert all(a != b for a, b in zip(main + continuation[1:], main[1:] + continuation[1:]))
-    reach_length, buffer_length = line_length(main), line_length(continuation)
+    # Platform libm may differ below a nanometre. Store metadata to micrometres;
+    # runtime chainage is still recomputed at full precision from source vertices.
+    reach_length, buffer_length = round(line_length(main), 6), round(line_length(continuation), 6)
     assert 3000 < reach_length < 3200 and 1300 < buffer_length < 1400
 
     common = {

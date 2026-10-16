@@ -62,6 +62,7 @@ async def test_expensive_short_reach_is_rejected_without_changing_parameters(cli
     response = await client.post('/api/v1/simulations', json=params)
     assert response.status_code == 422
     assert 'размер вычислений' in response.json()['detail']
+    assert 'длина определяется руслом' in response.json()['detail']
 
 
 @pytest.mark.anyio
