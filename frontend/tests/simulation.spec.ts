@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openParameters, openProfile } from './model-helpers';
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
@@ -6,6 +7,9 @@ test.beforeEach(async ({ page }) => {
 
 test('runs the actual conservative model and uses its profile on the map', async ({ page }) => {
   await page.goto('/#model');
+  await openParameters(page);
+  await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+  await page.getByLabel('Длительность, ч').fill('24');
   await expect(page.getByRole('heading', { name: 'Моделирование', exact: true })).toBeVisible();
   const responsePromise = page.waitForResponse(r => r.url().endsWith('/api/v1/simulations') && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
@@ -13,7 +17,7 @@ test('runs the actual conservative model and uses its profile on the map', async
   expect(response.ok()).toBeTruthy();
   const data = await response.json();
   await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
-  await expect(page.getByText('Условный расчётный участок — не реальное русло', { exact: true })).toBeVisible();
+  await expect(page.locator('.map-topline')).toContainText('Синтетическая геометрия');
   await expect(page.locator('.simulation-segment')).toHaveCount(data.distances_m.length);
   await expect(page.getByTestId('selected-concentration')).toHaveText('10,0000 мг/л');
   const scale = await page.getByTestId('concentration-scale').innerText();
@@ -26,6 +30,7 @@ test('runs the actual conservative model and uses its profile on the map', async
   await expect(page.getByTestId('selected-concentration')).toHaveText(`${expected.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`);
   await expect(page.locator('.simulation-segment').nth(20)).toHaveAttribute('data-concentration', String(expected));
   await expect(page.getByTestId('concentration-scale')).toHaveText(scale, { useInnerText: true });
+  await openProfile(page);
   await page.getByText('Таблица профиля', { exact: true }).click();
   await expect(page.getByRole('table', { name: 'Рассчитанный профиль' }).locator('tbody tr')).toHaveCount(data.distances_m.length);
   const mapValues = await page.locator('.simulation-segment').evaluateAll(elements => elements.map(element => Number(element.getAttribute('data-concentration'))));
@@ -58,6 +63,9 @@ test('shows a failed calculation and allows retry', async ({ page }) => {
   let attempt = 0;
   await page.route('**/api/v1/simulations', route => ++attempt === 1 ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } }) : route.continue());
   await page.goto('/#model');
+  await openParameters(page);
+  await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+  await page.getByLabel('Длительность, ч').fill('24');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Не удалось выполнить расчёт');
   await page.getByRole('button', { name: 'Повторить расчёт', exact: true }).click();
@@ -73,6 +81,9 @@ test('marks an in-flight result stale after inputs change', async ({ page }) => 
     await route.fulfill({ response });
   });
   await page.goto('/#model');
+  await openParameters(page);
+  await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+  await page.getByLabel('Длительность, ч').fill('24');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect(page.getByText('Выполняется расчёт…', { exact: true })).toBeVisible();
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('200');
@@ -108,6 +119,9 @@ for (const cancel of [false, true]) {
       await route.fulfill({ response });
     });
     await page.goto('/#model');
+    await openParameters(page);
+    await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+    await page.getByLabel('Длительность, ч').fill('24');
     await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
     await expect(page.getByText('Выполняется расчёт…', { exact: true })).toBeVisible();
     await firstReady;
@@ -123,6 +137,7 @@ for (const cancel of [false, true]) {
     await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
     release();
     await expect(page.locator('html')).toHaveAttribute('data-completed-simulations', '2');
+    await openProfile(page);
     await page.getByText('Параметры показанного расчёта', { exact: true }).click();
     await expect(page.locator('.simulation-used-inputs dl div').filter({ hasText: 'Концентрация стоков ce, мг/л' }).locator('dd')).toHaveText('200,000');
     await expect(page.getByText('Параметры изменены. Результат относится к предыдущим условиям.', { exact: true })).toHaveCount(0);
@@ -136,6 +151,9 @@ test('shows field errors returned by API and rejects malformed results', async (
     ? route.fulfill({ status: 422, json: { detail: [{ loc: ['body', 'velocity_m_s'], msg: 'Invalid value' }] } })
     : route.fulfill({ json: { inputs: {}, concentrations_mg_l: [] } }));
   await page.goto('/#model');
+  await openParameters(page);
+  await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+  await page.getByLabel('Длительность, ч').fill('24');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Проверьте параметры расчёта.');
   await expect(page.getByLabel('Скорость течения u, м/с')).toHaveAttribute('aria-invalid', 'true');
@@ -147,6 +165,9 @@ test('shows field errors returned by API and rejects malformed results', async (
 
 test('zero-source calculation shows a uniform legend matching every segment', async ({ page }) => {
   await page.goto('/#model');
+  await openParameters(page);
+  await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+  await page.getByLabel('Длительность, ч').fill('24');
   await page.getByLabel('Расход стоков q, м³/с').fill('0');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
@@ -164,6 +185,9 @@ for (const width of [375, 768, 1024, 1440]) {
   test(`model fits ${width}px and exposes keyboard controls`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/#model');
+    await openParameters(page);
+    await page.getByLabel('Геометрия сценария').selectOption('synthetic');
+    await page.getByLabel('Длительность, ч').fill('24');
     await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();

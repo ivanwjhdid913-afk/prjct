@@ -104,7 +104,7 @@ export default function App() {
         event.preventDefault();
         document.getElementById('content')?.focus();
       }}>К списку объектов</a>
-      <header className="masthead">
+      <header className={`masthead${modelOpen ? ' model-masthead' : ''}`}>
         <div className="brand">
           <svg className="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <path d="M4 15c6-9 12 9 18 0s12 9 16 0M4 24c6-9 12 9 18 0s12 9 16 0" stroke="currentColor" strokeWidth="2.5" />
@@ -113,7 +113,7 @@ export default function App() {
         </div>
         <span className="edition">Учебный проект</span>
       </header>
-      <main id="content" tabIndex={-1}>
+      <main id="content" tabIndex={-1} className={modelOpen ? 'model-main' : undefined}>
         <nav className="section-nav" aria-label="Разделы приложения"><a href="#" aria-current={!modelOpen ? 'page' : undefined}>Каталог</a><a href="#model" aria-current={modelOpen ? 'page' : undefined}>Моделирование</a></nav>
         {modelOpen ? <Simulation /> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
         <section className="introduction" aria-labelledby="page-title">
@@ -202,7 +202,7 @@ export default function App() {
           </>}
         </section>
         </>}
-        <footer className="page-footer"><span>Наблюдения за водой</span><span>Реестр объектов · Локальная версия</span></footer>
+        {!modelOpen && <footer className="page-footer"><span>Наблюдения за водой</span><span>Реестр объектов · Локальная версия</span></footer>}
       </main>
     </>
   );
