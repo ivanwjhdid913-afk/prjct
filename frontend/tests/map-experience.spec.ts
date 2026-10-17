@@ -80,3 +80,20 @@ test('mobile profile moves keyboard focus into the panel and leaves timeline acc
   await page.keyboard.press('Enter');
   await expect(open).toBeFocused();
 });
+
+test('short mobile viewport keeps the river legible above its inspector', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/#model');
+  await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
+  await expect(page.locator('.simulation-segment')).toHaveCount(100);
+  const bounds = await page.locator('.simulation-segment').evaluateAll(elements => {
+    const boxes = elements.map(element => element.getBoundingClientRect());
+    return { top: Math.min(...boxes.map(box => box.top)), bottom: Math.max(...boxes.map(box => box.bottom)) };
+  });
+  const inspector = (await page.locator('.map-inspector').boundingBox())!;
+  expect(bounds.bottom - bounds.top).toBeGreaterThan(120);
+  expect(bounds.bottom).toBeLessThan(inspector.y);
+  await expect(page.getByLabel('Время от начала сценария')).toBeInViewport();
+  await expect(page.getByLabel('Расчётный сегмент')).toBeInViewport();
+  await page.screenshot({ path: 'test-results/model-short-mobile.png' });
+});

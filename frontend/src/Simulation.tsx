@@ -69,6 +69,8 @@ function color(value: number, scale: [number, number]) {
 }
 
 function mapPadding(): L.FitBoundsOptions {
+  if (window.matchMedia('(max-width: 760px) and (max-height: 740px)').matches)
+    return { paddingTopLeft: [45, 70], paddingBottomRight: [45, 160], animate: false };
   return window.matchMedia('(max-width: 760px)').matches
     ? { paddingTopLeft: [45, 90], paddingBottomRight: [45, 210], animate: false }
     : { paddingTopLeft: [65, 105], paddingBottomRight: [265, 65], animate: false };
