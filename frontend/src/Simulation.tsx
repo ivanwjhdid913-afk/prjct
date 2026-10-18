@@ -69,7 +69,11 @@ function color(value: number, scale: [number, number]) {
   return `rgb(${palette[index].map((channel, axis) => Math.round(channel + (palette[index + 1][axis] - channel) * (position - index))).join(', ')})`;
 }
 
-function mapPadding(): L.FitBoundsOptions {
+function mapPadding(comparisonLayout = false): L.FitBoundsOptions {
+  if (comparisonLayout && window.matchMedia('(max-width: 760px)').matches)
+    return window.matchMedia('(max-height: 740px)').matches
+      ? { paddingTopLeft: [45, 15], paddingBottomRight: [45, 180], animate: false }
+      : { paddingTopLeft: [45, 45], paddingBottomRight: [45, 205], animate: false };
   if (window.matchMedia('(max-width: 760px) and (max-height: 740px)').matches)
     return { paddingTopLeft: [45, 70], paddingBottomRight: [45, 160], animate: false };
   return window.matchMedia('(max-width: 760px)').matches
@@ -77,7 +81,7 @@ function mapPadding(): L.FitBoundsOptions {
     : { paddingTopLeft: [65, 105], paddingBottomRight: [265, 65], animate: false };
 }
 
-function CalculationMap({ result, values, scale, selected, onSelect, suspended }: { result: Result; scale: [number, number]; values: number[]; selected: number; onSelect: (index: number) => void; suspended: boolean }) {
+function CalculationMap({ result, values, scale, selected, onSelect, suspended, comparisonLayout }: { result: Result; scale: [number, number]; values: number[]; selected: number; onSelect: (index: number) => void; suspended: boolean; comparisonLayout: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const segments = useRef<L.Polyline[]>([]);
   const [tileError, setTileError] = useState(false);
@@ -90,7 +94,8 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended }
     map.attributionControl.setPrefix(false);
     L.control.zoom({ zoomInTitle: 'Увеличить масштаб', zoomOutTitle: 'Уменьшить масштаб' }).addTo(map);
     const points: L.LatLngTuple[] = result.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
-    map.fitBounds(points, mapPadding());
+    map.attributionControl.setPosition('bottomleft');
+    map.fitBounds(points, mapPadding(comparisonLayout));
     const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
     let timer = window.setTimeout(() => setTileError(true), 10_000);
     tiles.on('loading', () => { window.clearTimeout(timer); timer = window.setTimeout(() => setTileError(true), 10_000); });
@@ -108,7 +113,7 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended }
     }
     const resize = new ResizeObserver(() => map.invalidateSize()); resize.observe(host.current);
     return () => { window.clearTimeout(timer); resize.disconnect(); segments.current = []; map.remove(); };
-  }, [geometryKey, onSelect, revision]);
+  }, [geometryKey, onSelect, revision, comparisonLayout]);
   useEffect(() => {
     segments.current.forEach((segment, index) => {
       segment.setStyle({ color: color(values[index], scale), weight: selected === index ? 11 : 9 });
@@ -119,7 +124,7 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended }
       title.textContent = `${format(result.distances_m[index], 0)} м: ${format(values[index], 4)} мг/л`;
       element?.replaceChildren(title);
     });
-  }, [values, selected, result, scale, revision]);
+  }, [values, selected, result, scale, revision, comparisonLayout]);
   return <section className="map-panel" aria-label="Карта расчётного участка" inert={suspended}>
     <p className="simulation-map-label">{result.reach_id ? String(result.reach_metadata?.name ?? "Реальное русло · сценарный расчёт") : "Условный расчётный участок — не реальное русло"}</p>
     <div ref={host} className="point-map simulation-map" aria-label="Расчётные сегменты на карте. Выбор с клавиатуры доступен ниже." />
@@ -357,7 +362,7 @@ export default function Simulation() {
       <section className="model-canvas" aria-label="Рабочая область модели">
           {comparison && <div className="scenario-switch" role="group" aria-label="Показанный сценарий" inert={parametersOpen}><button aria-pressed={activeScenario === 'А'} onClick={() => setActiveScenario('А')}>Показать А</button><button aria-pressed={activeScenario === 'Б'} onClick={() => setActiveScenario('Б')}>Показать Б</button><span>На карте: {activeScenario} · общее время</span></div>}
         <div className="model-map-stage">
-          {result && values ? <CalculationMap result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={profileOpen || parametersOpen} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
+          {result && values ? <CalculationMap comparisonLayout={comparison} result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={profileOpen || parametersOpen} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
 
           <div className="map-topline"><div><span className="map-kicker">{result ? 'Рассчитанные концентрации' : 'Подготовленный участок'}</span>{result ? <h2 id="result-title">Результат расчёта{comparison ? ` · ${activeScenario}` : variant && !hasB && !incompatibleDraft ? ' · А (Б ещё не рассчитан)' : ''}</h2> : <h2>{mode === 'river' ? reach?.name ?? 'Загрузка участка…' : 'Условный участок'}</h2>}<p>{result?.reach_id ? String(result.reach_metadata?.name ?? 'Реальное русло') : result ? 'Синтетическая геометрия' : mode === 'river' ? 'Реальная геометрия · сценарный источник' : 'Геометрия и параметры — синтетические'}</p></div></div>
           {result && values ? <aside className="map-inspector" inert={profileOpen || parametersOpen} aria-label="Концентрация и выбранный сегмент">

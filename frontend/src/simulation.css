@@ -99,7 +99,7 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .model-map-stage .map-warning { position: absolute; bottom: 68px; left: 12px; z-index: 405; padding: 10px 12px; max-width: 255px; font-size: 11px; border: 1px solid #d8c8a9; border-radius: 4px; }
 .model-map-stage .map-warning p { margin: 5px 0; }
 .model-map-stage .map-warning button { font-size: 11px; min-height: 34px; padding: 6px 9px; }
-.profile-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 430; width: 410px; max-width: 100%; padding: 16px 20px; background: #fffffff9; overflow: auto; box-shadow: -8px 0 25px #173f2f1a; border-left: 1px solid #c8d7cc; overscroll-behavior: contain; }
+.profile-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 430; width: 410px; max-width: 100%; padding: 16px 20px; background: #fff; overflow: auto; box-shadow: -8px 0 25px #173f2f1a; border-left: 1px solid #c8d7cc; overscroll-behavior: contain; }
 .profile-drawer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profile-drawer-heading h2 { font-size: 17px; }
 .profile-drawer-heading button { font-size: 24px; padding: 0; min-width: 44px; border-color: transparent; }

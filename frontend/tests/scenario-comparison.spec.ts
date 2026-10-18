@@ -237,3 +237,18 @@ test('explains incompatible geometry returned by the server instead of silently 
   await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();
   await expect(page.getByText(/Сравнение отключено/)).toHaveCount(0);
 });
+
+for (const height of [667, 812]) test(`comparison keeps the complete river above the inspector on a 375x${height} phone`, async ({ page }) => {
+  await page.setViewportSize({ width: 375, height });
+  await demo(page);
+  await page.getByRole('button', { name: 'Параметры', exact: true }).click();
+  await variant(page); await runB(page);
+  const line = await page.locator('.simulation-segment').evaluateAll(elements => {
+    const boxes = elements.map(element => element.getBoundingClientRect());
+    return { top: Math.min(...boxes.map(b => b.top)), bottom: Math.max(...boxes.map(b => b.bottom)) };
+  });
+  const inspector = (await page.locator('.map-inspector').boundingBox())!;
+  expect(line.bottom).toBeLessThan(inspector.y);
+  expect(line.bottom - line.top).toBeGreaterThan(95);
+  await expect(page.getByLabel('Время от начала сценария')).toBeInViewport();
+});
