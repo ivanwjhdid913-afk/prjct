@@ -61,13 +61,17 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .map-kicker { text-transform: uppercase; font-size: 9px; letter-spacing: 1.1px; color: #61766b; font-weight: 650; }
 .map-topline h2 { font-size: 19px; margin-top: 4px; letter-spacing: -.5px; }
 .map-topline p { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
-.map-status-stack { position: absolute; z-index: 410; top: 114px; left: 62px; max-width: min(440px, calc(100% - 340px)); }
+.map-status-stack { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px; background: #f7f9f6; border-bottom: 1px solid #cdd9d1; }
+.map-status-stack:empty { display: none; }
+.map-status-stack > * { flex: 1 1 260px; margin: 0; }
 .simulation-stale, .calculation-status { background: #fff5dcef; border: 1px solid #d7b778; border-left: 3px solid #9a6a1f; color: #624816; padding: 10px 12px; line-height: 1.5; font-size: 12px; margin: 0 0 8px; border-radius: 3px; }
 .calculation-status { border-color: #9ab8ab; background: #f2faf3f2; color: var(--ink); }
 .calculation-status span { display: block; }
 .simulation-error { background: #fff7f2f5; border: 1px solid #dcb3a4; border-left: 3px solid var(--error); padding: 12px; font-size: 12px; line-height: 1.5; border-radius: 4px; }
 .simulation-error p { margin: 6px 0 10px; }
 .simulation-error button { font-size: 12px; }
+.map-status-stack .simulation-error { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.map-status-stack .simulation-error p { flex: 1 1 180px; margin: 0; }
 .map-inspector { position: absolute; z-index: 402; top: 16px; right: 16px; width: 228px; background: #fffffff5; border: 1px solid #c9d5ca; border-radius: 6px; box-shadow: 0 4px 20px #163a3012; padding: 14px; }
 .simulation-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; font-variant-numeric: tabular-nums; }
 .simulation-legend strong, .simulation-gradient, .simulation-legend small { grid-column: 1 / -1; }
@@ -138,7 +142,6 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
   .map-inspector { width: 205px; right: 12px; }
   .map-topline { max-width: calc(100% - 238px); left: 12px; }
   .map-topline h2 { font-size: 15px; }
-  .map-status-stack { max-width: calc(100% - 285px); }
 }
 @media (max-width: 760px) {
   .model-masthead { padding: 5px 12px; height: 44px; min-height: 44px; }
@@ -186,7 +189,8 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
   .map-start-hint { bottom: 30px; left: 10px; right: 10px; width: auto; padding: 10px 12px; }
   .map-start-hint strong { font-size: 11px; }
   .map-start-hint p { font-size: 10px; margin-top: 4px; }
-  .map-status-stack { top: 72px; right: 10px; left: 62px; max-width: none; }
+  .map-status-stack { padding: 4px 8px; gap: 4px; }
+  .map-status-stack > * { flex-basis: 100%; }
   .simulation-stale, .calculation-status, .simulation-error { font-size: 10px; padding: 7px 9px; }
   .model-map-stage .map-caption { display: none; }
   .model-map-stage .leaflet-control-scale { margin-bottom: 6px; }

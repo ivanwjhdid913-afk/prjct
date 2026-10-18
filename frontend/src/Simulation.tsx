@@ -138,7 +138,7 @@ function sourcePoint(reach: Reach, distance: number): [number, number] {
   return [a[1] + (b[1] - a[1]) * share, a[0] + (b[0] - a[0]) * share];
 }
 
-function ReachPreview({ reach, distance }: { reach: Reach; distance: number }) {
+function ReachPreview({ reach, distance, suspended }: { reach: Reach; distance: number; suspended: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const marker = useRef<L.Marker | null>(null);
   const [tileError, setTileError] = useState(false);
@@ -160,7 +160,7 @@ function ReachPreview({ reach, distance }: { reach: Reach; distance: number }) {
     return () => { resize.disconnect(); marker.current = null; map.remove(); };
   }, [reach]);
   useEffect(() => { marker.current?.setLatLng(sourcePoint(reach, distance)); }, [reach, distance]);
-  return <div className="reach-preview"><div ref={host} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
+  return <div className="reach-preview" inert={suspended}><div ref={host} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
 }
 
 export default function Simulation() {
@@ -168,6 +168,18 @@ export default function Simulation() {
   const [parametersOpen, setParametersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileWasOpen = useRef(false);
+  const parametersWereOpen = useRef(false);
+  useEffect(() => {
+    if (parametersOpen) document.querySelector<HTMLButtonElement>('.close-parameters')?.focus({ preventScroll: true });
+    else if (parametersWereOpen.current) document.querySelector<HTMLButtonElement>('.mobile-parameters-toggle')?.focus({ preventScroll: true });
+    parametersWereOpen.current = parametersOpen;
+  }, [parametersOpen]);
+  useEffect(() => {
+    const mobile = window.matchMedia('(max-width: 760px)');
+    const closeOnDesktop = () => { if (!mobile.matches) setParametersOpen(false); };
+    mobile.addEventListener('change', closeOnDesktop);
+    return () => mobile.removeEventListener('change', closeOnDesktop);
+  }, []);
   useEffect(() => {
     if (profileOpen) document.querySelector<HTMLButtonElement>('.profile-close')?.focus({ preventScroll: true });
     else if (profileWasOpen.current) document.querySelector<HTMLButtonElement>('.profile-toggle')?.focus({ preventScroll: true });
@@ -271,9 +283,15 @@ export default function Simulation() {
   const profile = result && values ? values.map((value, index) => `${85 + 645 * result.distances_m[index] / result.inputs.length_m},${span === 0 ? 110 : 190 - 160 * (value - result.scale_mg_l[0]) / span}`).join(' ') : '';
   return <div className="simulation">
     <header className="model-heading"><div><h1 ref={title} tabIndex={-1}>Моделирование</h1><span className="scenario-badge">Сценарная симуляция · хлориды</span></div><div className="workspace-tools"><button className="mobile-parameters-toggle" aria-expanded={parametersOpen} aria-controls="model-parameters" onClick={() => setParametersOpen(value => !value)}>Параметры</button><button className="demo-button" disabled={!reaches.length || status === 'loading'} onClick={() => { void calculate(true); }}>Запустить демонстрацию</button></div></header>
+    <div className="map-status-stack">
+            {stale && <p className="simulation-stale" role="status">Параметры изменены. Результат относится к предыдущим условиям.</p>}
+            {status === 'loading' && <p className="calculation-status" role="status">Выполняется расчёт… {result && <span>Показан предыдущий расчёт.</span>}</p>}
+            {status === 'cancelled' && <p className="calculation-status" role="status">Ожидание отменено. Сервер может ещё завершать вычисление.</p>}
+            {status === 'error' && <div className="simulation-error" role="alert"><strong>Не удалось выполнить расчёт</strong><p>{message}</p><button onClick={() => { void calculate(); }}>Повторить расчёт</button></div>}
+          </div>
     <div className="model-workspace">
       <aside id="model-parameters" className={`simulation-parameters${parametersOpen ? ' is-open' : ''}`} aria-labelledby="parameters-title">
-        <div className="parameters-heading"><div><p className="eyebrow">Сценарий</p><h2 id="parameters-title">Условия расчёта</h2></div><button className="close-parameters" aria-label="Закрыть параметры" onClick={() => { setParametersOpen(false); document.querySelector<HTMLButtonElement>('.mobile-parameters-toggle')?.focus(); }}>×</button></div>
+        <div className="parameters-heading"><div><p className="eyebrow">Сценарий</p><h2 id="parameters-title">Условия расчёта</h2></div><button className="close-parameters" aria-label="Закрыть параметры" onClick={() => setParametersOpen(false)}>×</button></div>
         <form ref={form} onSubmit={event => { event.preventDefault(); void calculate(); }}>
           <div className="parameter-scroll">
             <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { setMode(event.target.value); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
@@ -296,20 +314,14 @@ export default function Simulation() {
       </aside>
       <section className="model-canvas" aria-label="Рабочая область модели">
         <div className="model-map-stage">
-          {result && values ? <CalculationMap result={result} values={values} selected={selected} onSelect={setSelected} suspended={profileOpen} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
+          {result && values ? <CalculationMap result={result} values={values} selected={selected} onSelect={setSelected} suspended={profileOpen || parametersOpen} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
           <div className="map-topline"><div><span className="map-kicker">{result ? 'Рассчитанные концентрации' : 'Подготовленный участок'}</span>{result ? <h2 id="result-title">Результат расчёта</h2> : <h2>{mode === 'river' ? reach?.name ?? 'Загрузка участка…' : 'Условный участок'}</h2>}<p>{result?.reach_id ? String(result.reach_metadata?.name ?? 'Реальное русло') : result ? 'Синтетическая геометрия' : mode === 'river' ? 'Реальная геометрия · сценарный источник' : 'Геометрия и параметры — синтетические'}</p></div></div>
-          <div className="map-status-stack">
-            {stale && <p className="simulation-stale" role="status">Параметры изменены. Результат относится к предыдущим условиям.</p>}
-            {status === 'loading' && <p className="calculation-status" role="status">Выполняется расчёт… {result && <span>Показан предыдущий расчёт.</span>}</p>}
-            {status === 'cancelled' && <p className="calculation-status" role="status">Ожидание отменено. Сервер может ещё завершать вычисление.</p>}
-            {status === 'error' && <div className="simulation-error" role="alert"><strong>Не удалось выполнить расчёт</strong><p>{message}</p><button onClick={() => { void calculate(); }}>Повторить расчёт</button></div>}
-          </div>
-          {result && values ? <aside className="map-inspector" inert={profileOpen} aria-label="Концентрация и выбранный сегмент">
+          {result && values ? <aside className="map-inspector" inert={profileOpen || parametersOpen} aria-label="Концентрация и выбранный сегмент">
             <div className="simulation-legend" data-testid="concentration-scale"><strong>Концентрация · мг/л</strong><div aria-hidden="true" className="simulation-gradient" style={span === 0 ? { background: color(result.scale_mg_l[0], result.scale_mg_l) } : undefined} /><span>{format(result.scale_mg_l[0], 4)}</span>{span !== 0 && <span>{format(result.scale_mg_l[1], 4)}</span>}<small>{span === 0 ? 'Концентрация одинакова на всём участке и во все моменты расчёта.' : 'Постоянная шкала этого расчёта.'} Цвет не означает нормативную оценку.</small></div>
             <div className="simulation-selection"><label htmlFor="simulation-segment">Расчётный сегмент</label><select id="simulation-segment" value={selected} onChange={event => setSelected(Number(event.target.value))}>{result.distances_m.map((distance, index) => <option key={index} value={index}>{index + 1} · {format(distance, 0)} м</option>)}</select><p aria-live={playing ? 'off' : 'polite'}><strong data-testid="selected-concentration">{format(values[selected], 4)} мг/л</strong><span>{format(result.distances_m[selected], 0)} м от источника · {format(shownHours)} ч</span></p></div>
             <button className="profile-toggle" aria-controls="model-profile" aria-expanded={profileOpen} onClick={() => setProfileOpen(value => !value)}>{profileOpen ? 'Свернуть профиль' : 'Профиль и показатели'}<span aria-hidden="true">{profileOpen ? '−' : '↗'}</span></button>
           </aside> : <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p></div>}
-          {result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen}>
+          {result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={parametersOpen}>
             <div className="profile-drawer-heading"><h2>Профиль и показатели</h2><button className="profile-close" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)}>×</button></div>
             <section className="simulation-profile" aria-labelledby="profile-title"><h3 id="profile-title">Профиль концентрации по расстоянию</h3><p>Центры расчётных сегментов · {format(shownHours)} ч</p><svg viewBox="0 0 760 235" role="img" aria-label="Расчётный профиль концентрации. Все значения доступны в таблице ниже."><path d="M85 25V195H735" fill="none" stroke="currentColor" /><polyline points={profile} fill="none" stroke="var(--accent)" strokeWidth="3" /><text x="85" y="17">мг/л</text>{span === 0 ? <text x="75" y="114" textAnchor="end">{format(result.scale_mg_l[0], 1)}</text> : <><text x="75" y="34" textAnchor="end">{format(result.scale_mg_l[1], 1)}</text><text x="75" y="194" textAnchor="end">{format(result.scale_mg_l[0], 1)}</text></>}<text x="85" y="220">0</text><text x="730" y="220" textAnchor="end">{format(result.inputs.length_m, 0)} м</text></svg>
               <details><summary>Таблица профиля</summary><div className="simulation-table"><table aria-label="Рассчитанный профиль"><thead><tr><th>Сегмент</th><th>Расстояние, м</th><th>Концентрация, мг/л</th></tr></thead><tbody>{result.distances_m.map((distance, index) => <tr key={index}><td>{index + 1}</td><td>{format(distance, 0)}</td><td>{format(values[index], 4)}</td></tr>)}</tbody></table></div></details>
