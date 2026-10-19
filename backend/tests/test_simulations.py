@@ -22,7 +22,7 @@ async def test_real_simulation_contract_geometry_and_database_preserved(client, 
     assert len(response.content) < 250_000
     result = response.json()
     assert result['provenance'] == 'synthetic'
-    assert result['inputs'] == PARAMS
+    assert result['inputs'] == PARAMS | dict(load_mode='continuous', load_duration_hours=None)
     assert result['derived']['area_m2'] == pytest.approx(40.4)
     assert result['derived']['load_kg_s'] == pytest.approx(0.010)
     assert result['derived']['excess_load_kg_s'] == pytest.approx(0.009)
@@ -139,3 +139,37 @@ def test_geometry_length_extremes_against_postgis(session, length):
     measured = session.scalar(text('SELECT ST_Length(ST_GeomFromGeoJSON(:geo)::geography)'),
                               {'geo': json.dumps(geometry)})
     assert measured == pytest.approx(length, abs=0.01)
+
+
+@pytest.mark.anyio
+async def test_finite_load_contract_and_mass_balance(client):
+    params = PARAMS | dict(length_m=3126, duration_hours=6,
+                          load_mode='finite', load_duration_hours=.5)
+    response = await client.post('/api/v1/simulations', json=params)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['inputs'] == params
+    assert result['concentrations_mg_l'][-1][0] == pytest.approx(10, abs=1e-7)
+    assert result['diagnostics']['excess_incoming_kg'] == pytest.approx(.009 * 1800)
+    assert result['diagnostics']['relative_excess_mass_error'] < 1e-9
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('settings', [
+    dict(load_mode='other'), dict(load_mode=True), dict(load_mode=None),
+    dict(load_mode='finite'), dict(load_mode='finite', load_duration_hours=None),
+    *[dict(load_mode='finite', load_duration_hours=v) for v in [True, False, 0, -1, 25, '0.5', 10**1000]],
+    dict(load_duration_hours=.5), dict(load_mode='continuous', load_duration_hours=.5),
+])
+async def test_invalid_load_settings_are_rejected(client, settings):
+    response = await client.post('/api/v1/simulations', json=PARAMS | settings)
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity'])
+async def test_nonfinite_load_duration_is_rejected(client, value):
+    raw = json.dumps(PARAMS | dict(load_mode='finite'))[:-1] + ', "load_duration_hours": ' + value + '}'
+    response = await client.post('/api/v1/simulations', content=raw, headers={'Content-Type': 'application/json'})
+    assert response.status_code == 422
+    assert response.json()['detail']

@@ -24,6 +24,17 @@ class SimulationInput(BaseModel):
     dispersion_m2_s: float = Field(ge=0.1, le=100)
     length_m: float = Field(ge=100, le=20000)
     duration_hours: float = Field(ge=0.1, le=48)
+    load_mode: Literal['continuous', 'finite'] = 'continuous'
+    load_duration_hours: float | None = Field(default=None, gt=0)
+
+    @model_validator(mode='after')
+    def load_conditions(self):
+        if self.load_mode == 'continuous' and self.load_duration_hours is not None:
+            raise ValueError('Для непрерывной нагрузки load_duration_hours должен быть null.')
+        if self.load_mode == 'finite' and (self.load_duration_hours is None
+                                           or self.load_duration_hours > self.duration_hours):
+            raise ValueError('Конечной нагрузке нужна длительность не больше длительности расчёта.')
+        return self
 
 
 class LineGeometry(BaseModel):
