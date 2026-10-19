@@ -227,6 +227,7 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 @media (prefers-reduced-motion: reduce) { .simulation *, .simulation *::before, .simulation *::after { scroll-behavior: auto; transition: none !important; } }
 
 /* Session comparison keeps completed results separate from the parameter form. */
+.map-inspector { max-height: calc(100% - 32px); overflow: auto; scrollbar-width: thin; }
 .scenario-comparison-controls { border-bottom: 1px solid var(--line); padding: 0 0 14px; margin-bottom: 16px; display: grid; gap: 7px; }
 .comparison-step { margin: 0 0 3px; font-weight: 600; font-size: 12px; color: #214f4a; }
 .scenario-comparison-controls button { font-size: 12px; width: 100%; }
@@ -244,6 +245,13 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .profile-comparison-key { display: flex; gap: 12px; font-size: 10px; }
 .profile-comparison-key span:first-child { color: #2367a1; }
 .profile-comparison-key span:last-child { color: #a3412d; }
+@media (min-width: 761px) {
+  .is-comparing .simulation-selection { margin-top: 8px; padding-top: 8px; }
+  .is-comparing .simulation-selection p { margin: 6px 0; }
+  .is-comparing .simulation-selection p strong { font-size: 18px; }
+  .is-comparing .comparison-values { margin: 4px 0; padding: 4px 0; }
+  .is-comparing .comparison-values > div { padding: 2px 0; }
+}
 @media (max-width: 760px) {
   .scenario-switch { padding: 4px 8px; gap: 5px; }
   .scenario-switch button { min-height: 44px; padding: 6px 9px; font-size: 11px; }

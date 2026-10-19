@@ -252,3 +252,11 @@ for (const height of [667, 812]) test(`comparison keeps the complete river above
   expect(line.bottom - line.top).toBeGreaterThan(95);
   await expect(page.getByLabel('Время от начала сценария')).toBeInViewport();
 });
+
+test('comparison profile control stays inside the map on a 1280x720 laptop', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await demo(page); await variant(page); await runB(page);
+  const stage = (await page.locator('.model-map-stage').boundingBox())!;
+  const control = (await page.getByRole('button', { name: 'Профиль и показатели', exact: true }).boundingBox())!;
+  expect(control.y + control.height).toBeLessThan(stage.y + stage.height - 5);
+});
