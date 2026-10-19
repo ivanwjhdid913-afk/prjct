@@ -267,3 +267,29 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 
 .comparison-notice { margin: 0; padding: 8px 12px; border: 1px solid #b9cbbf; border-left: 3px solid #41695b; border-radius: 4px; background: #f2f7f3; color: #254e40; font-size: 12px; line-height: 1.4; }
 @media (max-width: 760px) { .comparison-notice { padding: 7px 9px; font-size: 10px; } }
+
+.load-settings { display: grid; gap: 7px; padding: 0 0 16px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.load-settings p, .load-settings small { margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.load-settings button { font-size: 12px; }
+.profile-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+.profile-tabs button { flex: 1; font-size: 11px; padding: 6px; min-height: 44px; }
+.profile-tabs button[aria-pressed="true"] { background: #174c45; color: white; border-color: #174c45; }
+.temporal-profile label { font-size: 11px; margin: 8px 0 5px; }
+.temporal-profile select { min-height: 44px; }
+.temporal-reading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.temporal-reading strong { color: var(--ink); font-size: 16px; }
+.model-explanation { margin-top: 12px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
+.timeline-track { grid-column: 1 / -1; position: relative; display: flex; align-items: center; }
+.timeline-track input { width: 100%; position: relative; z-index: 1; background: transparent; }
+.timeline-track .load-end-marker { position: absolute; height: 20px; width: 0; border-left: 2px dashed #9a5b27; pointer-events: none; transform: translateX(-1px); z-index: 2; }
+.source-status { grid-column: 1 / -1; margin: 6px 0 0; font-size: 10px; line-height: 1.4; color: var(--ink); }
+.source-status:empty { display: none; }
+.source-status:not(:empty) + .timeline-note { display: none; }
+.load-end-caption { margin-left: 10px; color: #805120; }
+@media (max-width: 760px) {
+  .source-status { width: 100%; margin: 0; }
+  .load-settings select, .load-settings input, .temporal-profile select { font-size: 16px; }
+  .profile-tabs { margin-bottom: 0; }
+  .temporal-profile h3 { margin-top: 8px; }
+  .temporal-profile svg { min-height: 110px; }
+}

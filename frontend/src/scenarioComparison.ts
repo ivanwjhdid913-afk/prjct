@@ -32,7 +32,7 @@ export function sharedScale(a: ComparableResult, b: ComparableResult): [number, 
   return [minimum, maximum];
 }
 
-export function valuesAtHour(result: ComparableResult, hour: number): number[] {
+export function valuesAtHour(result: Pick<ComparableResult, 'times_hours' | 'concentrations_mg_l'>, hour: number): number[] {
   const last = result.times_hours.length - 1;
   if (hour <= result.times_hours[0]) return [...result.concentrations_mg_l[0]];
   if (hour >= result.times_hours[last]) return [...result.concentrations_mg_l[last]];
