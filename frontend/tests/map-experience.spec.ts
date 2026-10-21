@@ -40,7 +40,7 @@ test('explicit demonstration runs a four-hour preset and preserves the map view 
   const transform = await layer.getAttribute('style');
   const firstPath = await page.locator('.simulation-segment').first().getAttribute('d');
   await page.getByRole('button', { name: 'Воспроизвести', exact: true }).click();
-  await expect.poll(async () => Number(await page.getByLabel('Время от начала сценария').inputValue())).toBeGreaterThan(2);
+  await expect.poll(async () => Number(await page.getByLabel('Время от начала сценария').inputValue())).toBeGreaterThan(2 / 12);
   await page.getByRole('button', { name: 'Пауза', exact: true }).click();
   expect(await layer.getAttribute('style')).toBe(transform);
   expect(await page.locator('.simulation-segment').first().getAttribute('d')).toBe(firstPath);

@@ -36,7 +36,13 @@ export function valuesAtHour(result: Pick<ComparableResult, 'times_hours' | 'con
   const last = result.times_hours.length - 1;
   if (hour <= result.times_hours[0]) return [...result.concentrations_mg_l[0]];
   if (hour >= result.times_hours[last]) return [...result.concentrations_mg_l[last]];
-  const upper = result.times_hours.findIndex(time => time >= hour);
+  let left = 1, right = last;
+  while (left < right) {
+    const middle = Math.floor((left + right) / 2);
+    if (result.times_hours[middle] < hour) left = middle + 1;
+    else right = middle;
+  }
+  const upper = left;
   const lower = upper - 1;
   const fraction = (hour - result.times_hours[lower]) / (result.times_hours[upper] - result.times_hours[lower]);
   return result.concentrations_mg_l[lower].map((value, index) => value + fraction * (result.concentrations_mg_l[upper][index] - value));

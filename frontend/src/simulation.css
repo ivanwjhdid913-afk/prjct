@@ -278,6 +278,9 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .temporal-profile select { min-height: 44px; }
 .temporal-reading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .temporal-reading strong { color: var(--ink); font-size: 16px; }
+.temporal-extremum { margin: 10px 0; padding: 10px 0; border-block: 1px solid var(--line); }
+.temporal-extremum p { line-height: 1.5; overflow-wrap: anywhere; }
+.temporal-extremum button { min-height: 44px; padding: 8px 12px; }
 .model-explanation { margin-top: 12px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
 .timeline-track { grid-column: 1 / -1; position: relative; display: flex; align-items: center; }
 .timeline-track input { width: 100%; position: relative; z-index: 1; background: transparent; }

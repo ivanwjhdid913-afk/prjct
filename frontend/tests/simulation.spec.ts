@@ -22,7 +22,7 @@ test('runs the actual conservative model and uses its profile on the map', async
   await expect(page.getByTestId('selected-concentration')).toHaveText('10,0000 мг/л');
   const scale = await page.getByTestId('concentration-scale').innerText();
   const timeIndex = data.times_hours.findIndex((value: number) => value >= 6);
-  await page.getByLabel('Время от начала сценария').fill(String(timeIndex));
+  await page.getByLabel('Время от начала сценария').fill(String(data.times_hours[timeIndex]));
   await page.getByLabel('Расчётный сегмент').selectOption('20');
   const values: number[] = data.concentrations_mg_l[timeIndex];
   const expected = values[20];

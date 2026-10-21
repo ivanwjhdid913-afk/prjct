@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { concentrationsAt } from './model-helpers';
 
 const numberText = (n: number) => `${n.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`;
 async function demo(page: Page) {
@@ -32,13 +33,13 @@ test('identical A and B have zero difference and equal colors at shared fraction
   await variant(page);
   const b = await runB(page);
   for (const key of ['inputs', 'geometry', 'distances_m', 'times_hours', 'concentrations_mg_l', 'scale_mg_l']) expect(a[key]).toEqual(b[key]);
-  await page.getByLabel('Время от начала сценария').fill('24.5');
+  await page.getByLabel('Время от начала сценария').fill('2.04');
   await page.getByLabel('Расчётный сегмент').selectOption('50');
   await expect(page.getByTestId('comparison-delta')).toHaveText('0,0000 мг/л');
   const colors = await page.locator('.simulation-segment').evaluateAll(nodes => nodes.map(n => n.getAttribute('stroke')));
   await page.getByRole('button', { name: 'Показать А', exact: true }).click();
   expect(await page.locator('.simulation-segment').evaluateAll(nodes => nodes.map(n => n.getAttribute('stroke')))).toEqual(colors);
-  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('24.5');
+  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('2.04');
   await expect(page.getByLabel('Расчётный сегмент')).toHaveValue('50');
   await expect(page.getByText(/После перезагрузки страницы сценарии сбрасываются/)).toBeVisible();
 });
@@ -57,18 +58,18 @@ test('halved effluent compares actual results without changing A, time or map an
   await page.getByRole('button', { name: 'Увеличить масштаб', exact: true }).click();
   const view = await page.locator('.simulation-map .leaflet-map-pane').getAttribute('style');
   const path = await page.locator('.simulation-segment').nth(50).getAttribute('d');
-  for (const time of [12, 24, 36]) {
+  for (const time of [1, 2, 3]) {
     await page.getByLabel('Время от начала сценария').fill(String(time));
-    await expect(page.getByTestId('comparison-a')).toHaveText(numberText(a.concentrations_mg_l[time][50]));
-    await expect(page.getByTestId('comparison-b')).toHaveText(numberText(b.concentrations_mg_l[time][50]));
-    await expect(page.getByTestId('comparison-delta')).toHaveText(numberText(b.concentrations_mg_l[time][50] - a.concentrations_mg_l[time][50]));
+    await expect(page.getByTestId('comparison-a')).toHaveText(numberText(concentrationsAt(a, time)[50]));
+    await expect(page.getByTestId('comparison-b')).toHaveText(numberText(concentrationsAt(b, time)[50]));
+    await expect(page.getByTestId('comparison-delta')).toHaveText(numberText(concentrationsAt(b, time)[50] - concentrationsAt(a, time)[50]));
     for (const name of ['Показать А', 'Показать Б']) {
       await page.getByRole('button', { name, exact: true }).click();
       expect(await page.locator('.simulation-segment').nth(50).getAttribute('d')).toBe(path);
       expect(await page.locator('.simulation-map .leaflet-map-pane').getAttribute('style')).toBe(view);
       await expect(page.getByLabel('Время от начала сценария')).toHaveValue(String(time));
       await expect(page.getByTestId('concentration-scale')).toHaveText(scale, { useInnerText: true });
-      await expect(page.locator('.simulation-segment').nth(50)).toHaveAttribute('data-concentration', String((name === 'Показать А' ? a : b).concentrations_mg_l[time][50]));
+      await expect(page.locator('.simulation-segment').nth(50)).toHaveAttribute('data-concentration', String(concentrationsAt(name === 'Показать А' ? a : b, time)[50]));
     }
   }
   await page.getByRole('button', { name: 'Профиль и показатели', exact: true }).click();
@@ -77,14 +78,14 @@ test('halved effluent compares actual results without changing A, time or map an
   for (const [id, data] of [['profile-a', a], ['profile-b', b]] as const) {
     const points = await page.getByTestId(id).getAttribute('points');
     points!.split(' ').forEach((point, i) => {
-      expect(minimum + (190 - Number(point.split(',')[1])) * (maximum - minimum) / 160).toBeCloseTo(data.concentrations_mg_l[36][i], 10);
+      expect(minimum + (190 - Number(point.split(',')[1])) * (maximum - minimum) / 160).toBeCloseTo(concentrationsAt(data, 3)[i], 10);
     });
   }
   await page.getByRole('button', { name: 'Закрыть профиль' }).click();
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('25');
   await expect(page.locator('.simulation-stale')).toContainText('Б');
-  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(a.concentrations_mg_l[36][50]));
-  await expect(page.getByTestId('comparison-b')).toHaveText(numberText(b.concentrations_mg_l[36][50]));
+  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(concentrationsAt(a, 3)[50]));
+  await expect(page.getByTestId('comparison-b')).toHaveText(numberText(concentrationsAt(b, 3)[50]));
 });
 
 test('B errors and cancellation preserve both completed results and reject late responses', async ({ page }) => {
@@ -93,7 +94,7 @@ test('B errors and cancellation preserve both completed results and reject late 
     window.fetch = (input, init) => original(input, typeof input === 'string' && input.includes('/simulations') ? { ...init, signal: undefined } : init);
   });
   await demo(page); await variant(page); const b = await runB(page);
-  await page.getByLabel('Время от начала сценария').fill('24');
+  await page.getByLabel('Время от начала сценария').fill('2');
   const originalA = await page.getByTestId('comparison-a').innerText();
   const originalB = await page.getByTestId('comparison-b').innerText();
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('50');
@@ -156,15 +157,14 @@ test('playback keeps both concentrations at the same physical time when switchin
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('50');
   const b = await runB(page);
   await page.getByLabel('Расчётный сегмент').selectOption('50');
-  await page.getByLabel('Время от начала сценария').fill('24');
+  await page.getByLabel('Время от начала сценария').fill('2');
   const scale = await page.getByTestId('concentration-scale').innerText();
   await page.getByRole('button', { name: 'Воспроизвести', exact: true }).click();
-  await expect.poll(async () => Number(await page.getByLabel('Время от начала сценария').inputValue())).toBeGreaterThan(25);
+  await expect.poll(async () => Number(await page.getByLabel('Время от начала сценария').inputValue())).toBeGreaterThan(25 / 12);
   await page.getByRole('button', { name: 'Показать А', exact: true }).click();
   await page.getByRole('button', { name: 'Пауза', exact: true }).click();
   const time = Number(await page.getByLabel('Время от начала сценария').inputValue());
-  const lower = Math.floor(time), fraction = time - lower;
-  const interpolate = (data: typeof a) => data.concentrations_mg_l[lower][50] + fraction * (data.concentrations_mg_l[lower + 1][50] - data.concentrations_mg_l[lower][50]);
+  const interpolate = (data: typeof a) => concentrationsAt(data, time)[50];
   await expect(page.getByTestId('comparison-a')).toHaveText(numberText(interpolate(a)));
   await expect(page.getByTestId('comparison-b')).toHaveText(numberText(interpolate(b)));
   await expect(page.getByTestId('selected-concentration')).toHaveText(numberText(interpolate(a)));
@@ -184,17 +184,17 @@ test('all six physical parameters belong to B and A changes only through explici
   for (const [label, value] of parameters) await page.getByLabel(label, { exact: true }).fill(value);
   const b = await runB(page);
   expect(b.inputs).toMatchObject({ river_flow_m3_s: 20, effluent_flow_m3_s: .2, background_mg_l: 5, effluent_mg_l: 50, velocity_m_s: .3, dispersion_m2_s: 10 });
-  await page.getByLabel('Время от начала сценария').fill('24');
-  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(a.concentrations_mg_l[24][0]));
-  await expect(page.getByTestId('comparison-b')).toHaveText(numberText(b.concentrations_mg_l[24][0]));
+  await page.getByLabel('Время от начала сценария').fill('2');
+  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(concentrationsAt(a, 2)[0]));
+  await expect(page.getByTestId('comparison-b')).toHaveText(numberText(concentrationsAt(b, 2)[0]));
   await expect(page.getByTestId('concentration-scale')).toContainText('5,0000');
   await expect(page.getByTestId('concentration-scale')).toContainText('10,8911');
   await page.getByRole('button', { name: 'Заменить А показанным расчётом', exact: true }).click();
   await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();
   for (const [label, value] of parameters) await expect(page.getByLabel(label, { exact: true })).toHaveValue(value);
   await runB(page);
-  await page.getByLabel('Время от начала сценария').fill('24');
-  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(b.concentrations_mg_l[24][0]));
+  await page.getByLabel('Время от начала сценария').fill('2');
+  await expect(page.getByTestId('comparison-a')).toHaveText(numberText(concentrationsAt(b, 2)[0]));
   await expect(page.getByTestId('comparison-delta')).toHaveText('0,0000 мг/л');
 });
 
@@ -205,11 +205,11 @@ test('mobile comparison preserves status, focus and time controls with both pane
   await variant(page);
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('50');
   await runB(page);
-  await page.getByLabel('Время от начала сценария').fill('24');
+  await page.getByLabel('Время от начала сценария').fill('2');
   await page.getByRole('button', { name: 'Профиль и показатели', exact: true }).click();
   await expect(page.locator('.simulation-profile polyline')).toHaveCount(2);
   await page.getByRole('button', { name: 'Показать А', exact: true }).click();
-  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('24');
+  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('2');
   await page.getByRole('button', { name: 'Параметры', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Закрыть параметры' })).toBeFocused();
   await expect(page.locator('#model-profile')).toHaveAttribute('inert', '');

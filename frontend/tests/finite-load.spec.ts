@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openParameters, openProfile } from './model-helpers';
+import { concentrationsAt, openParameters, openProfile } from './model-helpers';
 
 const text = (v: number) => `${v.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`;
 async function finiteDemo(page: Page) {
@@ -21,24 +21,24 @@ test('finite demo shows exact load end, transport and return to background', asy
   expect(r.inputs.duration_hours).toBe(6);
   await expect(page.getByTestId('source-status')).toContainText('Повышенная нагрузка действует');
   await expect(page.getByTestId('load-end-marker')).toHaveAttribute('data-hour', '0.5');
-  await page.getByLabel('Время от начала сценария').fill('4');
+  await page.getByLabel('Время от начала сценария').fill('0.5');
   await expect(page.getByTestId('source-status')).toContainText('Повышенная нагрузка завершена');
-  await page.getByLabel('Время от начала сценария').fill('16');
-  const row = r.concentrations_mg_l[16];
+  await page.getByLabel('Время от начала сценария').fill('2');
+  const row = concentrationsAt(r, 2);
   expect(row[0]).toBeLessThan(10.001); expect(Math.max(...row)).toBeGreaterThan(10.2);
   expect(row.indexOf(Math.max(...row))).toBeGreaterThan(20);
   await expect(page.getByTestId('selected-concentration')).toHaveText(text(row[0]));
-  await page.getByLabel('Время от начала сценария').fill('48');
-  expect(Math.max(...r.concentrations_mg_l[48])).toBeLessThan(10.001);
+  await page.getByLabel('Время от начала сценария').fill('6');
+  expect(Math.max(...concentrationsAt(r, 6))).toBeLessThan(10.001);
 });
 
 test('C(t) follows selected map segment and shares physical cursor and current concentration', async ({ page }) => {
   const r = await finiteDemo(page);
-  await page.getByLabel('Время от начала сценария').fill('12.5');
+  await page.getByLabel('Время от начала сценария').fill('1.5625');
   await openProfile(page);
   await page.getByRole('button', { name: 'Во времени C(t)', exact: true }).click();
   await page.getByLabel('Сегмент для графика времени').selectOption('50');
-  const expected = (r.concentrations_mg_l[12][50] + r.concentrations_mg_l[13][50]) / 2;
+  const expected = concentrationsAt(r, 1.5625)[50];
   await expect(page.getByTestId('temporal-current')).toHaveText(text(expected));
   await expect(page.getByTestId('temporal-cursor')).toHaveAttribute('data-hour', '1.5625');
   const initial = await page.getByTestId('temporal-curve').getAttribute('points');
@@ -53,7 +53,7 @@ test('C(t) follows selected map segment and shares physical cursor and current c
   await expect(page.getByLabel('Сегмент для графика времени')).toHaveValue(String(clickedIndex));
   expect(await page.getByTestId('temporal-curve').getAttribute('points')).not.toBe(initial);
   await expect(page.locator('.simulation-segment').nth(clickedIndex)).toHaveAttribute('data-selected', 'true');
-  await expect(page.getByTestId('temporal-current')).toHaveText(text((r.concentrations_mg_l[12][clickedIndex] + r.concentrations_mg_l[13][clickedIndex]) / 2));
+  await expect(page.getByTestId('temporal-current')).toHaveText(text(concentrationsAt(r, 1.5625)[clickedIndex]));
   await page.getByRole('button', { name: 'По расстоянию C(x)', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Профиль концентрации по расстоянию' })).toBeVisible();
 });
@@ -68,14 +68,14 @@ test('constant A and finite B keep independent settings, scale and time', async 
   const response = page.waitForResponse(r => r.url().endsWith('/api/v1/simulations'));
   await page.getByRole('button', { name: 'Рассчитать Б', exact: true }).click();
   const r = await (await response).json(); expect(r.inputs.load_duration_hours).toBe(.5317);
-  await page.getByLabel('Время от начала сценария').fill('24');
+  await page.getByLabel('Время от начала сценария').fill('2');
   const scale = await page.getByTestId('concentration-scale').innerText();
   await openProfile(page); await page.getByRole('button', { name: 'Во времени C(t)', exact: true }).click();
   await expect(page.getByTestId('temporal-a')).toBeVisible(); await expect(page.getByTestId('temporal-b')).toBeVisible();
   await page.getByRole('button', { name: 'Показать А', exact: true }).click();
   await expect(page.getByTestId('source-status')).toContainText('А: Повышенная нагрузка действует');
   await expect(page.getByTestId('source-status')).toContainText('Б: Повышенная нагрузка завершена');
-  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('24');
+  await expect(page.getByLabel('Время от начала сценария')).toHaveValue('2');
   await expect(page.getByTestId('concentration-scale')).toHaveText(scale, { useInnerText: true });
   await page.getByRole('button', { name: 'Закрыть профиль' }).click();
   await page.getByLabel('Период загрязнения, ч', { exact: true }).fill('1');
@@ -91,7 +91,7 @@ for (const height of [667, 812]) test(`finite timeline and temporal profile rema
   await expect(page.getByLabel('Время от начала сценария')).toBeInViewport();
   await openProfile(page); await page.getByRole('button', { name: 'Во времени C(t)', exact: true }).click();
   await page.getByLabel('Сегмент для графика времени').selectOption('50');
-  await page.getByLabel('Время от начала сценария').fill('16');
+  await page.getByLabel('Время от начала сценария').fill('2');
   await expect(page.getByTestId('temporal-cursor')).toHaveAttribute('data-hour', '2');
   await openParameters(page); await expect(page.getByRole('button', { name: 'Закрыть параметры' })).toBeFocused();
   await page.getByLabel('Период загрязнения, ч', { exact: true }).fill('1');

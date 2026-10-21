@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openParameters, openProfile } from './model-helpers';
+import { concentrationsAt, openParameters, openProfile } from './model-helpers';
 
 const reach = { id: 'test-reach', name: 'Проверочный участок', length_m: 1000, geometry: { type: 'LineString', coordinates: [[39.2, 52.5], [39.201, 52.502], [39.203, 52.501], [39.205, 52.503]] }, distances_m: [0, 300, 600, 1000], metadata: { attribution: 'Тестовый источник геометрии', source_url: 'https://example.org', direction_basis: 'Проверочная направленная линия' } };
 
@@ -34,7 +34,7 @@ test('selects a river source, sends geometry identity and marks changed source s
   let request: Record<string, number | string> = {};
   await page.route('**/api/v1/simulations', async route => {
     request = route.request().postDataJSON();
-    await route.fulfill({ json: { inputs: { ...request, length_m: 500 }, derived: { total_flow_m3_s: 10.1, area_m2: 40.4, load_kg_s: .01, excess_load_kg_s: .009, steady_mg_l: 11, travel_hours: 1 }, distances_m: [125, 375], times_hours: [0, 12, 24], concentrations_mg_l: [[10, 10], [12, 10], [14, 12]], scale_mg_l: [10, 14], geometry: reach.geometry, provenance: 'river_scenario', reach_id: reach.id, source_distance_m: 500, source_coordinate: [39.202, 52.5015], reach_metadata: { ...reach.metadata, name: reach.name }, segment_geometries: [reach.geometry, reach.geometry] } });
+    await route.fulfill({ json: { inputs: { ...request, length_m: 500 }, derived: { total_flow_m3_s: 10.1, area_m2: 40.4, load_kg_s: .01, excess_load_kg_s: .009, steady_mg_l: 11, travel_hours: 1 }, distances_m: [125, 375], times_hours: [0, 2, 4], concentrations_mg_l: [[10, 10], [12, 10], [14, 12]], scale_mg_l: [10, 14], geometry: reach.geometry, provenance: 'river_scenario', reach_id: reach.id, source_distance_m: 500, source_coordinate: [39.202, 52.5015], reach_metadata: { ...reach.metadata, name: reach.name }, segment_geometries: [reach.geometry, reach.geometry] } });
   });
   await page.goto('/#model');
   await openParameters(page);
@@ -49,7 +49,7 @@ test('selects a river source, sends geometry identity and marks changed source s
   expect(request.source_distance_m).toBe(500);
   expect(request).not.toHaveProperty('length_m');
   await expect(page.locator('.simulation-segment')).toHaveCount(2);
-  await page.getByLabel('Время от начала сценария').fill('0.5');
+  await page.getByLabel('Время от начала сценария').fill('1');
   await expect(page.getByTestId('selected-concentration')).toHaveText('11,0000 мг/л');
   await expect(page.locator('.simulation-segment').first()).toHaveAttribute('data-concentration', '11');
   await page.getByLabel('Положение сценарного источника, м').fill('501');
@@ -71,12 +71,12 @@ test('plays, pauses, changes speed and seeks consistently without automatic play
   const paused = await slider.inputValue();
   await page.waitForTimeout(120);
   await expect(slider).toHaveValue(paused);
-  await slider.fill('12.5');
+  await slider.fill('1.04');
   await expect(page.getByRole('button', { name: 'Воспроизвести', exact: true })).toBeVisible();
-  await expect(slider).toHaveValue('12.5');
-  await slider.fill('48');
+  await expect(slider).toHaveValue('1.04');
+  await slider.fill('4');
   await page.getByRole('button', { name: 'Воспроизвести', exact: true }).click();
-  await expect.poll(async () => Number(await slider.inputValue())).toBeLessThan(48);
+  await expect.poll(async () => Number(await slider.inputValue())).toBeLessThan(4);
 });
 
 for (const width of [375, 1440]) {
@@ -98,8 +98,8 @@ for (const width of [375, 1440]) {
     expect(data.reach_id).toBe(actual.id);
     expect(data.inputs.length_m).toBeCloseTo(actual.length_m / 2, 6);
     await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
-    await page.getByLabel('Время от начала сценария').fill('12.5');
-    const expected = data.concentrations_mg_l[12].map((value: number, index: number) => value + .5 * (data.concentrations_mg_l[13][index] - value));
+    await page.getByLabel('Время от начала сценария').fill('1.5625');
+    const expected = concentrationsAt(data, 1.5625);
     const mapValues = await page.locator('.simulation-segment').evaluateAll(elements => elements.map(element => Number(element.getAttribute('data-concentration'))));
     expect(mapValues).toEqual(expected);
     const profile = (await page.locator('.simulation-profile polyline').getAttribute('points'))!;
