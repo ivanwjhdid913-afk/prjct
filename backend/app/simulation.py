@@ -8,8 +8,9 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import JSONResponse
 
-from app.transport import simulate
+from app.transport import MAX_RESPONSE_BYTES, _resolution_limit, simulate
 from app.river import prepared_reach
 
 
@@ -65,6 +66,7 @@ class SimulationResult(BaseModel):
     scale_mg_l: tuple[float, float]
     geometry: LineGeometry
     diagnostics: dict
+    temporal_resolution: dict
     provenance: Literal['synthetic', 'river_scenario'] = 'synthetic'
     reach_id: str | None = None
     source_distance_m: float = 0
@@ -108,7 +110,15 @@ def synthetic_line(length_m: float, segments: int = 100) -> dict:
     return {'type': 'LineString', 'coordinates': coordinates}
 
 
-def calculate(parameters: SimulationRequest) -> SimulationResult:
+def bounded_response(result: SimulationResult) -> JSONResponse:
+    """Measure the exact UTF-8 body that is returned, including river geometry."""
+    response = JSONResponse(result.model_dump(mode='json'))
+    if len(response.body) > MAX_RESPONSE_BYTES:
+        raise _resolution_limit(f'ответ превышает {MAX_RESPONSE_BYTES} байт.')
+    return response
+
+
+def calculate(parameters: SimulationRequest) -> JSONResponse:
     # One bounded calculation per server process; no growing job queue or DB writes.
     if not calculation_lock.acquire(blocking=False):
         raise HTTPException(503, 'Другой расчёт ещё выполняется. Повторите попытку через несколько секунд.',
@@ -117,7 +127,7 @@ def calculate(parameters: SimulationRequest) -> SimulationResult:
         physics = parameters.model_dump(exclude={'reach_id', 'source_distance_m'})
         if parameters.reach_id is None:
             result = simulate(physics)
-            return SimulationResult(**result, geometry=synthetic_line(parameters.length_m))
+            return bounded_response(SimulationResult(**result, geometry=synthetic_line(parameters.length_m)))
         reach, line = prepared_reach()
         if parameters.reach_id != reach['id']:
             raise ValueError('Неизвестный подготовленный участок реки.')
@@ -133,11 +143,11 @@ def calculate(parameters: SimulationRequest) -> SimulationResult:
             raise ValueError('Для этих параметров расчётный буфер выходит за проверенное продолжение русла. '
                              'Измените параметры сценария; автоматической подмены нет.')
         result = simulate(physics)
-        return SimulationResult(**result, provenance='river_scenario', reach_id=reach['id'],
+        return bounded_response(SimulationResult(**result, provenance='river_scenario', reach_id=reach['id'],
                                 source_distance_m=start, source_coordinate=line.point_at(start),
                                 reach_metadata=reach['metadata'],
                                 geometry={'type': 'LineString', 'coordinates': line.slice(start, line.length_m)},
-                                segment_geometries=line.segments(start, line.length_m))
+                                segment_geometries=line.segments(start, line.length_m)))
     except ValueError as error:
         if parameters.reach_id and str(error).startswith('Слишком большой размер вычислений'):
             raise HTTPException(422, 'Слишком большой размер вычислений: длина определяется руслом. '

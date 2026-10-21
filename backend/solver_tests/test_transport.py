@@ -29,7 +29,8 @@ def test_units_shape_and_steady_limit(demo):
     assert d['excess_load_kg_s'] == pytest.approx(.009)
     assert d['steady_mg_l'] == pytest.approx(110 / 10.1)
     assert d['travel_hours'] == pytest.approx(10000 / .25 / 3600)
-    assert len(demo['times_hours']) == 49
+    assert 49 <= len(demo['times_hours']) <= 2048
+    assert set(i * 24 / 48 for i in range(49)) <= set(demo['times_hours'])
     assert demo['times_hours'][0] == 0 and demo['times_hours'][-1] == 24
     assert demo['distances_m'] == [50 + 100 * i for i in range(100)]
     assert all(len(row) == 100 for row in demo['concentrations_mg_l'])

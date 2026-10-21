@@ -19,7 +19,7 @@ async def test_real_simulation_contract_geometry_and_database_preserved(client, 
               for model in (WaterBody, ObservationPoint)]
     response = await client.post('/api/v1/simulations', json=PARAMS)
     assert response.status_code == 200
-    assert len(response.content) < 250_000
+    assert len(response.content) <= 5 * 1024 * 1024
     result = response.json()
     assert result['provenance'] == 'synthetic'
     assert result['inputs'] == PARAMS | dict(load_mode='continuous', load_duration_hours=None)
@@ -29,13 +29,15 @@ async def test_real_simulation_contract_geometry_and_database_preserved(client, 
     assert result['derived']['steady_mg_l'] == pytest.approx(10.8910891089)
     assert result['derived']['travel_hours'] == pytest.approx(11.1111111111)
     assert len(result['distances_m']) == 100
-    assert len(result['times_hours']) == 49
+    assert 49 <= len(result['times_hours']) <= 2048
+    assert set(i * 24 / 48 for i in range(49)) <= set(result['times_hours'])
+    assert result['temporal_resolution']['saved_states'] == len(result['times_hours'])
     assert result['times_hours'][0] == 0
     assert result['times_hours'][-1] == 24
     assert result['distances_m'][0] == 50
     assert result['distances_m'][-1] == 9950
     values = result['concentrations_mg_l']
-    assert len(values) == 49 and all(len(row) == 100 for row in values)
+    assert len(values) == len(result['times_hours']) and all(len(row) == 100 for row in values)
     assert values[0] == pytest.approx([10] * 100)
     assert values[-1] == pytest.approx([10.8910891089] * 100, abs=0.002)
     assert result['scale_mg_l'] == pytest.approx([10, 10.8910891089])

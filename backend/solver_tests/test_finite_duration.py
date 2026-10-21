@@ -9,9 +9,17 @@ from app.transport import _integrate, simulate
 from test_transport import DEMO
 
 
+def legacy_rows(result):
+    rows = dict(zip(result['times_hours'], result['concentrations_mg_l']))
+    return [rows[i * result['inputs']['duration_hours'] / 48] for i in range(49)]
+
+
 def test_continuous_numeric_output_is_bit_for_bit_unchanged():
     # Captured from the original continuous solver before finite-load changes.
     result = simulate(DEMO | {'duration_hours': 6})
+    result['concentrations_mg_l'] = legacy_rows(result)
+    result['times_hours'] = [i * 6 / 48 for i in range(49)]
+    result.pop('temporal_resolution')
     result.pop('inputs')
     result['diagnostics'].pop('runtime_seconds')
     digest = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -153,7 +161,7 @@ def test_finite_demo_refinement_and_outlet_length_sensitivity():
     params = DEMO | dict(length_m=3126., duration_hours=6., load_mode='finite', load_duration_hours=.5)
     baseline = simulate(params)
     def difference(other):
-        return max(abs(a-b) for row_a, row_b in zip(baseline['concentrations_mg_l'], other['concentrations_mg_l'])
+        return max(abs(a-b) for row_a, row_b in zip(legacy_rows(baseline), legacy_rows(other))
                    for a, b in zip(row_a, row_b))
     differences = [difference(simulate(params, **option)) for option in
                    [dict(spatial_refinement=2), dict(temporal_refinement=2), dict(buffer_factor=2)]]

@@ -51,7 +51,7 @@ async def test_source_positions_preserve_bends_lengths_and_mass(client, session,
     for segment in segments:
         length = session.scalar(text('SELECT ST_Length(ST_GeomFromGeoJSON(:geo)::geography)'), {'geo': json.dumps(segment)})
         assert length == pytest.approx(result['inputs']['length_m']/100, abs=.001)
-    assert len(response.content) < 300000
+    assert len(response.content) <= 5 * 1024 * 1024
 
 
 @pytest.mark.anyio

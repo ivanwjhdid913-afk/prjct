@@ -15,6 +15,7 @@ import pytest
 
 from app.transport import _integrate, simulate
 from test_transport import DEMO
+from test_finite_duration import legacy_rows
 
 
 def eigenmode(n, t, mode=0):
@@ -79,7 +80,7 @@ def test_demo_refinement_and_outflow_buffer():
     fine_t = simulate(params, temporal_refinement=2)
     long_buffer = simulate(params, buffer_factor=2)
     def largest(a, b):
-        return max(abs(x-y) for row_a, row_b in zip(a['concentrations_mg_l'], b['concentrations_mg_l'])
+        return max(abs(x-y) for row_a, row_b in zip(legacy_rows(a), legacy_rows(b))
                    for x, y in zip(row_a, row_b))
     spatial, temporal, buffer = (largest(coarse, r) for r in (fine_x, fine_t, long_buffer))
     print('demo mg/L differences: dx/2=', spatial, 'dt/2=', temporal, 'buffer*2=', buffer)
@@ -92,7 +93,7 @@ def test_output_buffer_when_front_has_crossed_display_end():
     params = DEMO | {'duration_hours': 15}
     base = simulate(params)
     extended = simulate(params, buffer_factor=2)
-    difference = max(abs(x-y) for a,b in zip(base['concentrations_mg_l'], extended['concentrations_mg_l'])
+    difference = max(abs(x-y) for a,b in zip(legacy_rows(base), legacy_rows(extended))
                      for x,y in zip(a,b))
     print('post arrival buffer difference mg/L:', difference)
     assert difference < 1e-7
