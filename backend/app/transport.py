@@ -279,6 +279,18 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     amplitudes = [max(abs(low - p['background_mg_l']), abs(high - p['background_mg_l']))
                   for low, high in zip(minimum, maximum)]
     selected, interpolation_error, checks = _compress_trajectory(trajectory, mandatory, amplitudes)
+    # A split event can differ from an ordinary step by less than one ULP
+    # in hours. Keep one state only when both time and all means are identical;
+    # integration, mass accounting, and the stored values remain unchanged.
+    distinct = []
+    for index in selected:
+        if distinct and trajectory[index * 101] <= trajectory[distinct[-1] * 101]:
+            previous = distinct[-1]
+            if trajectory[index * 101:(index + 1) * 101] == trajectory[previous * 101:(previous + 1) * 101]:
+                continue
+            raise _resolution_limit('близкие моменты нельзя различить с машинной точностью.')
+        distinct.append(index)
+    selected = distinct
     times = [trajectory[i * 101] for i in selected]
     rows = [list(trajectory[i * 101 + 1:(i + 1) * 101]) for i in selected]
     excess_stored = area * dx * math.fsum(run['final_state'])

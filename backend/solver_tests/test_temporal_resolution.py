@@ -143,3 +143,17 @@ def test_absolute_floor_allows_sub_nanogram_noise_but_not_larger_error():
     data[102] = 2e-9
     selected, _, _ = transport._compress_trajectory(data, {0, 2}, [2e-9] * 100)
     assert selected == [0, 1, 2]
+
+
+def test_representationally_coincident_event_and_legacy_frame_have_one_output_time():
+    # The event and next ordinary state have identical float64 means and hour,
+    # even though the unchanged integrator takes a ~2e-15-second final piece.
+    params = SHORT | dict(duration_hours=.3, load_duration_hours=.0062499999999999995)
+    reference=[]
+    result=transport.simulate(params, reference_callback=lambda t,row:reference.append((t,row.copy())))
+    times=result['times_hours']
+    assert all(a < b for a,b in zip(times,times[1:]))
+    assert times.count(params['load_duration_hours']) == 1
+    assert set(i*.3/48 for i in range(49)) <= set(times)
+    assert_reference_error(result,reference)
+    assert result['diagnostics']['relative_excess_mass_error'] < 1e-9
