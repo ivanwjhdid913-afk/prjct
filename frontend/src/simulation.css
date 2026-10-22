@@ -276,11 +276,12 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .profile-tabs button[aria-pressed="true"] { background: #174c45; color: white; border-color: #174c45; }
 .temporal-profile label { font-size: 11px; margin: 8px 0 5px; }
 .temporal-profile select { min-height: 44px; }
-.temporal-reading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.temporal-reading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 8px 0; }
 .temporal-reading strong { color: var(--ink); font-size: 16px; }
-.temporal-extremum { margin: 10px 0; padding: 10px 0; border-block: 1px solid var(--line); }
-.temporal-extremum p { line-height: 1.5; overflow-wrap: anywhere; }
-.temporal-extremum button { min-height: 44px; padding: 8px 12px; }
+.temporal-extremum { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 0; border-block: 1px solid var(--line); }
+.temporal-extremum p { margin: 0; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; flex: 1; }
+.temporal-extremum button { min-height: 44px; padding: 6px 8px; max-width: 145px; font-size: 12px; }
+.temporal-profile svg { min-height: 110px; margin: 6px 0; }
 .model-explanation { margin-top: 12px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
 .timeline-track { grid-column: 1 / -1; position: relative; display: flex; align-items: center; }
 .timeline-track input { width: 100%; position: relative; z-index: 1; background: transparent; }
@@ -293,6 +294,11 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
   .source-status { width: 100%; margin: 0; }
   .load-settings select, .load-settings input, .temporal-profile select { font-size: 16px; }
   .profile-tabs { margin-bottom: 0; }
-  .temporal-profile h3 { margin-top: 8px; }
+  .profile-drawer:has(.temporal-profile) .profile-tabs { margin: 0 0 4px; }
+  .profile-drawer:has(.temporal-profile) { padding-top: 4px; }
+  .temporal-profile h3 { margin: 4px 0; }
+  .temporal-profile label { margin: 4px 0 3px; }
+  .temporal-reading { margin: 6px 0; }
+  .temporal-extremum { margin: 4px 0; padding: 4px 0; }
   .temporal-profile svg { min-height: 110px; }
 }

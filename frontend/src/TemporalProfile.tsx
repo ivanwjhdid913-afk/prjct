@@ -28,7 +28,7 @@ export default function TemporalProfile({ result, a, b, distances, selected, onS
     <p className="temporal-reading"><strong data-testid="temporal-current">{number(current)} мг/л</strong><span>{number(hour, 6)} ч · {number(distances[selected], 0)} м</span></p>
     <div className="temporal-extremum" data-testid="temporal-extremum">
       {flat ? <p>{maximum === background ? 'Отклонения от фона нет. Выраженного экстремума нет.' : 'Концентрация постоянна. Выраженного экстремума нет.'}</p> : <>
-        <p>Расчётная оценка · {isMinimum ? 'минимум' : 'максимум'}: <strong>{number(extremum, 6)} мг/л</strong> в {number(extremumHour, 9)} ч ({number(extremumHour * 3600, 3)} с). Для выбранного сегмента показанного расчёта.</p>
+        <p>Расчётная оценка · {isMinimum ? 'минимум' : 'максимум'}<br /><strong>{number(extremum, 6)} мг/л</strong> · {number(extremumHour * 3600, 3)} с</p>
         <button type="button" onClick={() => onSeek(extremumHour)}>{isMinimum ? 'Перейти к минимуму' : 'Перейти к максимуму'}</button>
       </>}
     </div>

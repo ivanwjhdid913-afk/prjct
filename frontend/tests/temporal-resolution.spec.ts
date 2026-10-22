@@ -50,6 +50,7 @@ test('independent A and B grids share physical time, map geometry, scale and act
   await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();
   await page.route('**/api/v1/simulations', route => route.fulfill({ json: b }));
   await page.getByRole('button', { name: 'Рассчитать Б', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Показать Б', exact: true })).toBeEnabled();
   const slider = page.getByLabel('Время от начала сценария');
   await slider.fill('0.01');
   const scale = await page.getByTestId('concentration-scale').innerText();
@@ -165,4 +166,14 @@ for (const height of [667, 812]) test(`minimum jump and keyboard time remain acc
   await page.getByRole('button', { name: 'Закрыть профиль' }).click();
   await expect(page.getByRole('button', { name: 'Профиль и показатели', exact: true })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+});
+
+for (const viewport of [{width:1280,height:720},{width:375,height:667}]) test(`extremum and C(t) fit together at ${viewport.width}x${viewport.height}`, async ({page}) => {
+  await page.setViewportSize(viewport); await mock(page, sample()); await openProfile(page);
+  await page.getByRole('button', {name:'Во времени C(t)', exact:true}).click();
+  const panel=await page.locator('#model-profile').boundingBox();
+  for (const item of [page.getByRole('button',{name:'Перейти к максимуму',exact:true}), page.locator('.temporal-profile svg')]) {
+    const box=await item.boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(panel!.y);
+    expect(box!.y+box!.height).toBeLessThanOrEqual(panel!.y+panel!.height);
+  }
 });
