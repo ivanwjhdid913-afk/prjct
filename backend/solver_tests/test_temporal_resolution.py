@@ -99,6 +99,76 @@ def test_integrator_callback_includes_split_and_preserves_legacy_arithmetic():
     assert compact['outflow_per_area'] == original['outflow_per_area']
 
 
+@pytest.mark.parametrize('load_hours', [None, .001, .05, .1])
+def test_endpoint_canonicalization_preserves_frame_cell_means_steps_and_mass(monkeypatch, load_hours):
+    params = DEMO | dict(length_m=1000., duration_hours=.1)
+    if load_hours is not None:
+        params.update(load_mode='finite', load_duration_hours=load_hours)
+    integrate = transport._integrate
+    baseline = {}
+
+    def observe(**kwargs):
+        # Independently obtain unmodified integrator snapshots, bypassing the
+        # output timestamp/compression layer being tested.
+        baseline.update(integrate(**(kwargs | dict(state_callback=None, keep_snapshots=True))))
+        return integrate(**kwargs)
+
+    monkeypatch.setattr(transport, '_integrate', observe)
+    result = transport.simulate(params)
+    times = result['times_hours']
+    for frame, cells in enumerate(baseline['snapshots']):
+        hours = .1 if frame == 48 else frame * .1 / 48
+        if load_hours is not None and frame * 7.5 == load_hours * 3600:
+            hours = load_hours
+        # This scenario has one 10 m internal cell per displayed segment.
+        expected = [(.01 + value) * 1000 for value in cells[:100]]
+        assert result['concentrations_mg_l'][times.index(hours)] == expected
+    assert result['diagnostics']['steps'] == baseline['steps']
+    assert result['diagnostics']['dt_s'] == baseline['dt_s']
+    assert result['diagnostics']['excess_outgoing_kg'] == 40.4 * baseline['outflow_per_area']
+    assert result['diagnostics']['relative_excess_mass_error'] < 1e-9
+
+
+def test_event_encoding_collision_retains_every_cell_mean_and_exact_event(monkeypatch):
+    params = DEMO | dict(length_m=1000., duration_hours=.7,
+                         load_mode='finite', load_duration_hours=.7 / 3)
+    integrate = transport._integrate
+    raw, encoded = [], []
+
+    def observe(**kwargs):
+        capture = kwargs['state_callback']
+        def record(t, state):
+            raw.append((t, [(.01 + value) * 1000 for value in state[:100]]))
+            capture(t, state)
+        return integrate(**(kwargs | dict(state_callback=record)))
+
+    monkeypatch.setattr(transport, '_integrate', observe)
+    result = transport.simulate(params, reference_callback=lambda t, row: encoded.append((t, row)))
+    assert [row for _, row in raw] == [row for _, row in encoded]
+    event = params['load_duration_hours']
+    event_index = next(i for i, (t, _) in enumerate(raw) if t == event * 3600)
+    assert encoded[event_index][0] == event
+    assert encoded[event_index + 1][0] == math.nextafter(event, math.inf)
+    assert encoded[event_index][1] != encoded[event_index + 1][1]
+    assert all(a[0] < b[0] for a, b in zip(encoded, encoded[1:]))
+    assert all(0 <= t <= .7 for t, _ in encoded)
+    assert_reference_error(result, encoded)
+
+
+def test_event_neighbor_encoding_preserves_order_domain_and_small_ulp_bound():
+    event = .7 / 3
+    for direction in (-math.inf, math.inf):
+        moved = transport._event_neighbor_hour(event, event, direction, .7)
+        assert moved == math.nextafter(event, direction)
+        assert abs(moved - event) == math.ulp(event)
+    with pytest.raises(ValueError, match='машинной точностью'):
+        transport._event_neighbor_hour(.7, .7, math.inf, .7)
+    with pytest.raises(ValueError, match='машинной точностью'):
+        transport._event_neighbor_hour(0., 0., -math.inf, .7)
+    with pytest.raises(ValueError, match='машинной точностью'):
+        transport._event_neighbor_hour(.6, event, -math.inf, .7)
+
+
 @pytest.mark.parametrize('finite', [False, True])
 def test_constant_trajectory_keeps_exact_legacy_values(finite):
     params = SHORT | dict(effluent_mg_l=10.) if finite else DEMO | dict(effluent_mg_l=10., duration_hours=1.)

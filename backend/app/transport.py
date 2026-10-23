@@ -195,6 +195,21 @@ def _load_switch(dt: float, load_end_seconds: float | None) -> tuple[int | None,
     return index, load_end_seconds - index * dt
 
 
+def _event_neighbor_hour(hours: float, event: float, direction: float, horizon: float) -> float:
+    """Encode a distinct event neighbor when seconds collapse onto one hour.
+
+    The event itself is immutable. Move only its ordinary neighbor by at most
+    two event-hour ULPs; never manufacture room outside the requested domain.
+    This changes the float representation of time, not integration or values.
+    """
+    if (direction < 0 and hours < event) or (direction > 0 and hours > event):
+        return hours
+    candidate = math.nextafter(event, direction)
+    if not 0 <= candidate <= horizon or abs(candidate - hours) > 2 * math.ulp(event):
+        raise _resolution_limit('близкие моменты нельзя различить с машинной точностью.')
+    return candidate
+
+
 def simulate(params: dict, *, spatial_refinement: float = 1.,
              temporal_refinement: float = 1., buffer_factor: float = 1.,
              reference_callback: Callable[[float, list[float]], None] | None = None) -> dict:
@@ -251,6 +266,13 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
         hours = t / 3600
         if index in legacy_frames:
             hours = legacy_frames[index] * p['duration_hours'] / 48
+            # Endpoints belong to the requested domain exactly. In particular,
+            # 48 * .1 / 48 is one ULP larger than .1; keep the historical
+            # arithmetic only for interior frames, without touching the state.
+            if legacy_frames[index] == 0:
+                hours = 0.
+            elif legacy_frames[index] == 48:
+                hours = p['duration_hours']
         if load_end is not None and t == load_end:
             hours = p['load_duration_hours']
             mandatory.add(index)
@@ -258,6 +280,17 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
         trajectory[offset] = hours
         values = [(cb + math.fsum(state[i:i + per_segment]) / per_segment) * 1000
                   for i in range(0, 100 * per_segment, per_segment)]
+        if before_stop > 0:
+            event_index = stop_index + 1
+            if index == event_index - 1:
+                hours = _event_neighbor_hour(hours, p['load_duration_hours'], -math.inf, p['duration_hours'])
+            elif index == event_index + 1 and values != list(trajectory[offset - 100:offset]):
+                hours = _event_neighbor_hour(hours, p['load_duration_hours'], math.inf, p['duration_hours'])
+            if index in legacy_frames and legacy_frames[index] in (0, 48):
+                endpoint = 0. if legacy_frames[index] == 0 else p['duration_hours']
+                if hours != endpoint:
+                    raise _resolution_limit('близкие моменты нельзя различить с машинной точностью.')
+        trajectory[offset] = hours
         for j, value in enumerate(values):
             trajectory[offset + j + 1] = value
             if value < minimum[j]:

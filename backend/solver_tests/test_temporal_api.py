@@ -1,5 +1,6 @@
 """Actual serialized output bounds without requiring the database service."""
 import json
+import math
 
 from fastapi import FastAPI
 import httpx
@@ -7,6 +8,7 @@ import pytest
 
 from app import simulation, transport
 from test_temporal_resolution import SHORT
+from test_transport import DEMO
 
 
 @pytest.fixture
@@ -75,3 +77,50 @@ async def test_invalid_finite_time_is_rejected(api, value):
     raw = json.dumps(params)[:-1] + ', "load_duration_hours": ' + value + '}'
     response = await api.post('/api/v1/simulations', content=raw, headers={'Content-Type': 'application/json'})
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize('hours', [.1, .2, .4, .7, 6.1])
+@pytest.mark.parametrize('finite', [False, True])
+@pytest.mark.parametrize('river', [False, True])
+@pytest.mark.anyio
+async def test_fractional_horizon_is_exact_and_bounded_in_both_geometries(api, hours, finite, river):
+    params = DEMO | dict(length_m=1000., duration_hours=hours)
+    if finite:
+        params.update(load_mode='finite', load_duration_hours=.001)
+    if river:
+        params.pop('length_m')
+        params['reach_id'] = simulation.prepared_reach()[0]['id']
+    response = await api.post('/api/v1/simulations', json=params)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    times = result['times_hours']
+    assert times[0] == 0.
+    assert times[-1] == hours
+    assert all(math.isfinite(t) and 0 <= t <= hours for t in times)
+    assert all(a < b for a, b in zip(times, times[1:]))
+    # Only the endpoints are canonicalized: preserve historical interior times.
+    assert {i * hours / 48 for i in range(1, 48)} <= set(times)
+    if finite:
+        assert params['load_duration_hours'] in times
+    assert result['diagnostics']['relative_excess_mass_error'] < 1e-9
+    assert result['provenance'] == ('river_scenario' if river else 'synthetic')
+
+
+@pytest.mark.parametrize('river', [False, True])
+@pytest.mark.anyio
+async def test_third_of_fractional_horizon_retains_exact_event_and_distinct_times(api, river):
+    params = DEMO | dict(length_m=1000., duration_hours=.7,
+                         load_mode='finite', load_duration_hours=.7 / 3)
+    if river:
+        params.pop('length_m')
+        params['reach_id'] = simulation.prepared_reach()[0]['id']
+    response = await api.post('/api/v1/simulations', json=params)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    times = result['times_hours']
+    assert times[0] == 0 and times[-1] == .7
+    assert params['load_duration_hours'] in times
+    assert all(math.isfinite(t) and 0 <= t <= .7 for t in times)
+    assert all(a < b for a, b in zip(times, times[1:]))
+    assert {i * .7 / 48 for i in range(1, 48)} <= set(times)
+    assert result['diagnostics']['relative_excess_mass_error'] < 1e-9
