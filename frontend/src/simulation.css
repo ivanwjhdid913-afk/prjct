@@ -282,6 +282,13 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .temporal-extremum p { margin: 0; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; flex: 1; }
 .temporal-extremum button { min-height: 44px; padding: 6px 8px; max-width: 145px; font-size: 12px; }
 .temporal-profile svg { min-height: 110px; margin: 6px 0; }
+.temporal-table table { table-layout: fixed; }
+.temporal-table th, .temporal-table td { overflow-wrap: anywhere; }
+.temporal-table td small { display: block; margin-top: 3px; font-size: 10px; color: var(--muted); }
+.temporal-table-note { font-size: 11px; line-height: 1.4; }
+.temporal-table-pagination { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.temporal-table-pagination p { flex-basis: 100%; margin: 0; font-size: 11px; }
+.temporal-table-pagination button { min-height: 44px; flex: 1; }
 .model-explanation { margin-top: 12px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); }
 .timeline-track { grid-column: 1 / -1; position: relative; display: flex; align-items: center; }
 .timeline-track input { width: 100%; position: relative; z-index: 1; background: transparent; }

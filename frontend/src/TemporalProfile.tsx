@@ -1,3 +1,4 @@
+import { memo, useEffect, useMemo, useState } from 'react';
 import { valuesAtHour } from './scenarioComparison';
 
 type Series = { times_hours: number[]; concentrations_mg_l: number[][] };
@@ -7,6 +8,43 @@ type Props = {
   hour: number; duration: number; scale: [number, number]; background: number; onSeek: (hour: number) => void;
 };
 const number = (value: number, digits = 4) => value.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+const TABLE_PAGE_SIZE = 100;
+const TemporalTable = memo(function TemporalTable({ primary, secondary, selected }: { primary: Series; secondary: Series | null; selected: number }) {
+  const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  // Keep every saved event, even when two timestamps are extremely close.
+  const times = useMemo(() => secondary
+    ? [...new Set([...primary.times_hours, ...secondary.times_hours])].sort((a, b) => a - b)
+    : primary.times_hours, [primary, secondary]);
+  useEffect(() => setPage(0), [times]);
+  const pages = Math.ceil(times.length / TABLE_PAGE_SIZE);
+  const currentPage = Math.min(page, pages - 1);
+  const first = currentPage * TABLE_PAGE_SIZE;
+  const rows = useMemo(() => open ? times.slice(first, first + TABLE_PAGE_SIZE).map(time => ({
+    time,
+    primary: valuesAtHour(primary, time)[selected],
+    secondary: secondary ? valuesAtHour(secondary, time)[selected] : null,
+  })) : [], [open, times, first, primary, secondary, selected]);
+
+  return <details onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Таблица C(t)</summary>
+    {open && <>
+      {secondary && <p className="temporal-table-note">Все сохранённые моменты А и Б. Между ними значения каждого сценария интерполированы.</p>}
+      <nav className="temporal-table-pagination" aria-label="Страницы таблицы C(t)">
+        <p role="status" data-testid="temporal-table-status">Строки {first + 1}–{Math.min(first + TABLE_PAGE_SIZE, times.length)} из {times.length} · Страница {currentPage + 1} / {pages}</p>
+        <button type="button" aria-label="Предыдущая страница C(t)" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Назад</button>
+        <button type="button" aria-label="Следующая страница C(t)" disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>Далее</button>
+      </nav>
+      <div className="simulation-table temporal-table"><table aria-label="Концентрация сегмента во времени">
+        <thead><tr><th scope="col">Время</th>{secondary ? <><th scope="col">А, мг/л</th><th scope="col">Б, мг/л</th></> : <th scope="col">Концентрация, мг/л</th>}</tr></thead>
+        <tbody>{rows.map(row => <tr key={row.time}>
+          <td><span>{(row.time * 3600).toLocaleString('ru-RU', { maximumFractionDigits: 3 })} с</span><small><span className="temporal-table-hour">{String(row.time).replace('.', ',')}</span> ч</small></td><td>{number(row.primary)}</td>{row.secondary !== null && <td>{number(row.secondary)}</td>}
+        </tr>)}</tbody>
+      </table></div>
+    </>}
+  </details>;
+});
 
 export default function TemporalProfile({ result, a, b, distances, selected, onSelect, hour, duration, scale, background, onSeek }: Props) {
   const x = (time: number) => 85 + 645 * time / duration;
@@ -42,6 +80,6 @@ export default function TemporalProfile({ result, a, b, distances, selected, onS
       <text x="85" y="220">0</text><text x="730" y="220" textAnchor="end">{number(duration, 2)} ч</text>
     </svg>
     {a && b && <p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}
-    <details><summary>Таблица C(t)</summary><div className="simulation-table"><table aria-label="Концентрация сегмента во времени"><thead><tr><th>Время, ч</th>{a && b ? <><th>А, мг/л</th><th>Б, мг/л</th></> : <th>Концентрация, мг/л</th>}</tr></thead><tbody>{result.times_hours.map((time, index) => <tr key={time}><td>{number(time, 9)}</td>{a && b ? <><td>{number(valuesAtHour(a, time)[selected])}</td><td>{number(valuesAtHour(b, time)[selected])}</td></> : <td>{number(result.concentrations_mg_l[index][selected])}</td>}</tr>)}</tbody></table></div></details>
+    <TemporalTable primary={a && b ? a : result} secondary={a && b ? b : null} selected={selected} />
   </section>;
 }
