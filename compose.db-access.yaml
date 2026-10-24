@@ -1,0 +1,5 @@
+# Optional host access for database clients. The application uses db:5432.
+services:
+  db:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
