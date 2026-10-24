@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="openstreetmap-cgimap 2.1.0 (2059 spike-07.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+ <node id="393120802" visible="true" version="3" changeset="8756806" timestamp="2011-07-18T10:39:53Z" user="shuvaev32167" uid="213199" lat="52.7064082" lon="39.6830552"/>
+ <node id="393120805" visible="true" version="3" changeset="6297758" timestamp="2010-11-05T19:55:00Z" user="shuvaev32167" uid="213199" lat="52.7110873" lon="39.6804914"/>
+ <node id="393120809" visible="true" version="4" changeset="6297758" timestamp="2010-11-05T19:54:56Z" user="shuvaev32167" uid="213199" lat="52.7163601" lon="39.6856264"/>
+ <node id="393120811" visible="true" version="5" changeset="8756806" timestamp="2011-07-18T10:39:54Z" user="shuvaev32167" uid="213199" lat="52.7174468" lon="39.6929084"/>
+ <node id="393120812" visible="true" version="5" changeset="8756806" timestamp="2011-07-18T10:39:54Z" user="shuvaev32167" uid="213199" lat="52.7147586" lon="39.6966880"/>
+ <node id="393120814" visible="true" version="5" changeset="33358081" timestamp="2015-08-15T19:42:11Z" user="Calcio" uid="720591" lat="52.7135757" lon="39.7082875"/>
+ <node id="393120816" visible="true" version="5" changeset="33358081" timestamp="2015-08-15T19:42:11Z" user="Calcio" uid="720591" lat="52.7123708" lon="39.7108797"/>
+ <node id="393120818" visible="true" version="4" changeset="33358081" timestamp="2015-08-15T19:42:12Z" user="Calcio" uid="720591" lat="52.7159478" lon="39.7213902"/>
+ <node id="412452074" visible="true" version="5" changeset="8756806" timestamp="2011-07-18T10:39:54Z" user="shuvaev32167" uid="213199" lat="52.7167406" lon="39.6943563"/>
+ <node id="412452075" visible="true" version="5" changeset="33358081" timestamp="2015-08-15T19:42:12Z" user="Calcio" uid="720591" lat="52.7153733" lon="39.6992927"/>
+ <node id="412452076" visible="true" version="4" changeset="33358081" timestamp="2015-08-15T19:42:12Z" user="Calcio" uid="720591" lat="52.7143836" lon="39.7184373"/>
+ <node id="412452077" visible="true" version="4" changeset="33358081" timestamp="2015-08-15T19:42:12Z" user="Calcio" uid="720591" lat="52.7150789" lon="39.7052497"/>
+ <node id="871790477" visible="true" version="3" changeset="8756806" timestamp="2011-07-18T10:40:10Z" user="shuvaev32167" uid="213199" lat="52.7023982" lon="39.6851368"/>
+ <node id="977751030" visible="true" version="3" changeset="14948775" timestamp="2013-02-07T19:48:18Z" user="Calcio48" uid="1189340" lat="52.7159487" lon="39.6846280"/>
+ <node id="977751124" visible="true" version="1" changeset="6297758" timestamp="2010-11-05T19:54:18Z" user="shuvaev32167" uid="213199" lat="52.7158852" lon="39.6950532"/>
+ <node id="977751196" visible="true" version="3" changeset="14948775" timestamp="2013-02-07T19:48:18Z" user="Calcio48" uid="1189340" lat="52.7153211" lon="39.6949870"/>
+ <node id="977751241" visible="true" version="3" changeset="14948775" timestamp="2013-02-07T19:48:18Z" user="Calcio48" uid="1189340" lat="52.7130730" lon="39.6825086"/>
+ <node id="977751284" visible="true" version="2" changeset="8756806" timestamp="2011-07-18T10:40:25Z" user="shuvaev32167" uid="213199" lat="52.7169229" lon="39.6905015"/>
+ <node id="977751376" visible="true" version="3" changeset="14948775" timestamp="2013-02-07T19:48:18Z" user="Calcio48" uid="1189340" lat="52.7120386" lon="39.6812163"/>
+ <node id="977751400" visible="true" version="1" changeset="6297758" timestamp="2010-11-05T19:54:24Z" user="shuvaev32167" uid="213199" lat="52.7101618" lon="39.6804214"/>
+ <node id="977751417" visible="true" version="2" changeset="8756806" timestamp="2011-07-18T10:40:25Z" user="shuvaev32167" uid="213199" lat="52.7167178" lon="39.6867408"/>
+ <node id="1365291885" visible="true" version="2" changeset="33358081" timestamp="2015-08-15T19:42:11Z" user="Calcio" uid="720591" lat="52.7125619" lon="39.7097000"/>
+ <node id="1365291899" visible="true" version="1" changeset="8756806" timestamp="2011-07-18T10:38:18Z" user="shuvaev32167" uid="213199" lat="52.7153851" lon="39.7014265"/>
+ <node id="1365291901" visible="true" version="2" changeset="33358081" timestamp="2015-08-15T19:42:11Z" user="Calcio" uid="720591" lat="52.7156909" lon="39.7206639"/>
+ <node id="1365291906" visible="true" version="1" changeset="8756806" timestamp="2011-07-18T10:38:19Z" user="shuvaev32167" uid="213199" lat="52.7169456" lon="39.6883767"/>
+ <node id="1365291908" visible="true" version="1" changeset="8756806" timestamp="2011-07-18T10:38:19Z" user="shuvaev32167" uid="213199" lat="52.7173557" lon="39.6916298"/>
+ <node id="2104712829" visible="true" version="1" changeset="14602131" timestamp="2013-01-10T19:46:42Z" user="Calcio48" uid="1189340" lat="52.7100748" lon="39.6804988"/>
+ <node id="2145717824" visible="true" version="1" changeset="14948775" timestamp="2013-02-07T19:47:59Z" user="Calcio48" uid="1189340" lat="52.7145092" lon="39.6836456"/>
+ <node id="2145717845" visible="true" version="1" changeset="14948775" timestamp="2013-02-07T19:47:59Z" user="Calcio48" uid="1189340" lat="52.7149016" lon="39.6956483"/>
+ <node id="2145717881" visible="true" version="1" changeset="14948775" timestamp="2013-02-07T19:48:00Z" user="Calcio48" uid="1189340" lat="52.7154248" lon="39.6841254"/>
+ <node id="2145717962" visible="true" version="1" changeset="14948775" timestamp="2013-02-07T19:48:01Z" user="Calcio48" uid="1189340" lat="52.7172655" lon="39.6936092"/>
+ <node id="3698979504" visible="true" version="1" changeset="33358081" timestamp="2015-08-15T19:42:03Z" user="Calcio" uid="720591" lat="52.7148077" lon="39.7061533"/>
+ <way id="26274036" visible="true" version="57" changeset="185135849" timestamp="2026-07-05T11:48:06Z" user="Vozduhan" uid="22641821">
+  <nd ref="393120818"/>
+  <nd ref="1365291901"/>
+  <nd ref="412452076"/>
+  <nd ref="393120816"/>
+  <nd ref="1365291885"/>
+  <nd ref="393120814"/>
+  <nd ref="3698979504"/>
+  <nd ref="412452077"/>
+  <nd ref="1365291899"/>
+  <nd ref="412452075"/>
+  <nd ref="393120812"/>
+  <nd ref="2145717845"/>
+  <nd ref="977751196"/>
+  <nd ref="977751124"/>
+  <nd ref="412452074"/>
+  <nd ref="2145717962"/>
+  <nd ref="393120811"/>
+  <nd ref="1365291908"/>
+  <nd ref="977751284"/>
+  <nd ref="1365291906"/>
+  <nd ref="977751417"/>
+  <nd ref="393120809"/>
+  <nd ref="977751030"/>
+  <nd ref="2145717881"/>
+  <nd ref="2145717824"/>
+  <nd ref="977751241"/>
+  <nd ref="977751376"/>
+  <nd ref="393120805"/>
+  <nd ref="977751400"/>
+  <nd ref="2104712829"/>
+  <nd ref="393120802"/>
+  <nd ref="871790477"/>
+  <tag k="admin_level" v="6"/>
+  <tag k="boat" v="no"/>
+  <tag k="boundary" v="administrative"/>
+  <tag k="intermittent" v="no"/>
+  <tag k="name" v="Воронеж"/>
+  <tag k="name:uk" v="Воронеж"/>
+  <tag k="salt" v="no"/>
+  <tag k="waterway" v="river"/>
+  <tag k="wikidata" v="Q847893"/>
+  <tag k="wikipedia" v="ru:Воронеж (река)"/>
+ </way>
+</osm>
