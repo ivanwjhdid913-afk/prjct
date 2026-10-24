@@ -116,7 +116,7 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended, 
     segments.current = result.distances_m.map((_, index) => L.polyline(result.segment_geometries?.[index].coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple) ?? [points[index], points[index + 1]], { color: color(result.concentrations_mg_l[0][index], result.scale_mg_l), weight: 9, dashArray: result.reach_id ? undefined : '7 5', className: 'simulation-segment', smoothFactor: 0 }).addTo(map).on('click', () => onSelect(index)));
     sourceMarker(points[0]).addTo(map);
     L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
-    for (const index of [0, Math.floor(points.length / 2), points.length - 2]) {
+    for (const index of new Set([0, Math.floor(points.length / 2), points.length - 2].filter(index => index >= 0 && index + 1 < points.length))) {
       const a = map.project(points[index]); const b = map.project(points[index + 1]);
       const angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
       L.marker(points[index], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'simulation-arrow', html: `<span style="transform:rotate(${angle}deg)">➜</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) }).addTo(map);

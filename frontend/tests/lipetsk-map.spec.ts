@@ -177,3 +177,35 @@ test('mobile source mode exposes the map, supports Escape and keeps the timeline
   await expect(page.getByRole('button', { name: 'Параметры', exact: true })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
+
+for (const width of [1280, 375]) for (const load of ['continuous', 'finite']) {
+  test(`real pilot last 100m renders a two-vertex result safely at ${width}px with ${load} load`, async ({ page, request }) => {
+    await page.unroute('**/api/v1/river-reaches');
+    await page.unroute('**/api/v1/simulations');
+    await page.setViewportSize({ width, height: 812 });
+    const catalog = await (await request.get('/api/v1/river-reaches')).json();
+    const pilot = catalog.items.find((item: { id: string }) => item.id === 'voronezh-zheltye-peski');
+    expect(pilot).toBeTruthy();
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/#model');
+    await openParameters(page);
+    await page.getByLabel('Подготовленный участок').selectOption(pilot.id);
+    await page.getByLabel('Положение сценарного источника, м').fill(String(pilot.length_m - 100));
+    await page.getByLabel('Длительность, ч').fill('.1');
+    await page.getByLabel('Режим нагрузки', { exact: true }).selectOption(load);
+    if (load === 'finite') await page.getByLabel('Период загрязнения, ч').fill('.05');
+    const response = page.waitForResponse(answer => answer.url().endsWith('/api/v1/simulations'));
+    await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
+    const answer = await response;
+    expect(answer.ok()).toBeTruthy();
+    const data = await answer.json();
+    expect(data.geometry.coordinates).toHaveLength(2);
+    await page.waitForTimeout(100);
+    expect(errors).toEqual([]);
+    await expect(page.locator('.simulation-segment')).toHaveCount(100);
+    await expect(page.locator('.simulation-arrow')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Время от начала сценария')).toBeEnabled();
+  });
+}
