@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import './simulation.css';
 import { comparisonReason, sharedScale, valuesAtHour } from './scenarioComparison';
 import TemporalProfile from './TemporalProfile';
+import { riverCoordinate } from './riverCoordinate';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
 
 const fields = [
@@ -33,6 +34,7 @@ type Result = {
   temporal_resolution?: TemporalResolution;
 };
 const initialDraft = Object.fromEntries(fields.map(field => [field.key, String(field.initial)])) as Draft;
+const DEMO_REACH_ID = 'don-olkhovets';
 const format = (value: number, digits = 2) => value.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const formatTime = (hour: number) => hour > 0 && hour < 1 / 60 ? `${format(hour * 3600, 3)} с` : `${format(hour, 4)} ч`;
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -146,16 +148,15 @@ function sourceMarker(point: L.LatLngExpression) {
 }
 
 function sourcePoint(reach: Reach, distance: number): [number, number] {
-  const index = Math.max(0, reach.distances_m.findIndex(value => value >= distance) - 1);
-  const span = reach.distances_m[index + 1] - reach.distances_m[index];
-  const share = Math.max(0, Math.min(1, (distance - reach.distances_m[index]) / span));
-  const a = reach.geometry.coordinates[index], b = reach.geometry.coordinates[index + 1];
-  return [a[1] + (b[1] - a[1]) * share, a[0] + (b[0] - a[0]) * share];
+  const [longitude, latitude] = riverCoordinate(reach.geometry.coordinates, reach.distances_m, distance);
+  return [latitude, longitude];
 }
 
-function ReachPreview({ reach, distance, suspended }: { reach: Reach; distance: number; suspended: boolean }) {
+function ReachPreview({ reach, distance, point, suspended, picking, onPick }: { reach: Reach; distance: number; point: [number, number] | null; suspended: boolean; picking: boolean; onPick: (longitude: number, latitude: number) => void }) {
   const host = useRef<HTMLDivElement>(null);
   const marker = useRef<L.Marker | null>(null);
+  const pick = useRef(onPick);
+  pick.current = onPick;
   const [tileError, setTileError] = useState(false);
   useEffect(() => {
     if (!host.current) return;
@@ -167,15 +168,27 @@ function ReachPreview({ reach, distance, suspended }: { reach: Reach; distance: 
     const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(map);
     tiles.on('tileerror', () => setTileError(true));
     L.polyline(points, { color: 'white', weight: 10, smoothFactor: 0 }).addTo(map);
-    L.polyline(points, { color: '#397b86', weight: 5, smoothFactor: 0 }).addTo(map);
+    L.polyline(points, { color: '#397b86', weight: 5, smoothFactor: 0, className: 'reach-preview-line' }).addTo(map);
+    for (const index of [0, Math.floor((points.length - 1) / 2), points.length - 2]) {
+      const a = map.project(points[index]), b = map.project(points[index + 1]);
+      const angle = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+      L.marker(points[index], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'simulation-arrow', html: `<span style="transform:rotate(${angle}deg)">➜</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) }).addTo(map);
+    }
+    map.on('click', event => pick.current(event.latlng.lng, event.latlng.lat));
     L.circleMarker(points[points.length - 1], { radius: 5, color: '#163b38', fillOpacity: 1 }).bindTooltip('Конец участка · ниже по течению').addTo(map);
     marker.current = sourceMarker(points[0]).addTo(map);
     L.control.scale({ imperial: false }).addTo(map);
     const resize = new ResizeObserver(() => map.invalidateSize()); resize.observe(host.current);
     return () => { resize.disconnect(); marker.current = null; map.remove(); };
   }, [reach]);
-  useEffect(() => { marker.current?.setLatLng(sourcePoint(reach, distance)); }, [reach, distance]);
-  return <div className="reach-preview" inert={suspended}><div ref={host} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
+  useEffect(() => { marker.current?.setLatLng(point ? [point[1], point[0]] : sourcePoint(reach, distance)); }, [reach, distance, point]);
+  useEffect(() => {
+    if (!picking) return;
+    const frame = requestAnimationFrame(() => host.current?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [picking]);
+  const shownPoint = point ?? (() => { const [lat, lon] = sourcePoint(reach, distance); return [lon, lat]; })();
+  return <div className={`reach-preview${picking ? ' is-picking' : ''}`} data-reach-id={reach.id} data-source-coordinate={JSON.stringify(shownPoint)} inert={suspended}><div ref={host} tabIndex={-1} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
 }
 
 export default function Simulation() {
@@ -205,8 +218,18 @@ export default function Simulation() {
     profileWasOpen.current = profileOpen;
   }, [profileOpen]);
   const [reaches, setReaches] = useState<Reach[]>([]);
-  const [reachId, setReachId] = useState('');
+  const [reachId, setReachId] = useState(DEMO_REACH_ID);
   const [source, setSource] = useState('0');
+  const [sourceCoordinate, setSourceCoordinate] = useState<[number, number] | null>(null);
+  const [pickingSource, setPickingSource] = useState(false);
+  const [pickMessage, setPickMessage] = useState('');
+  const [pickPending, setPickPending] = useState(false);
+  const [draftPreview, setDraftPreview] = useState(false);
+  const snapRequest = useRef(0);
+  const snapController = useRef<AbortController | null>(null);
+  const previewBeforePick = useRef(false);
+  const sourcePickButton = useRef<HTMLButtonElement>(null);
+  const pickingRef = useRef(false);
   const [reachError, setReachError] = useState('');
   const [reachRevision, setReachRevision] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -229,6 +252,7 @@ export default function Simulation() {
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => { title.current?.focus({ preventScroll: true }); return () => { request.current++; controller.current?.abort(); }; }, []);
   const reach = reaches.find(item => item.id === reachId);
+  const demoReach = reaches.find(item => item.id === DEMO_REACH_ID);
   const sourceValid = !!reach && source.trim() !== '' && Number.isFinite(Number(source)) && Number(source) >= 0 && Number(source) <= reach.length_m - 100;
   const displayLength = mode === 'river' && reach ? Math.max(0, reach.length_m - Number(source || 0)) : Number(draft.length_m);
   useEffect(() => {
@@ -239,10 +263,53 @@ export default function Simulation() {
       const data = await response.json();
       if (!record(data) || !Array.isArray(data.items) || !data.items.length || !data.items.every(validReach)) throw new Error();
       const items = data.items;
-      setReaches(items); setReachId(current => current || items[0].id);
+      setReaches(items); setReachId(current => items.some(item => item.id === current) ? current : items.some(item => item.id === DEMO_REACH_ID) ? DEMO_REACH_ID : items[0].id);
     }).catch(() => { if (!abort.signal.aborted) setReachError('Не удалось загрузить подготовленный участок. Повторите запрос.'); });
     return () => abort.abort();
   }, [reachRevision]);
+  function invalidateSnap() { snapRequest.current++; snapController.current?.abort(); setPickPending(false); }
+  function finishPicking(restorePreview = false) {
+    invalidateSnap(); pickingRef.current = false; setPickingSource(false); setPickMessage('');
+    if (restorePreview) setDraftPreview(previewBeforePick.current);
+    requestAnimationFrame(() => (mobileLayout ? document.querySelector<HTMLButtonElement>('.mobile-parameters-toggle') : sourcePickButton.current)?.focus({ preventScroll: true }));
+  }
+  function editSource(value: string) {
+    invalidateSnap(); setSource(value); setSourceCoordinate(null); setDraftPreview(true); setPickMessage(''); setPlaying(false);
+  }
+  function selectReach(id: string) {
+    finishPicking(); setReachId(id); setSource('0'); setSourceCoordinate(null); setDraftPreview(true); setPlaying(false);
+  }
+  function startPicking() {
+    if (!reach || mode !== 'river') return;
+    invalidateSnap(); previewBeforePick.current = draftPreview; pickingRef.current = true;
+    setPickingSource(true); setDraftPreview(true); setPickMessage(''); setParametersOpen(false); setProfileOpen(false); setPlaying(false);
+  }
+  useEffect(() => {
+    if (!pickingSource) return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); finishPicking(true); } };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [pickingSource, mobileLayout]);
+  useEffect(() => () => { snapRequest.current++; snapController.current?.abort(); }, []);
+  async function pickSource(longitude: number, latitude: number) {
+    if (!pickingRef.current || !reach || mode !== 'river') return;
+    invalidateSnap(); const id = snapRequest.current; const selectedReach = reach;
+    const abort = new AbortController(); snapController.current = abort;
+    setPickPending(true); setPickMessage('Привязываем точку к выбранному руслу…');
+    try {
+      const response = await fetch(`/api/v1/river-reaches/${encodeURIComponent(selectedReach.id)}/source-snap?${new URLSearchParams({ longitude: String(longitude), latitude: String(latitude) })}`, { signal: abort.signal });
+      const data: unknown = await response.json();
+      if (id !== snapRequest.current || !pickingRef.current) return;
+      if (!response.ok) throw new Error(response.status === 422 ? 'Точка слишком далеко от выбранного русла или ниже неё осталось менее 100 м. Выберите другую точку.' : 'Не удалось привязать источник. Повторите выбор точки.');
+      if (!record(data) || data.reach_id !== selectedReach.id || !finite(data.source_distance_m) || !coordinate(data.coordinate) || !finite(data.distance_to_river_m) || data.distance_to_river_m < 0 || data.max_distance_m !== 75) throw new Error('Некорректный ответ сервера. Повторите выбор точки.');
+      if (data.distance_to_river_m > 75) throw new Error('Точка слишком далеко: нажмите не дальше 75 м от выбранного русла.');
+      if (data.source_distance_m < 0 || data.source_distance_m > selectedReach.length_m - 100) throw new Error('Ниже сценарного источника должно оставаться не менее 100 м. Выберите точку выше по течению.');
+      setSource(String(data.source_distance_m)); setSourceCoordinate(data.coordinate); setPlaying(false); finishPicking();
+      setPickMessage(`Сценарный источник выбран: ${selectedReach.name} · ${format(data.source_distance_m, 1)} м. Примените условия кнопкой «Рассчитать».`);
+    } catch (error) {
+      if (id === snapRequest.current && !abort.signal.aborted && pickingRef.current) setPickMessage(error instanceof Error ? error.message : 'Не удалось привязать источник. Повторите выбор точки.');
+    } finally { if (id === snapRequest.current) setPickPending(false); }
+  }
   const incompatibleDraft = baseline && variant ? (
     (mode === 'river' ? reachId !== baseline.reach_id : !!baseline.reach_id) ? 'Нужны одинаковые участок и геометрия.'
     : mode === 'river' && (Number(source) !== baseline.source_distance_m || !sourceValid) ? 'Сценарный источник должен находиться в том же положении, что и в А.'
@@ -262,7 +329,7 @@ export default function Simulation() {
     if (!baseline) return;
     stopRequest(); setPlaying(false); setMode(baseline.reach_id ? 'river' : 'synthetic');
     if (baseline.reach_id) setReachId(baseline.reach_id);
-    setSource(String(baseline.source_distance_m ?? 0));
+    finishPicking(); setDraftPreview(false); setSourceCoordinate(baseline.source_coordinate ?? null); setSource(String(baseline.source_distance_m ?? 0));
     setLoadMode(baseline.inputs.load_mode ?? 'continuous'); setLoadDuration(String(baseline.inputs.load_duration_hours ?? .5));
     setDraft(Object.fromEntries(fields.map(field => [field.key, String(baseline.inputs[field.key])])) as Draft);
     setResult(baseline); setVariant(true); setHasB(false); setActiveScenario('Б'); setTime(0); setSelected(0);
@@ -285,13 +352,14 @@ export default function Simulation() {
 
 
   async function calculate(demonstration: false | true | 'finite' = false) {
-    const chosenReach = demonstration ? reaches[0] : reach;
+    const chosenReach = demonstration ? demoReach : reach;
     if (demonstration ? !chosenReach : !form.current?.reportValidity() || (mode === 'river' && !sourceValid)) return;
     const nextDraft = demonstration ? { ...initialDraft, duration_hours: demonstration === 'finite' ? '6' : '4' } : draft;
     const nextLoadMode = demonstration ? (demonstration === 'finite' ? 'finite' : 'continuous') : loadMode;
     const nextLoadDuration = nextLoadMode === 'finite' ? (demonstration ? .5 : Number(loadDuration)) : null;
     const nextMode = demonstration ? 'river' : mode;
-    if (demonstration) { setComparisonExitReason(''); setVariant(false); setHasB(false); setMode('river'); setReachId(chosenReach!.id); setSource('0'); setDraft(nextDraft); setLoadMode(nextLoadMode); setLoadDuration('.5'); }
+    finishPicking();
+    if (demonstration) { setSourceCoordinate(null); setComparisonExitReason(''); setVariant(false); setHasB(false); setMode('river'); setReachId(chosenReach!.id); setSource('0'); setDraft(nextDraft); setLoadMode(nextLoadMode); setLoadDuration('.5'); }
     setParametersOpen(false);
     setPlaying(false);
     const inputs = { ...Object.fromEntries(fields.filter(field => nextMode !== 'river' || field.key !== 'length_m').map(field => [field.key, Number(nextDraft[field.key])])), load_mode: nextLoadMode, load_duration_hours: nextLoadDuration };
@@ -318,7 +386,7 @@ export default function Simulation() {
       const compatibleB = !demonstration && variant && baseline && !comparisonReason(baseline, data);
       setComparisonExitReason(!demonstration && variant && baseline ? comparisonReason(baseline, data) : '');
       setVariant(!!compatibleB); setHasB(!!compatibleB); setActiveScenario('Б');
-      setPlaying(false); setResult(data); setTime(0); setSelected(0); setStatus('ready');
+      setPlaying(false); setDraftPreview(false); setResult(data); setTime(0); setSelected(0); setStatus('ready');
     } catch (error) {
       if (id !== request.current) return;
       setMessage(currentController.signal.aborted ? 'Превышено время ожидания. Повторите расчёт.' : error instanceof Error ? error.message : 'Проверьте соединение с сервером.');
@@ -337,8 +405,10 @@ export default function Simulation() {
   const sourceState = (item: Result) => loadEnd(item) !== null && shownHours >= loadEnd(item)! ? 'Повышенная нагрузка завершена' : 'Повышенная нагрузка действует';
   const sourceDescription = (item: Result) => item.derived.excess_load_kg_s === 0 ? 'Добавочной нагрузки нет' : item.derived.excess_load_kg_s < 0 ? (loadEnd(item) !== null && shownHours >= loadEnd(item)! ? 'Период пониженной концентрации завершён' : 'Поступает вода ниже фоновой концентрации') : sourceState(item);
   const loadMarkers = (comparison && baseline && latestResult ? [{ item: baseline, label: 'А' }, { item: latestResult, label: 'Б' }] : result ? [{ item: result, label: '' }] : []).filter(({ item }) => loadEnd(item) !== null);
+  const showingPreview = mode === 'river' && !!reach && (draftPreview || !result);
+  const showingResult = !!result && !showingPreview;
   return <div className={`simulation${comparison ? " is-comparing" : ""}`}>
-    <header className="model-heading"><div><h1 ref={title} tabIndex={-1}>Моделирование</h1><span className="scenario-badge">Сценарная симуляция · хлориды</span></div><div className="workspace-tools"><button className="mobile-parameters-toggle" aria-expanded={parametersOpen} aria-controls="model-parameters" onClick={() => setParametersOpen(value => !value)}>Параметры</button><button className="demo-button" disabled={!reaches.length || status === 'loading'} onClick={() => { void calculate(true); }}>Запустить демонстрацию</button></div></header>
+    <header className="model-heading"><div><h1 ref={title} tabIndex={-1}>Моделирование</h1><span className="scenario-badge">Сценарная симуляция · хлориды</span></div><div className="workspace-tools"><button className="mobile-parameters-toggle" aria-expanded={parametersOpen} aria-controls="model-parameters" onClick={() => setParametersOpen(value => !value)}>Параметры</button><button className="demo-button" disabled={!demoReach || status === 'loading'} onClick={() => { void calculate(true); }}>Запустить демонстрацию</button></div></header>
     <div className="map-status-stack">
       {(incompatibleDraft || completedReason || comparisonExitReason) && <p className="comparison-notice" role="status">Сравнение отключено. {incompatibleDraft || completedReason || comparisonExitReason} Можно выполнить одиночный расчёт; закреплённый А сохранён.</p>}
             {stale && <p className="simulation-stale" role="status">{variant && !incompatibleDraft ? hasB ? 'Параметры Б изменены. Прежний результат Б относится к предыдущим условиям.' : 'Условия Б изменены. Показан базовый расчёт А; вариант Б ещё не рассчитан.' : 'Параметры изменены. Результат относится к предыдущим условиям.'}</p>}
@@ -356,12 +426,12 @@ export default function Simulation() {
               {!baseline ? <button type="button" disabled={!result || status === 'loading'} onClick={pinBaseline}>Закрепить как А</button> : <><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" className="replace-baseline" disabled={!result || status === 'loading'} onClick={pinBaseline}>Заменить А показанным расчётом</button></>}
               <small>После перезагрузки страницы сценарии сбрасываются.</small>
             </section>
-            <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { setMode(event.target.value); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
+            <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { finishPicking(); setMode(event.target.value); setDraftPreview(false); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
             {mode === 'river' && <section className="river-setup" aria-label="Выбор речного участка">
-              {reachError ? <div role="alert"><p>{reachError}</p><button type="button" onClick={() => setReachRevision(value => value + 1)}>Повторить загрузку участка</button></div> : !reach ? <p role="status">Загрузка участка…</p> : <>
-                <label htmlFor="reach-id">Подготовленный участок</label><select id="reach-id" value={reachId} onChange={event => { setReachId(event.target.value); setPlaying(false); }}>{reaches.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
+              {!demoReach && reaches.length > 0 && <p className="simulation-field-error" role="status">Участок Дона для демонстраций недоступен. Для расчёта выбран другой подготовленный участок.</p>}{reachError ? <div role="alert"><p>{reachError}</p><button type="button" onClick={() => setReachRevision(value => value + 1)}>Повторить загрузку участка</button></div> : !reach ? <><label htmlFor="reach-id">Подготовленный участок</label><select id="reach-id" value="" onChange={event => selectReach(event.target.value)}><option value="" disabled>Выберите участок</option>{reaches.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select><p role="status">{reaches.length ? 'Выберите подготовленное русло.' : 'Загрузка участка…'}</p></> : <>
+                <label htmlFor="reach-id">Подготовленный участок</label><select id="reach-id" value={reachId} onChange={event => { selectReach(event.target.value); }}>{reaches.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
                 <p className="simulation-hint">{format(reach.length_m / 1000, 3)} км · направление вниз по течению</p>
-                <label htmlFor="source-distance">Положение сценарного источника, м</label><input id="source-distance" required type="number" min={0} max={reach.length_m - 100} step="any" value={source} onChange={event => { setSource(event.target.value); setPlaying(false); }} aria-describedby="source-help" /><input className="source-slider" type="range" min={0} max={Math.floor(reach.length_m - 100)} step={1} value={sourceValid ? Number(source) : 0} aria-label="Переместить сценарный источник вдоль русла" onChange={event => { setSource(event.target.value); setPlaying(false); }} /><p className="simulation-hint" id="source-help">От начала вниз по течению; ниже источника — не менее 100 м. {sourceValid ? `Для расчёта: ${format(displayLength, 1)} м.` : 'Укажите допустимое положение.'}</p>
+                {result && !draftPreview && !pickingSource && !pickMessage && <button type="button" className="source-pick-toggle" onClick={() => { setDraftPreview(true); setProfileOpen(false); }}>Показать условия следующего расчёта</button>}<button ref={sourcePickButton} type="button" className="source-pick-toggle" aria-pressed={pickingSource} onClick={() => pickingSource ? finishPicking(true) : startPicking()}>Указать источник на карте</button><label htmlFor="source-distance">Положение сценарного источника, м</label><input id="source-distance" required type="number" min={0} max={reach.length_m - 100} step="any" value={source} onChange={event => { editSource(event.target.value); }} aria-describedby="source-help" /><input className="source-slider" type="range" min={0} max={Math.floor(reach.length_m - 100)} step={1} value={sourceValid ? Number(source) : 0} aria-label="Переместить сценарный источник вдоль русла" onChange={event => { editSource(event.target.value); }} /><p className="simulation-hint" id="source-help">От начала вниз по течению; ниже источника — не менее 100 м. {sourceValid ? `Для расчёта: ${format(displayLength, 1)} м.` : 'Укажите допустимое положение.'}</p>
               </>}
             </section>}
             <div className="parameter-section-title">Нагрузка и поток <span>Заданы пользователем</span></div>
@@ -369,7 +439,7 @@ export default function Simulation() {
               <label htmlFor="load-mode">Режим нагрузки</label><select id="load-mode" value={loadMode} onChange={event => { setLoadMode(event.target.value as LoadMode); setPlaying(false); }}><option value="continuous">Постоянная нагрузка</option><option value="finite">Ограниченный период загрязнения</option></select>
               {loadMode === 'finite' && <><label htmlFor="load-duration">Период загрязнения, ч</label><input id="load-duration" type="number" required min={0.000001} max={Number(draft.duration_hours)} step="any" value={loadDuration} onChange={event => { setLoadDuration(event.target.value); setPlaying(false); }} aria-describedby="load-help" /></>}
               <p id="load-help">{loadMode === 'finite' ? 'От начала до заданного времени действует ce, затем поступающая вода имеет концентрацию cb. Расход воды сохраняется: это не закрытие водовыпуска и не гидравлическая волна.' : 'При постоянной нагрузке и гидравлике после прохождения фронта возможно плато. Оно не означает ошибку модели.'}</p>
-              <button type="button" disabled={!reaches.length || status === 'loading'} onClick={() => { void calculate('finite'); }}>Демонстрация периода</button><small>Синтетические параметры на Дону: нагрузка 0,5 ч, расчёт 6 ч. Заменяет условия формы.</small>
+              <button type="button" disabled={!demoReach || status === 'loading'} onClick={() => { void calculate('finite'); }}>Демонстрация периода</button><small>Синтетические параметры на Дону: нагрузка 0,5 ч, расчёт 6 ч. Заменяет условия формы.</small>
             </section>
             <div className="simulation-fields">{fields.map(field => <div className="simulation-field" key={field.key}>
               <label htmlFor={field.key}>{field.label}</label><input id={field.key} type="number" required step="any" min={field.min} max={field.max} value={mode === 'river' && field.key === 'length_m' ? (reach ? String(Number(displayLength.toFixed(3))) : '') : draft[field.key]} readOnly={mode === 'river' && field.key === 'length_m'} aria-describedby={`${field.key}-help${fieldErrors[field.key] ? ` ${field.key}-error` : ''}`} aria-invalid={!!fieldErrors[field.key]} onChange={event => { setDraft(current => ({ ...current, [field.key]: event.target.value })); setPlaying(false); }} />
@@ -381,18 +451,23 @@ export default function Simulation() {
         </form>
       </aside>
       <section className="model-canvas" aria-label="Рабочая область модели">
-          {comparison && <div className="scenario-switch" role="group" aria-label="Показанный сценарий" inert={parametersOpen}><button aria-pressed={activeScenario === 'А'} onClick={() => setActiveScenario('А')}>Показать А</button><button aria-pressed={activeScenario === 'Б'} onClick={() => setActiveScenario('Б')}>Показать Б</button><span>На карте: {activeScenario} · общее время</span></div>}
+          {comparison && !showingPreview && <div className="scenario-switch" role="group" aria-label="Показанный сценарий" inert={parametersOpen}><button aria-pressed={activeScenario === 'А'} onClick={() => setActiveScenario('А')}>Показать А</button><button aria-pressed={activeScenario === 'Б'} onClick={() => setActiveScenario('Б')}>Показать Б</button><span>На карте: {activeScenario} · общее время</span></div>}
+        {(pickingSource || pickMessage || (result && mode === 'river' && reach && draftPreview)) && <div className="source-map-tools">
+          {(pickingSource || pickMessage) && <p role="status" data-testid="source-pick-status">{pickingSource && <strong>{reach?.name}: нажмите рядом с руслом, не дальше 75 м. Ниже источника — минимум 100 м. Escape — отмена. </strong>}{pickMessage}</p>}
+          {pickingSource ? <button type="button" onClick={() => finishPicking(true)}>Отменить выбор источника</button> : result && mode === 'river' && reach && <button type="button" onClick={() => { setDraftPreview(value => !value); setProfileOpen(false); }}>{showingPreview ? 'Показать рассчитанный результат' : 'Показать условия следующего расчёта'}</button>}
+          {pickPending && <span aria-hidden="true" className="source-pick-pending">…</span>}
+        </div>}
         <div className="model-map-stage">
-          {result && values ? <CalculationMap comparisonLayout={comparison} result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={parametersOpen || (profileOpen && mobileLayout)} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
+          {showingResult && result && values ? <CalculationMap comparisonLayout={comparison} result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={parametersOpen || (profileOpen && mobileLayout)} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} point={sourceValid ? sourceCoordinate : null} picking={pickingSource} onPick={(lon, lat) => { void pickSource(lon, lat); }} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
 
-          <div className="map-topline"><div><span className="map-kicker">{result ? 'Рассчитанные концентрации' : 'Подготовленный участок'}</span>{result ? <h2 id="result-title">Результат расчёта{comparison ? ` · ${activeScenario}` : variant && !hasB && !incompatibleDraft ? ' · А (Б ещё не рассчитан)' : ''}</h2> : <h2>{mode === 'river' ? reach?.name ?? 'Загрузка участка…' : 'Условный участок'}</h2>}<p>{result?.reach_id ? String(result.reach_metadata?.name ?? 'Реальное русло') : result ? 'Синтетическая геометрия' : mode === 'river' ? 'Реальная геометрия · сценарный источник' : 'Геометрия и параметры — синтетические'}</p></div></div>
-          {result && values ? <aside className="map-inspector" inert={profileOpen || parametersOpen} aria-label="Концентрация и выбранный сегмент">
+          <div className="map-topline"><div><span className="map-kicker">{showingResult ? 'Рассчитанные концентрации' : result ? 'Условия следующего расчёта · прежний результат сохранён' : 'Подготовленный участок'}</span>{showingResult && result ? <h2 id="result-title">Результат расчёта{comparison ? ` · ${activeScenario}` : variant && !hasB && !incompatibleDraft ? ' · А (Б ещё не рассчитан)' : ''}</h2> : <h2>{mode === 'river' ? reach?.name ?? 'Загрузка участка…' : 'Условный участок'}</h2>}<p>{showingResult && result?.reach_id ? String(result.reach_metadata?.name ?? 'Реальное русло') : showingResult ? 'Синтетическая геометрия' : mode === 'river' ? 'Реальная геометрия · сценарный источник' : 'Геометрия и параметры — синтетические'}</p></div></div>
+          {showingResult && result && values ? <aside className="map-inspector" inert={profileOpen || parametersOpen} aria-label="Концентрация и выбранный сегмент">
             <div className="simulation-legend" data-testid="concentration-scale"><strong>Концентрация · мг/л</strong><div aria-hidden="true" className="simulation-gradient" style={span === 0 ? { background: color(scale[0], scale) } : undefined} /><span>{format(scale[0], 4)}</span>{span !== 0 && <span>{format(scale[1], 4)}</span>}<small>{span === 0 ? 'Концентрация одинакова на всём участке и во все моменты расчёта.' : comparison ? 'Общая постоянная шкала А и Б.' : 'Постоянная шкала этого расчёта.'} Цвет не означает нормативную оценку.</small></div>
             <div className="simulation-selection"><label htmlFor="simulation-segment">Расчётный сегмент</label><select id="simulation-segment" value={selected} onChange={event => setSelected(Number(event.target.value))}>{result.distances_m.map((distance, index) => <option key={index} value={index}>{index + 1} · {format(distance, 0)} м</option>)}</select><p aria-live={playing ? 'off' : 'polite'}><strong data-testid="selected-concentration">{format(values[selected], 4)} мг/л</strong><span>{format(result.distances_m[selected], 0)} м от источника · {formatTime(shownHours)}</span></p></div>
             {valuesA && valuesB && <dl className="comparison-values" aria-label="Сравнение выбранного сегмента"><div><dt>А</dt><dd data-testid="comparison-a">{format(valuesA[selected], 4)} мг/л</dd></div><div><dt>Б</dt><dd data-testid="comparison-b">{format(valuesB[selected], 4)} мг/л</dd></div><div><dt>Б − А</dt><dd data-testid="comparison-delta">{format(valuesB[selected] - valuesA[selected], 4)} мг/л</dd></div></dl>}
             <button className="profile-toggle" aria-controls="model-profile" aria-expanded={profileOpen} onClick={() => setProfileOpen(value => !value)}>{profileOpen ? 'Свернуть профиль' : 'Профиль и показатели'}<span aria-hidden="true">{profileOpen ? '−' : '↗'}</span></button>
-          </aside> : <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p></div>}
-          {result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={parametersOpen}>
+          </aside> : !pickingSource && !result ? <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p></div> : null}
+          {showingResult && result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={parametersOpen}>
             <div className="profile-drawer-heading"><h2>Профиль и показатели</h2><button className="profile-close" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)}>×</button></div>
             <div className="profile-tabs" role="group" aria-label="Вид графика"><button aria-pressed={profileView === 'space'} onClick={() => setProfileView('space')}>По расстоянию C(x)</button><button aria-pressed={profileView === 'time'} onClick={() => setProfileView('time')}>Во времени C(t)</button></div>
             {profileView === 'time' ? <TemporalProfile result={result} a={comparison ? baseline : null} b={comparison ? latestResult : null} distances={result.distances_m} selected={selected} onSelect={setSelected} onSeek={hour => { setPlaying(false); setTime(hour); }} background={result.inputs.background_mg_l} hour={shownHours} duration={result.inputs.duration_hours} scale={scale} /> : <section className="simulation-profile" aria-labelledby="profile-title"><h3 id="profile-title">Профиль концентрации по расстоянию</h3><p>Центры расчётных сегментов · {formatTime(shownHours)}</p><svg viewBox="0 0 760 235" role="img" aria-label="Расчётный профиль концентрации. Все значения доступны в таблице ниже."><path d="M85 25V195H735" fill="none" stroke="currentColor" />{valuesA && valuesB ? <><polyline data-testid="profile-a" points={profilePoints(valuesA)} fill="none" stroke="#2367a1" strokeWidth="3" /><polyline data-testid="profile-b" points={profilePoints(valuesB)} fill="none" stroke="#b54b35" strokeWidth="3" strokeDasharray="8 4" /></> : <polyline points={profile} fill="none" stroke="var(--accent)" strokeWidth="3" />}<text x="85" y="17">мг/л</text>{span === 0 ? <text x="75" y="114" textAnchor="end">{format(scale[0], 1)}</text> : <><text x="75" y="34" textAnchor="end">{format(scale[1], 1)}</text><text x="75" y="194" textAnchor="end">{format(scale[0], 1)}</text></>}<text x="85" y="220">0</text><text x="730" y="220" textAnchor="end">{format(result.inputs.length_m, 0)} м</text></svg>
