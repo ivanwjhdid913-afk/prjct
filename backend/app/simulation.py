@@ -5,13 +5,13 @@ import math
 from threading import Lock
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
 from app.transport import MAX_RESPONSE_BYTES, _resolution_limit, simulate
-from app.river import prepared_reach
+from app.river import prepared_reach, prepared_reaches
 
 
 class SimulationInput(BaseModel):
@@ -128,9 +128,7 @@ def calculate(parameters: SimulationRequest) -> JSONResponse:
         if parameters.reach_id is None:
             result = simulate(physics)
             return bounded_response(SimulationResult(**result, geometry=synthetic_line(parameters.length_m)))
-        reach, line = prepared_reach()
-        if parameters.reach_id != reach['id']:
-            raise ValueError('Неизвестный подготовленный участок реки.')
+        reach, line = prepared_reach(parameters.reach_id)
         start = parameters.source_distance_m
         length = line.length_m - start
         if length < 100:
@@ -184,5 +182,29 @@ async def run_simulation(request: Request):
 
 @router.get('/api/v1/river-reaches')
 def river_reaches():
-    reach, _ = prepared_reach()
-    return {'items': [reach]}
+    return {'items': prepared_reaches()}
+
+
+@router.get('/api/v1/river-reaches/{reach_id}/source-snap')
+def source_snap(reach_id: str, longitude: float = Query(ge=-180, le=180, allow_inf_nan=False),
+                latitude: float = Query(ge=-90, le=90, allow_inf_nan=False)):
+    try:
+        reach, line = prepared_reach(reach_id)
+        projected = line.project([longitude, latitude])
+        if projected['distance_to_river_m'] > 75 + 1e-6:
+            raise ValueError('Нажмите не дальше 75 м от выбранного русла. Источник не перемещён.')
+        if projected['distance_to_river_m'] > 75:
+            projected['distance_to_river_m'] = 75.
+        maximum = line.length_m - 100
+        # GeographicLib and the bounded minimizer can differ by fractions of a
+        # millimetre at an exactly selected boundary. This is numerical equality,
+        # not an extension of the usable 100 m remainder or a user-value clamp.
+        if projected['source_distance_m'] > maximum + 1e-6:
+            raise ValueError('Ниже сценарного источника должно оставаться не менее 100 м '
+                             'подготовленного русла. Выберите точку выше по течению.')
+        if projected['source_distance_m'] > maximum:
+            projected['source_distance_m'] = maximum
+            projected['coordinate'] = line.point_at(maximum)
+        return dict(reach_id=reach['id'], **projected, max_distance_m=75)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
