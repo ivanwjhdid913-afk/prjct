@@ -10,14 +10,15 @@ async function expectSourceAndSelectionExposed(page: Page) {
     const segment = host.querySelector<SVGPathElement>('.simulation-segment[data-selected="true"]')!;
     const point = segment.getPointAtLength(segment.getTotalLength() / 2).matrixTransform(segment.getScreenCTM()!);
     const clear = (x: number, y: number) => document.elementFromPoint(x, y)?.closest('.simulation-map') === host;
-    return (profile.left >= map.right - 1 || profile.top >= map.bottom - 1) && map.height >= 130 && map.width >= 300
+    const separateRegions = innerWidth <= 1100 ? profile.top >= map.bottom - 1 : profile.left >= map.right - 1;
+    return separateRegions && map.height >= 130 && map.width >= 300
       && source.left >= map.left && source.right <= map.right && source.top >= map.top && source.bottom <= map.bottom
       && point.x > map.left + 5 && point.x < map.right - 5 && point.y > map.top + 5 && point.y < map.bottom - 5
       && clear(source.x + source.width / 2, source.y + source.height / 2) && clear(point.x, point.y);
   })).toBeTruthy();
 }
 
-for (const viewport of [{ width: 375, height: 667 }, { width: 375, height: 812 }, { width: 1280, height: 720 }]) {
+for (const viewport of [{ width: 375, height: 667 }, { width: 375, height: 812 }, { width: 768, height: 720 }, { width: 1024, height: 768 }, { width: 1280, height: 720 }]) {
   test(`profile preserves exposed source, last segment, time and map instance at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.route('https://tile.openstreetmap.org/**', route => route.abort());
