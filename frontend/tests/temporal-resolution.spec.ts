@@ -55,11 +55,14 @@ test('independent A and B grids share physical time, map geometry, scale and act
   await slider.fill('0.01');
   const scale = await page.getByTestId('concentration-scale').innerText();
   await page.getByRole('button', { name: 'Увеличить масштаб', exact: true }).click();
-  const shape = await page.locator('.simulation-segment').first().getAttribute('d');
-  const view = await page.locator('.simulation-map .leaflet-map-pane').getAttribute('style');
   await expect(page.getByTestId('comparison-a')).toHaveText(`${concentrationsAt(a, .01)[0].toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`);
   await expect(page.getByTestId('comparison-b')).toHaveText('9,6000 мг/л');
   await openProfile(page); await page.getByRole('button', { name: 'Во времени C(t)', exact: true }).click();
+  // Opening the split profile explicitly fits the source and selected segment;
+  // seeking and switching A/B must preserve that resulting view.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const shape = await page.locator('.simulation-segment').first().getAttribute('d');
+  const view = await page.locator('.simulation-map .leaflet-map-pane').getAttribute('style');
   await page.getByRole('button', { name: 'Перейти к минимуму', exact: true }).click();
   await expect(slider).toHaveValue('0.05');
   await page.getByRole('button', { name: 'Показать А', exact: true }).click();
@@ -168,9 +171,17 @@ for (const height of [667, 812]) test(`minimum jump and keyboard time remain acc
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
-for (const viewport of [{width:1280,height:720},{width:375,height:667}]) test(`extremum and C(t) fit together at ${viewport.width}x${viewport.height}`, async ({page}) => {
+for (const viewport of [{width:1280,height:720},{width:375,height:667}]) test(`extremum and C(t) fit together after optional profile scroll at ${viewport.width}x${viewport.height}`, async ({page}) => {
   await page.setViewportSize(viewport); await mock(page, sample()); await openProfile(page);
   await page.getByRole('button', {name:'Во времени C(t)', exact:true}).click();
+  // The phone reserves a separate, interactive map above the scrolling profile.
+  // Scrolling this panel reveals the extremum and curve together without moving
+  // the source/selected segment or the always-available model clock.
+  if (viewport.width === 375) await page.getByTestId('temporal-extremum').evaluate(element => {
+    element.scrollIntoView({ block: 'start' });
+    const panel = element.closest('#model-profile')!;
+    panel.scrollTop -= panel.querySelector('.profile-drawer-heading')!.getBoundingClientRect().height + 8;
+  });
   const panel=await page.locator('#model-profile').boundingBox();
   for (const item of [page.getByRole('button',{name:'Перейти к максимуму',exact:true}), page.locator('.temporal-profile svg')]) {
     const box=await item.boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(panel!.y);

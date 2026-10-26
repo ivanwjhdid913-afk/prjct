@@ -91,8 +91,9 @@ function mapPadding(comparisonLayout = false): L.FitBoundsOptions {
     : { paddingTopLeft: [65, 105], paddingBottomRight: [265, 65], animate: false };
 }
 
-function CalculationMap({ result, values, scale, selected, onSelect, suspended, comparisonLayout }: { result: Result; scale: [number, number]; values: number[]; selected: number; onSelect: (index: number) => void; suspended: boolean; comparisonLayout: boolean }) {
+function CalculationMap({ result, values, scale, selected, onSelect, suspended, comparisonLayout, profileOpen }: { result: Result; scale: [number, number]; values: number[]; selected: number; onSelect: (index: number) => void; suspended: boolean; comparisonLayout: boolean; profileOpen: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
   const segments = useRef<L.Polyline[]>([]);
   const [tileError, setTileError] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -101,6 +102,7 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended, 
     if (!host.current) return;
     setTileError(false);
     const map = L.map(host.current, { scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false, zoomControl: false, zoomSnap: .25 });
+    mapRef.current = map;
     map.attributionControl.setPrefix(false);
     L.control.zoom({ zoomInTitle: 'Увеличить масштаб', zoomOutTitle: 'Уменьшить масштаб' }).addTo(map);
     const points: L.LatLngTuple[] = result.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
@@ -122,8 +124,21 @@ function CalculationMap({ result, values, scale, selected, onSelect, suspended, 
       L.marker(points[index], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'simulation-arrow', html: `<span style="transform:rotate(${angle}deg)">➜</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }) }).addTo(map);
     }
     const resize = new ResizeObserver(() => map.invalidateSize()); resize.observe(host.current);
-    return () => { window.clearTimeout(timer); resize.disconnect(); segments.current = []; map.remove(); };
+    return () => { window.clearTimeout(timer); resize.disconnect(); segments.current = []; mapRef.current = null; map.remove(); };
   }, [geometryKey, onSelect, revision, comparisonLayout]);
+  useEffect(() => {
+    if (!profileOpen) return;
+    const frame = requestAnimationFrame(() => {
+      const map = mapRef.current, segment = segments.current[selected];
+      if (!map || !segment) return;
+      // Only an explicit panel/segment change fits the map; time updates preserve
+      // the user's zoom and pan, and keep the same Leaflet map instance.
+      map.invalidateSize({ pan: false });
+      const bounds = segment.getBounds().extend([result.geometry.coordinates[0][1], result.geometry.coordinates[0][0]]);
+      map.fitBounds(bounds, { paddingTopLeft: [65, 50], paddingBottomRight: [35, 35], maxZoom: 18, animate: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [profileOpen, selected, geometryKey, revision, comparisonLayout]);
   useEffect(() => {
     segments.current.forEach((segment, index) => {
       segment.setStyle({ color: color(values[index], scale), weight: selected === index ? 11 : 9 });
@@ -407,6 +422,7 @@ export default function Simulation() {
   const loadMarkers = (comparison && baseline && latestResult ? [{ item: baseline, label: 'А' }, { item: latestResult, label: 'Б' }] : result ? [{ item: result, label: '' }] : []).filter(({ item }) => loadEnd(item) !== null);
   const showingPreview = mode === 'river' && !!reach && (draftPreview || !result);
   const showingResult = !!result && !showingPreview;
+  const concentrationLegend = <div className="simulation-legend" data-testid="concentration-scale"><strong>Концентрация · мг/л</strong><div aria-hidden="true" className="simulation-gradient" style={span === 0 ? { background: color(scale[0], scale) } : undefined} /><span>{format(scale[0], 4)}</span>{span !== 0 && <span>{format(scale[1], 4)}</span>}<small>{span === 0 ? 'Концентрация одинакова на всём участке и во все моменты расчёта.' : comparison ? 'Общая постоянная шкала А и Б.' : 'Постоянная шкала этого расчёта.'} Цвет не означает нормативную оценку.</small></div>;
   return <div className={`simulation${comparison ? " is-comparing" : ""}`}>
     <header className="model-heading"><div><h1 ref={title} tabIndex={-1}>Моделирование</h1><span className="scenario-badge">Сценарная симуляция · хлориды</span></div><div className="workspace-tools"><button className="mobile-parameters-toggle" aria-expanded={parametersOpen} aria-controls="model-parameters" onClick={() => setParametersOpen(value => !value)}>Параметры</button><button className="demo-button" disabled={!demoReach || status === 'loading'} onClick={() => { void calculate(true); }}>Запустить демонстрацию</button></div></header>
     <div className="map-status-stack">
@@ -457,18 +473,18 @@ export default function Simulation() {
           {pickingSource ? <button type="button" onClick={() => finishPicking(true)}>Отменить выбор источника</button> : result && mode === 'river' && reach && <button type="button" onClick={() => { setDraftPreview(value => !value); setProfileOpen(false); }}>{showingPreview ? 'Показать рассчитанный результат' : 'Показать условия следующего расчёта'}</button>}
           {pickPending && <span aria-hidden="true" className="source-pick-pending">…</span>}
         </div>}
-        <div className="model-map-stage">
-          {showingResult && result && values ? <CalculationMap comparisonLayout={comparison} result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={parametersOpen || (profileOpen && mobileLayout)} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} point={sourceValid ? sourceCoordinate : null} picking={pickingSource} onPick={(lon, lat) => { void pickSource(lon, lat); }} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
+        <div className={`model-map-stage${profileOpen && showingResult ? ' has-profile' : ''}`}>
+          {showingResult && result && values ? <CalculationMap comparisonLayout={comparison} result={result} scale={scale} values={values} selected={selected} onSelect={setSelected} suspended={parametersOpen} profileOpen={profileOpen} /> : mode === 'river' && reach ? <ReachPreview reach={reach} distance={sourceValid ? Number(source) : 0} point={sourceValid ? sourceCoordinate : null} picking={pickingSource} onPick={(lon, lat) => { void pickSource(lon, lat); }} suspended={parametersOpen} /> : <div className="map-waiting"><div className="map-waiting-symbol" aria-hidden="true">∿</div><strong>{mode === 'river' ? 'Подготовленный участок Дона' : 'Синтетическая геометрия'}</strong><p>{mode === 'river' ? reachError || 'Загружаем речное русло…' : 'Условная линия появится после расчёта. Она не описывает реальную реку.'}</p></div>}
 
           <div className="map-topline"><div><span className="map-kicker">{showingResult ? 'Рассчитанные концентрации' : result ? 'Условия следующего расчёта · прежний результат сохранён' : 'Подготовленный участок'}</span>{showingResult && result ? <h2 id="result-title">Результат расчёта{comparison ? ` · ${activeScenario}` : variant && !hasB && !incompatibleDraft ? ' · А (Б ещё не рассчитан)' : ''}</h2> : <h2>{mode === 'river' ? reach?.name ?? 'Загрузка участка…' : 'Условный участок'}</h2>}<p>{showingResult && result?.reach_id ? String(result.reach_metadata?.name ?? 'Реальное русло') : showingResult ? 'Синтетическая геометрия' : mode === 'river' ? 'Реальная геометрия · сценарный источник' : 'Геометрия и параметры — синтетические'}</p></div></div>
           {showingResult && result && values ? <aside className="map-inspector" inert={profileOpen || parametersOpen} aria-label="Концентрация и выбранный сегмент">
-            <div className="simulation-legend" data-testid="concentration-scale"><strong>Концентрация · мг/л</strong><div aria-hidden="true" className="simulation-gradient" style={span === 0 ? { background: color(scale[0], scale) } : undefined} /><span>{format(scale[0], 4)}</span>{span !== 0 && <span>{format(scale[1], 4)}</span>}<small>{span === 0 ? 'Концентрация одинакова на всём участке и во все моменты расчёта.' : comparison ? 'Общая постоянная шкала А и Б.' : 'Постоянная шкала этого расчёта.'} Цвет не означает нормативную оценку.</small></div>
+            {!profileOpen && concentrationLegend}
             <div className="simulation-selection"><label htmlFor="simulation-segment">Расчётный сегмент</label><select id="simulation-segment" value={selected} onChange={event => setSelected(Number(event.target.value))}>{result.distances_m.map((distance, index) => <option key={index} value={index}>{index + 1} · {format(distance, 0)} м</option>)}</select><p aria-live={playing ? 'off' : 'polite'}><strong data-testid="selected-concentration">{format(values[selected], 4)} мг/л</strong><span>{format(result.distances_m[selected], 0)} м от источника · {formatTime(shownHours)}</span></p></div>
             {valuesA && valuesB && <dl className="comparison-values" aria-label="Сравнение выбранного сегмента"><div><dt>А</dt><dd data-testid="comparison-a">{format(valuesA[selected], 4)} мг/л</dd></div><div><dt>Б</dt><dd data-testid="comparison-b">{format(valuesB[selected], 4)} мг/л</dd></div><div><dt>Б − А</dt><dd data-testid="comparison-delta">{format(valuesB[selected] - valuesA[selected], 4)} мг/л</dd></div></dl>}
             <button className="profile-toggle" aria-controls="model-profile" aria-expanded={profileOpen} onClick={() => setProfileOpen(value => !value)}>{profileOpen ? 'Свернуть профиль' : 'Профиль и показатели'}<span aria-hidden="true">{profileOpen ? '−' : '↗'}</span></button>
           </aside> : !pickingSource && !result ? <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p></div> : null}
           {showingResult && result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={parametersOpen}>
-            <div className="profile-drawer-heading"><h2>Профиль и показатели</h2><button className="profile-close" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)}>×</button></div>
+            <div className="profile-drawer-heading"><h2>Профиль и показатели</h2>{profileOpen && concentrationLegend}<button className="profile-close" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)}>×</button></div>
             <div className="profile-tabs" role="group" aria-label="Вид графика"><button aria-pressed={profileView === 'space'} onClick={() => setProfileView('space')}>По расстоянию C(x)</button><button aria-pressed={profileView === 'time'} onClick={() => setProfileView('time')}>Во времени C(t)</button></div>
             {profileView === 'time' ? <TemporalProfile result={result} a={comparison ? baseline : null} b={comparison ? latestResult : null} distances={result.distances_m} selected={selected} onSelect={setSelected} onSeek={hour => { setPlaying(false); setTime(hour); }} background={result.inputs.background_mg_l} hour={shownHours} duration={result.inputs.duration_hours} scale={scale} /> : <section className="simulation-profile" aria-labelledby="profile-title"><h3 id="profile-title">Профиль концентрации по расстоянию</h3><p>Центры расчётных сегментов · {formatTime(shownHours)}</p><svg viewBox="0 0 760 235" role="img" aria-label="Расчётный профиль концентрации. Все значения доступны в таблице ниже."><path d="M85 25V195H735" fill="none" stroke="currentColor" />{valuesA && valuesB ? <><polyline data-testid="profile-a" points={profilePoints(valuesA)} fill="none" stroke="#2367a1" strokeWidth="3" /><polyline data-testid="profile-b" points={profilePoints(valuesB)} fill="none" stroke="#b54b35" strokeWidth="3" strokeDasharray="8 4" /></> : <polyline points={profile} fill="none" stroke="var(--accent)" strokeWidth="3" />}<text x="85" y="17">мг/л</text>{span === 0 ? <text x="75" y="114" textAnchor="end">{format(scale[0], 1)}</text> : <><text x="75" y="34" textAnchor="end">{format(scale[1], 1)}</text><text x="75" y="194" textAnchor="end">{format(scale[0], 1)}</text></>}<text x="85" y="220">0</text><text x="730" y="220" textAnchor="end">{format(result.inputs.length_m, 0)} м</text></svg>
               {comparison && <p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}

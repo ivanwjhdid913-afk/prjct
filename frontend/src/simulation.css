@@ -100,7 +100,23 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .model-map-stage .map-warning p { margin: 5px 0; }
 .model-map-stage .map-warning button { font-size: 11px; min-height: 34px; padding: 6px 9px; }
 .profile-drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 430; width: 410px; max-width: 100%; padding: 16px 20px; background: #fff; overflow: auto; box-shadow: -8px 0 25px #173f2f1a; border-left: 1px solid #c8d7cc; overscroll-behavior: contain; }
+.model-map-stage.has-profile { display: grid; grid-template-columns: minmax(0, 1fr) 410px; }
+.model-map-stage.has-profile > .map-panel { position: relative; inset: auto; min-width: 0; min-height: 0; }
+.model-map-stage.has-profile > .profile-drawer { position: relative; inset: auto; width: auto; max-width: none; min-height: 0; box-shadow: none; }
+.has-profile .map-inspector { visibility: hidden; pointer-events: none; }
+.has-profile .map-topline, .has-profile .map-caption { display: none; }
+.model-map-stage.has-profile .simulation-map-label { display: block; position: absolute; z-index: 401; top: 0; left: 0; right: 0; margin: 0; padding: 7px 10px; background: #fffffff2; font-size: 11px; line-height: 1.4; pointer-events: none; }
+.model-map-stage.has-profile .leaflet-top.leaflet-left { top: 32px; }
+.model-map-stage.has-profile .map-warning { top: auto; bottom: 0; left: 50px; right: 0; max-width: none; padding: 3px 6px; font-size: 9px; pointer-events: none; }
+.model-map-stage.has-profile .map-warning p, .model-map-stage.has-profile .map-warning button { display: none; }
+.model-map-stage.has-profile .leaflet-control-scale { margin-bottom: 14px; }
 .profile-drawer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.has-profile .profile-drawer-heading { position: sticky; top: -16px; z-index: 2; min-height: 44px; background: white; gap: 8px; }
+.has-profile .profile-drawer-heading h2 { margin: 0; font-size: 14px; }
+.profile-drawer-heading .simulation-legend { flex-shrink: 0; width: 122px; gap: 2px; font-size: 10px; }
+.profile-drawer-heading .simulation-legend strong { font-size: 10px; }
+.profile-drawer-heading .simulation-gradient { height: 6px; }
+.profile-drawer-heading .simulation-legend small { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .profile-drawer-heading h2 { font-size: 17px; }
 .profile-drawer-heading button { font-size: 24px; padding: 0; min-width: 44px; border-color: transparent; }
 .simulation-profile h3 { font-size: 13px; margin: 14px 0 4px; }
@@ -144,6 +160,9 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
   .map-topline h2 { font-size: 15px; }
 }
 @media (max-width: 760px) {
+  .model-map-stage.has-profile { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(140px, 36%) minmax(0, 1fr); }
+  .model-map-stage.has-profile > .profile-drawer { border-left: 0; border-top: 1px solid #c8d7cc; padding: 8px 12px; scrollbar-width: thin; }
+  .has-profile .profile-drawer-heading { top: -8px; }
   .model-masthead { padding: 5px 12px; height: 44px; min-height: 44px; }
   .model-masthead .brand { font-size: 12px; gap: 8px; }
   .model-masthead .edition { font-size: 10px; }

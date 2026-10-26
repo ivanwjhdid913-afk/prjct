@@ -207,5 +207,8 @@ for (const width of [1280, 375]) for (const load of ['continuous', 'finite']) {
     await expect(page.locator('.simulation-arrow')).toHaveCount(1);
     await expect(page.getByRole('heading', { name: 'Результат расчёта', exact: true })).toBeVisible();
     await expect(page.getByLabel('Время от начала сценария')).toBeEnabled();
+    await page.getByRole('button', { name: 'Воспроизвести', exact: true }).click();
+    await expect.poll(async () => Number(await page.getByLabel('Время от начала сценария').inputValue())).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Пауза', exact: true }).click();
   });
 }
