@@ -113,3 +113,19 @@ test('opening a delayed variant respects A pinned while the record was loading',
   await page.getByRole('button', { name: 'Рассчитать Б', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Показать А', exact: true })).toBeVisible();
 });
+
+test('a cancelled open ignores a late response and can be retried', async ({ page }) => {
+  await page.addInitScript(() => { const fetch = window.fetch; window.fetch = (input, options) => fetch(input, typeof input === 'string' && input.includes('/scenarios/') ? { ...options, signal: undefined } : options); });
+  let release!: () => void;
+  await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
+  await page.goto('/#model'); await library(page);
+  await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
+  await expect.poll(() => !!release).toBeTruthy();
+  await page.getByRole('button', { name: 'Отменить ожидание библиотеки', exact: true }).click();
+  release();
+  await expect(page.getByTestId('library-status')).toContainText('отменено');
+  await expect(page.getByLabel('Геометрия сценария')).toHaveValue('river');
+  await page.route(`**/api/v1/scenarios/${id}`, route => route.fulfill({ json: saved }));
+  await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
+  await expect(page.getByLabel('Геометрия сценария')).toHaveValue('synthetic');
+});
