@@ -178,6 +178,11 @@ def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
              openapi_extra={'requestBody': {'required': True, 'content': {
                  'application/json': {'schema': ScenarioCreate.model_json_schema()}}}})
 async def create_scenario(request: Request, session: Annotated[Session, Depends(get_session)]):
+    # A local browser app must not accept cross-site form/no-cors writes. JSON
+    # requires a preflight across origins; this app intentionally enables no CORS.
+    media_type = request.headers.get('content-type', '').split(';', 1)[0].strip().lower()
+    if media_type != 'application/json':
+        raise HTTPException(415, 'Для сохранения условий требуется Content-Type: application/json.')
     body = bytearray()
     async for chunk in request.stream():
         if len(body) + len(chunk) > MAX_BODY_BYTES:

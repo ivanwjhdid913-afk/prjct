@@ -1,5 +1,6 @@
 """Saved conditions use the disposable PostgreSQL database, never working data."""
 from datetime import datetime
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -251,3 +252,24 @@ async def test_committed_conditions_survive_new_app_connection_without_calculati
         if created:
             with engine.begin() as connection:
                 connection.execute(text('DELETE FROM saved_scenarios WHERE id=:id'), {'id': created['id']})
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('content_type', ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data', None])
+async def test_browser_simple_requests_cannot_create_scenarios(client, session, content_type):
+    sent = await payload(client)
+    headers = {'origin': 'https://unrelated.example'}
+    if content_type is not None:
+        headers['content-type'] = content_type
+    response = await client.post('/api/v1/scenarios', content=json.dumps(sent),
+                                 headers=headers)
+    assert response.status_code == 415
+    assert session.scalar(text('SELECT count(*) FROM saved_scenarios')) == 0
+
+
+@pytest.mark.anyio
+async def test_json_charset_remains_supported(client):
+    sent = await payload(client)
+    response = await client.post('/api/v1/scenarios', content=json.dumps(sent),
+                                 headers={'content-type': 'application/json; charset=UTF-8'})
+    assert response.status_code == 201
