@@ -240,6 +240,8 @@ export default function Simulation() {
   const [pickMessage, setPickMessage] = useState('');
   const [pickPending, setPickPending] = useState(false);
   const [draftPreview, setDraftPreview] = useState(false);
+  // Completion may publish its own result, but cannot replace a newer draft view.
+  const geometryEditRevision = useRef(0);
   const snapRequest = useRef(0);
   const snapController = useRef<AbortController | null>(null);
   const previewBeforePick = useRef(false);
@@ -289,13 +291,16 @@ export default function Simulation() {
     requestAnimationFrame(() => (mobileLayout ? document.querySelector<HTMLButtonElement>('.mobile-parameters-toggle') : sourcePickButton.current)?.focus({ preventScroll: true }));
   }
   function editSource(value: string) {
+    geometryEditRevision.current++;
     invalidateSnap(); setSource(value); setSourceCoordinate(null); setDraftPreview(true); setPickMessage(''); setPlaying(false);
   }
   function selectReach(id: string) {
+    geometryEditRevision.current++;
     finishPicking(); setReachId(id); setSource('0'); setSourceCoordinate(null); setDraftPreview(true); setPlaying(false);
   }
   function startPicking() {
     if (!reach || mode !== 'river') return;
+    geometryEditRevision.current++;
     invalidateSnap(); previewBeforePick.current = draftPreview; pickingRef.current = true;
     setPickingSource(true); setDraftPreview(true); setPickMessage(''); setParametersOpen(false); setProfileOpen(false); setPlaying(false);
   }
@@ -310,11 +315,13 @@ export default function Simulation() {
     if (!pickingRef.current || !reach || mode !== 'river') return;
     invalidateSnap(); const id = snapRequest.current; const selectedReach = reach;
     const abort = new AbortController(); snapController.current = abort;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => { timedOut = true; abort.abort(); }, 10_000);
     setPickPending(true); setPickMessage('Привязываем точку к выбранному руслу…');
     try {
       const response = await fetch(`/api/v1/river-reaches/${encodeURIComponent(selectedReach.id)}/source-snap?${new URLSearchParams({ longitude: String(longitude), latitude: String(latitude) })}`, { signal: abort.signal });
       const data: unknown = await response.json();
-      if (id !== snapRequest.current || !pickingRef.current) return;
+      if (id !== snapRequest.current || !pickingRef.current || abort.signal.aborted) return;
       if (!response.ok) throw new Error(response.status === 422 ? 'Точка слишком далеко от выбранного русла или ниже неё осталось менее 100 м. Выберите другую точку.' : 'Не удалось привязать источник. Повторите выбор точки.');
       if (!record(data) || data.reach_id !== selectedReach.id || !finite(data.source_distance_m) || !coordinate(data.coordinate) || !finite(data.distance_to_river_m) || data.distance_to_river_m < 0 || data.max_distance_m !== 75) throw new Error('Некорректный ответ сервера. Повторите выбор точки.');
       if (data.distance_to_river_m > 75) throw new Error('Точка слишком далеко: нажмите не дальше 75 м от выбранного русла.');
@@ -322,8 +329,8 @@ export default function Simulation() {
       setSource(String(data.source_distance_m)); setSourceCoordinate(data.coordinate); setPlaying(false); finishPicking();
       setPickMessage(`Сценарный источник выбран: ${selectedReach.name} · ${format(data.source_distance_m, 1)} м. Примените условия кнопкой «Рассчитать».`);
     } catch (error) {
-      if (id === snapRequest.current && !abort.signal.aborted && pickingRef.current) setPickMessage(error instanceof Error ? error.message : 'Не удалось привязать источник. Повторите выбор точки.');
-    } finally { if (id === snapRequest.current) setPickPending(false); }
+      if (id === snapRequest.current && pickingRef.current && (timedOut || !abort.signal.aborted)) setPickMessage(timedOut ? 'Превышено время ожидания привязки. Источник не перемещён. Повторите выбор точки.' : error instanceof Error ? error.message : 'Не удалось привязать источник. Повторите выбор точки.');
+    } finally { window.clearTimeout(timeout); if (id === snapRequest.current) setPickPending(false); }
   }
   const incompatibleDraft = baseline && variant ? (
     (mode === 'river' ? reachId !== baseline.reach_id : !!baseline.reach_id) ? 'Нужны одинаковые участок и геометрия.'
@@ -380,6 +387,7 @@ export default function Simulation() {
     const inputs = { ...Object.fromEntries(fields.filter(field => nextMode !== 'river' || field.key !== 'length_m').map(field => [field.key, Number(nextDraft[field.key])])), load_mode: nextLoadMode, load_duration_hours: nextLoadDuration };
     const payload = nextMode === 'river' ? { ...inputs, reach_id: chosenReach!.id, source_distance_m: demonstration ? 0 : Number(source) } : inputs;
     const id = ++request.current;
+    const requestedGeometryRevision = geometryEditRevision.current;
     controller.current?.abort();
     const currentController = new AbortController(); controller.current = currentController;
     setStatus('loading'); setMessage(''); setFieldErrors({});
@@ -401,7 +409,8 @@ export default function Simulation() {
       const compatibleB = !demonstration && variant && baseline && !comparisonReason(baseline, data);
       setComparisonExitReason(!demonstration && variant && baseline ? comparisonReason(baseline, data) : '');
       setVariant(!!compatibleB); setHasB(!!compatibleB); setActiveScenario('Б');
-      setPlaying(false); setDraftPreview(false); setResult(data); setTime(0); setSelected(0); setStatus('ready');
+      setPlaying(false); if (geometryEditRevision.current === requestedGeometryRevision) setDraftPreview(false);
+      setResult(data); setTime(0); setSelected(0); setStatus('ready');
     } catch (error) {
       if (id !== request.current) return;
       setMessage(currentController.signal.aborted ? 'Превышено время ожидания. Повторите расчёт.' : error instanceof Error ? error.message : 'Проверьте соединение с сервером.');
@@ -442,12 +451,12 @@ export default function Simulation() {
               {!baseline ? <button type="button" disabled={!result || status === 'loading'} onClick={pinBaseline}>Закрепить как А</button> : <><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" className="replace-baseline" disabled={!result || status === 'loading'} onClick={pinBaseline}>Заменить А показанным расчётом</button></>}
               <small>После перезагрузки страницы сценарии сбрасываются.</small>
             </section>
-            <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { finishPicking(); setMode(event.target.value); setDraftPreview(false); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
+            <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { geometryEditRevision.current++; finishPicking(); setMode(event.target.value); setDraftPreview(false); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
             {mode === 'river' && <section className="river-setup" aria-label="Выбор речного участка">
               {!demoReach && reaches.length > 0 && <p className="simulation-field-error" role="status">Участок Дона для демонстраций недоступен. Для расчёта выбран другой подготовленный участок.</p>}{reachError ? <div role="alert"><p>{reachError}</p><button type="button" onClick={() => setReachRevision(value => value + 1)}>Повторить загрузку участка</button></div> : !reach ? <><label htmlFor="reach-id">Подготовленный участок</label><select id="reach-id" value="" onChange={event => selectReach(event.target.value)}><option value="" disabled>Выберите участок</option>{reaches.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select><p role="status">{reaches.length ? 'Выберите подготовленное русло.' : 'Загрузка участка…'}</p></> : <>
                 <label htmlFor="reach-id">Подготовленный участок</label><select id="reach-id" value={reachId} onChange={event => { selectReach(event.target.value); }}>{reaches.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
                 <p className="simulation-hint">{format(reach.length_m / 1000, 3)} км · направление вниз по течению</p>
-                {result && !draftPreview && !pickingSource && !pickMessage && <button type="button" className="source-pick-toggle" onClick={() => { setDraftPreview(true); setProfileOpen(false); }}>Показать условия следующего расчёта</button>}<button ref={sourcePickButton} type="button" className="source-pick-toggle" aria-pressed={pickingSource} onClick={() => pickingSource ? finishPicking(true) : startPicking()}>Указать источник на карте</button><label htmlFor="source-distance">Положение сценарного источника, м</label><input id="source-distance" required type="number" min={0} max={reach.length_m - 100} step="any" value={source} onChange={event => { editSource(event.target.value); }} aria-describedby="source-help" /><input className="source-slider" type="range" min={0} max={Math.floor(reach.length_m - 100)} step={1} value={sourceValid ? Number(source) : 0} aria-label="Переместить сценарный источник вдоль русла" onChange={event => { editSource(event.target.value); }} /><p className="simulation-hint" id="source-help">От начала вниз по течению; ниже источника — не менее 100 м. {sourceValid ? `Для расчёта: ${format(displayLength, 1)} м.` : 'Укажите допустимое положение.'}</p>
+                {result && !draftPreview && !pickingSource && !pickMessage && <button type="button" className="source-pick-toggle" onClick={() => { geometryEditRevision.current++; setDraftPreview(true); setProfileOpen(false); }}>Показать условия следующего расчёта</button>}<button ref={sourcePickButton} type="button" className="source-pick-toggle" aria-pressed={pickingSource} onClick={() => pickingSource ? finishPicking(true) : startPicking()}>Указать источник на карте</button><label htmlFor="source-distance">Положение сценарного источника, м</label><input id="source-distance" required type="number" min={0} max={reach.length_m - 100} step="any" value={source} onChange={event => { editSource(event.target.value); }} aria-describedby="source-help" /><input className="source-slider" type="range" min={0} max={Math.floor(reach.length_m - 100)} step={1} value={sourceValid ? Number(source) : 0} aria-label="Переместить сценарный источник вдоль русла" onChange={event => { editSource(event.target.value); }} /><p className="simulation-hint" id="source-help">От начала вниз по течению; ниже источника — не менее 100 м. {sourceValid ? `Для расчёта: ${format(displayLength, 1)} м.` : 'Укажите допустимое положение.'}</p>
               </>}
             </section>}
             <div className="parameter-section-title">Нагрузка и поток <span>Заданы пользователем</span></div>
@@ -470,7 +479,7 @@ export default function Simulation() {
           {comparison && !showingPreview && <div className="scenario-switch" role="group" aria-label="Показанный сценарий" inert={parametersOpen}><button aria-pressed={activeScenario === 'А'} onClick={() => setActiveScenario('А')}>Показать А</button><button aria-pressed={activeScenario === 'Б'} onClick={() => setActiveScenario('Б')}>Показать Б</button><span>На карте: {activeScenario} · общее время</span></div>}
         {(pickingSource || pickMessage || (result && mode === 'river' && reach && draftPreview)) && <div className="source-map-tools">
           {(pickingSource || pickMessage) && <p role="status" data-testid="source-pick-status">{pickingSource && <strong>{reach?.name}: нажмите рядом с руслом, не дальше 75 м. Ниже источника — минимум 100 м. Escape — отмена. </strong>}{pickMessage}</p>}
-          {pickingSource ? <button type="button" onClick={() => finishPicking(true)}>Отменить выбор источника</button> : result && mode === 'river' && reach && <button type="button" onClick={() => { setDraftPreview(value => !value); setProfileOpen(false); }}>{showingPreview ? 'Показать рассчитанный результат' : 'Показать условия следующего расчёта'}</button>}
+          {pickingSource ? <button type="button" onClick={() => finishPicking(true)}>Отменить выбор источника</button> : result && mode === 'river' && reach && <button type="button" onClick={() => { geometryEditRevision.current++; setDraftPreview(value => !value); setProfileOpen(false); }}>{showingPreview ? 'Показать рассчитанный результат' : 'Показать условия следующего расчёта'}</button>}
           {pickPending && <span aria-hidden="true" className="source-pick-pending">…</span>}
         </div>}
         <div className={`model-map-stage${profileOpen && showingResult ? ' has-profile' : ''}`}>
