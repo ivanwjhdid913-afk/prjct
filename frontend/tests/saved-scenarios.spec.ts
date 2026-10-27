@@ -129,3 +129,17 @@ test('a cancelled open ignores a late response and can be retried', async ({ pag
   await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
   await expect(page.getByLabel('Геометрия сценария')).toHaveValue('synthetic');
 });
+
+test('Enter in the saved name saves conditions instead of submitting a calculation', async ({ page }) => {
+  let calculations = 0, saves = 0;
+  page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; });
+  await page.route('**/api/v1/scenarios', route => { saves++; return route.fulfill({ status: 201, json: { ...saved, ...route.request().postDataJSON() } }); });
+  await page.goto('/#model'); await library(page);
+  await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
+  await expect(page.getByTestId('library-status')).toContainText('Открыты условия');
+  await expect(page.getByRole('button', { name: 'Сохранить как новый сценарий', exact: true })).toBeEnabled();
+  await page.getByLabel('Название сохраняемых условий').fill('Вариант с клавиатуры');
+  await page.getByLabel('Название сохраняемых условий').press('Enter');
+  await expect.poll(() => saves).toBe(1);
+  expect(calculations).toBe(0);
+});
