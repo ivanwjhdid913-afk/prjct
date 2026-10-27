@@ -160,6 +160,8 @@ def _load_reach(main_path, downstream_path):
         raise ValueError('Длина проверенного продолжения не соответствует геометрии буфера.')
     metadata = {**document['properties'], 'geometry_sha256': hashlib.sha256(
         json.dumps(document['geometry'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+    metadata['downstream_geometry_sha256'] = hashlib.sha256(
+        json.dumps(downstream['geometry'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     if not isinstance(metadata.get('id'), str) or not metadata['id'] or not metadata.get('name'):
         raise ValueError('Подготовленному руслу нужны идентификатор и название.')
     # Buffer acceptance uses the measured saved tail, never an overstated label.
