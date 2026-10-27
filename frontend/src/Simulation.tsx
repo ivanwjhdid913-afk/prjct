@@ -6,6 +6,8 @@ import { comparisonReason, sharedScale, valuesAtHour } from './scenarioCompariso
 import TemporalProfile from './TemporalProfile';
 import { riverCoordinate } from './riverCoordinate';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
+import SavedScenarios from './SavedScenarios';
+import { MODEL_ID, SCENARIO_FORMAT, RIVER_VERSION, SYNTHETIC_VERSION, validConditions, type Conditions, type SavePayload, type SavedScenario } from './scenarioStorage';
 
 const fields = [
   { key: 'river_flow_m3_s', label: 'Расход реки Qr, м³/с', initial: 10, min: .1, max: 1000, help: 'Поток воды выше условного источника.' },
@@ -372,6 +374,41 @@ export default function Simulation() {
   }, [playing, speed, clockResult]);
   const stale = latestResult !== null && (loadMode !== (latestResult.inputs.load_mode ?? 'continuous') || (loadMode === 'finite' && Number(loadDuration) !== latestResult.inputs.load_duration_hours) || (mode === 'river' ? reachId !== latestResult.reach_id || Number(source) !== latestResult.source_distance_m || !sourceValid : !!latestResult.reach_id) || fields.some(field => (mode !== 'river' || field.key !== 'length_m') && (draft[field.key].trim() === '' || Number(draft[field.key]) !== latestResult.inputs[field.key])));
 
+  function conditionsToSave(): SavePayload {
+    if (!form.current?.reportValidity() || pickPending || pickingSource || (mode === 'river' && (!reach || !sourceValid)))
+      throw new Error('Завершите выбор источника и заполните корректные условия расчёта.');
+    const conditions = {
+      ...Object.fromEntries(fields.filter(field => mode !== 'river' || field.key !== 'length_m').map(field => [field.key, Number(draft[field.key])])),
+      load_mode: loadMode, load_duration_hours: loadMode === 'finite' ? Number(loadDuration) : null,
+      ...(mode === 'river' ? { reach_id: reach!.id, source_distance_m: Number(source) } : {}),
+    };
+    if (!validConditions(conditions)) throw new Error('Проверьте условия: числа, диапазоны и длительность периода загрязнения.');
+    const checksum = mode === 'river' ? reach?.metadata.geometry_sha256 : null;
+    if (mode === 'river' && (typeof checksum !== 'string' || !/^[0-9a-f]{64}$/.test(checksum)))
+      throw new Error('Версия геометрии ещё не загружена. Обновите участок перед сохранением условий.');
+    return { format_version: SCENARIO_FORMAT, model_id: MODEL_ID,
+      geometry_version: mode === 'river' ? RIVER_VERSION : SYNTHETIC_VERSION,
+      geometry_sha256: checksum as string | null, conditions };
+  }
+  function openSavedConditions(saved: SavedScenario) {
+    const conditions: Conditions = saved.conditions;
+    if (conditions.reach_id != null) {
+      const savedReach = reaches.find(item => item.id === conditions.reach_id);
+      if (!savedReach || savedReach.metadata.geometry_sha256 !== saved.geometry_sha256)
+        throw new Error('Участок отсутствует или геометрия страницы изменилась. Обновите страницу; исходная запись сохранена.');
+      if (savedReach.length_m - (conditions.source_distance_m ?? 0) < 100)
+        throw new Error('Для сохранённого источника осталось менее 100 м русла. Исходная запись сохранена.');
+    }
+    stopRequest(); finishPicking(); geometryEditRevision.current++;
+    setMode(conditions.reach_id ? 'river' : 'synthetic');
+    if (conditions.reach_id) setReachId(conditions.reach_id);
+    setSource(String(conditions.source_distance_m ?? 0)); setSourceCoordinate(null);
+    setDraft(Object.fromEntries(fields.map(field => [field.key, String(conditions[field.key] ?? initialDraft[field.key])])) as Draft);
+    setLoadMode(conditions.load_mode); setLoadDuration(String(conditions.load_duration_hours ?? .5));
+    setDraftPreview(!!conditions.reach_id); setPlaying(false); setProfileOpen(false);
+    setVariant(!!baseline);
+  }
+  const savedDraftKey = JSON.stringify([mode, reachId, source, draft, loadMode, loadDuration, pickingSource, pickPending]);
 
   async function calculate(demonstration: false | true | 'finite' = false) {
     const chosenReach = demonstration ? demoReach : reach;
@@ -446,10 +483,11 @@ export default function Simulation() {
         <div className="parameters-heading"><div><p className="eyebrow">Сценарий</p><h2 id="parameters-title">Условия расчёта</h2></div><button className="close-parameters" aria-label="Закрыть параметры" onClick={() => setParametersOpen(false)}>×</button></div>
         <form ref={form} onSubmit={event => { event.preventDefault(); void calculate(); }}>
           <div className="parameter-scroll">
+            <SavedScenarios draftKey={savedDraftKey} getConditions={conditionsToSave} onOpen={openSavedConditions} />
             <section className="scenario-comparison-controls" aria-label="Сценарии текущего сеанса">
               <p className="comparison-step">{baseline ? variant ? 'Б · редактируемый вариант' : 'А · закреплённый расчёт' : 'Начните с базового расчёта'}</p>
               {!baseline ? <button type="button" disabled={!result || status === 'loading'} onClick={pinBaseline}>Закрепить как А</button> : <><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" className="replace-baseline" disabled={!result || status === 'loading'} onClick={pinBaseline}>Заменить А показанным расчётом</button></>}
-              <small>После перезагрузки страницы сценарии сбрасываются.</small>
+              <small>После перезагрузки страницы сценарии сбрасываются: результаты А/Б хранятся только в сеансе. Сохранённые условия остаются в библиотеке.</small>
             </section>
             <div className="scenario-geometry"><label htmlFor="scenario-mode">Геометрия сценария</label><select id="scenario-mode" value={mode} onChange={event => { geometryEditRevision.current++; finishPicking(); setMode(event.target.value); setDraftPreview(false); setPlaying(false); }}><option value="river">Реальное речное русло</option><option value="synthetic">Синтетический участок</option></select></div>
             {mode === 'river' && <section className="river-setup" aria-label="Выбор речного участка">
