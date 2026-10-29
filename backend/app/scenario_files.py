@@ -87,4 +87,6 @@ async def validate_condition_file(request: Request):
             message = str(error)
         raise HTTPException(422, message) from None
     compatible = conditions_compatibility(**document.model_dump(exclude={'name', 'reach_name', 'geometry_source'}))
+    compatible.reasons = [reason.replace('исходная запись сохранена', 'исходный файл не изменён')
+                         .replace('Сохранение отменено', 'Применение недоступно') for reason in compatible.reasons]
     return FileValidation(document=document, compatibility=compatible)
