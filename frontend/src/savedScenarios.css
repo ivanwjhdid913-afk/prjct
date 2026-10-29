@@ -15,3 +15,17 @@
 .saved-scenarios li button { grid-column: 2; grid-row: 1 / 4; align-self: center; min-height: 44px; padding: 6px 8px; font-size: 11px; }
 .library-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; }
 .library-pagination button { min-width: 44px; min-height: 44px; }
+.saved-scenarios .library-item-actions { grid-column: 2; grid-row: 1 / 4; align-self: center; display: flex; flex-direction: column; gap: 4px; }
+.saved-scenarios .library-item-actions button { grid-column: auto; grid-row: auto; }
+.conditions-transfer { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0; margin-top: 14px; }
+.conditions-transfer h3 { font-size: 12px; margin: 0 0 8px; }
+.conditions-transfer > button { width: 100%; font-size: 11px; margin-bottom: 8px; }
+.conditions-transfer label { margin-top: 12px; }
+.simulation .conditions-transfer input[type="file"] { padding: 8px 4px; font-size: 11px; }
+.conditions-transfer input::file-selector-button { min-height: 36px; margin-right: 6px; border: 1px solid #9db0a5; background: #f3f7f2; color: var(--ink); border-radius: 3px; }
+.conditions-preview { background: #f6f9f4; border: 1px solid #cdd9d1; border-radius: 4px; padding: 10px; margin-top: 10px; overflow-wrap: anywhere; }
+.conditions-preview > strong { font-size: 12px; }
+.conditions-preview dl { font-size: 10px; line-height: 1.5; margin: 8px 0; }
+.conditions-preview dt { color: var(--muted); margin-top: 7px; }
+.conditions-preview dd { margin: 0; font-variant-numeric: tabular-nums; }
+.conditions-preview button { width: 100%; font-size: 11px; margin-top: 6px; }

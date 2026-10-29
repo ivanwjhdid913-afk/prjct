@@ -343,3 +343,9 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
   .temporal-extremum { margin: 4px 0; padding: 4px 0; }
   .temporal-profile svg { min-height: 110px; }
 }
+
+.result-exports { border-top:1px solid var(--line); margin-top:12px; }
+.result-exports p { font-size:11px; line-height:1.5; color:var(--muted); }
+.result-exports > div { display:flex; gap:8px; flex-wrap:wrap; }
+.result-exports button { min-height:44px; font-size:12px; flex:1; }
+.map-start-hint > button { min-height:32px; font-size:10px; margin-top:6px; }

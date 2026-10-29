@@ -7,6 +7,7 @@ import TemporalProfile from './TemporalProfile';
 import { riverCoordinate } from './riverCoordinate';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
 import SavedScenarios from './SavedScenarios';
+import ResultExports from './ResultExports';
 import { MODEL_ID, SCENARIO_FORMAT, RIVER_VERSION, SYNTHETIC_VERSION, validConditions, type Conditions, type SavePayload, type SavedScenario } from './scenarioStorage';
 
 const fields = [
@@ -26,6 +27,7 @@ type Draft = Record<Key, string>;
 type Line = { type: 'LineString'; coordinates: [number, number][] };
 type Reach = { id: string; name: string; length_m: number; geometry: Line; distances_m: number[]; metadata: Record<string, unknown> };
 type Result = {
+  model_id?: string; format_version?: number;
   inputs: Inputs;
   reach_id?: string | null; source_distance_m?: number; source_coordinate?: [number, number] | null;
   reach_metadata?: Record<string, unknown> | null; segment_geometries?: Line[] | null;
@@ -261,6 +263,7 @@ export default function Simulation() {
   const [hasB, setHasB] = useState(false);
   const [activeScenario, setActiveScenario] = useState<'А' | 'Б'>('Б');
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error' | 'cancelled'>('idle');
+  const [interactionKey, setInteractionKey] = useState(0);
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<Key, string>>>({});
   const [time, setTime] = useState(0);
@@ -390,29 +393,45 @@ export default function Simulation() {
       geometry_version: mode === 'river' ? RIVER_VERSION : SYNTHETIC_VERSION,
       geometry_sha256: checksum as string | null, conditions };
   }
-  function openSavedConditions(saved: SavedScenario) {
+  function openSavedConditions(saved: Pick<SavedScenario, 'conditions' | 'geometry_sha256'> & { downstream_geometry_sha256?: string | null }) {
     const conditions: Conditions = saved.conditions;
     if (conditions.reach_id != null) {
       const savedReach = reaches.find(item => item.id === conditions.reach_id);
       if (!savedReach || savedReach.metadata.geometry_sha256 !== saved.geometry_sha256)
         throw new Error('Участок отсутствует или геометрия страницы изменилась. Обновите страницу; исходная запись сохранена.');
+      if (saved.downstream_geometry_sha256 != null && savedReach.metadata.downstream_geometry_sha256 !== saved.downstream_geometry_sha256)
+        throw new Error('Проверенное продолжение участка изменилось. Обновите страницу; источник не перенесён.');
       if (savedReach.length_m - (conditions.source_distance_m ?? 0) < 100)
         throw new Error('Для сохранённого источника осталось менее 100 м русла. Исходная запись сохранена.');
     }
+    setInteractionKey(value => value + 1);
     stopRequest(); finishPicking(); geometryEditRevision.current++;
     setMode(conditions.reach_id ? 'river' : 'synthetic');
     if (conditions.reach_id) setReachId(conditions.reach_id);
     setSource(String(conditions.source_distance_m ?? 0)); setSourceCoordinate(null);
     setDraft(Object.fromEntries(fields.map(field => [field.key, String(conditions[field.key] ?? initialDraft[field.key])])) as Draft);
     setLoadMode(conditions.load_mode); setLoadDuration(String(conditions.load_duration_hours ?? .5));
-    setDraftPreview(!!conditions.reach_id); setPlaying(false); setProfileOpen(false);
+    const geometryChanged = !latestResult || (conditions.reach_id ?? null) !== (latestResult.reach_id ?? null)
+      || (conditions.source_distance_m ?? 0) !== (latestResult.source_distance_m ?? 0);
+    setDraftPreview(!!conditions.reach_id && geometryChanged); setPlaying(false);
     setVariant(!!baseline);
   }
   const savedDraftKey = JSON.stringify([mode, reachId, source, draft, loadMode, loadDuration, pickingSource, pickPending]);
+  function conditionsDocument(name: string) {
+    const payload = conditionsToSave();
+    const metadata = mode === 'river' ? reach!.metadata : {};
+    return { ...payload, name, geometry_mode: mode === 'river' ? 'river' as const : 'synthetic' as const,
+      reach_id: payload.conditions.reach_id ?? null, reach_name: mode === 'river' ? reach!.name : 'Синтетический участок',
+      downstream_geometry_sha256: mode === 'river' ? String(metadata.downstream_geometry_sha256 ?? '') : null,
+      geometry_source: Object.fromEntries(['source','source_url','attribution','license','crs','snapshot_date','osm_way_id','osm_way_version','osm_way_timestamp','raw_sha256'].filter(key => key in metadata).map(key => [key, metadata[key]])),
+      conditions: { ...payload.conditions, reach_id: payload.conditions.reach_id ?? null, source_distance_m: payload.conditions.source_distance_m ?? 0, length_m: payload.conditions.length_m ?? null },
+    };
+  }
 
   async function calculate(demonstration: false | true | 'finite' = false) {
     const chosenReach = demonstration ? demoReach : reach;
     if (demonstration ? !chosenReach : !form.current?.reportValidity() || (mode === 'river' && !sourceValid)) return;
+    setInteractionKey(value => value + 1);
     const nextDraft = demonstration ? { ...initialDraft, duration_hours: demonstration === 'finite' ? '6' : '4' } : draft;
     const nextLoadMode = demonstration ? (demonstration === 'finite' ? 'finite' : 'continuous') : loadMode;
     const nextLoadDuration = nextLoadMode === 'finite' ? (demonstration ? .5 : Number(loadDuration)) : null;
@@ -483,7 +502,7 @@ export default function Simulation() {
         <div className="parameters-heading"><div><p className="eyebrow">Сценарий</p><h2 id="parameters-title">Условия расчёта</h2></div><button className="close-parameters" aria-label="Закрыть параметры" onClick={() => setParametersOpen(false)}>×</button></div>
         <form ref={form} onSubmit={event => { event.preventDefault(); void calculate(); }}>
           <div className="parameter-scroll">
-            <SavedScenarios draftKey={savedDraftKey} getConditions={conditionsToSave} onOpen={openSavedConditions} />
+            <SavedScenarios draftKey={savedDraftKey} interactionKey={interactionKey} getConditions={conditionsToSave} getDocument={conditionsDocument} onApplyConditions={openSavedConditions} onOpen={openSavedConditions} />
             <section className="scenario-comparison-controls" aria-label="Сценарии текущего сеанса">
               <p className="comparison-step">{baseline ? variant ? 'Б · редактируемый вариант' : 'А · закреплённый расчёт' : 'Начните с базового расчёта'}</p>
               {!baseline ? <button type="button" disabled={!result || status === 'loading'} onClick={pinBaseline}>Закрепить как А</button> : <><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" className="replace-baseline" disabled={!result || status === 'loading'} onClick={pinBaseline}>Заменить А показанным расчётом</button></>}
@@ -510,7 +529,7 @@ export default function Simulation() {
             </div>)}</div>
             <details className="simulation-assumptions"><summary>Методика и происхождение данных</summary><p><strong>{mode === 'river' ? 'Реальное русло · условный сброс' : 'Синтетический сценарий'}</strong></p><p>Источник — условная граница после полного смешения. Это не подтверждённый выпуск предприятия. Нагрузка и гидрология заданы пользователем; концентрации рассчитаны. Проверка по реальным наблюдениям не выполнена.</p>{mode === 'river' && reach && <p className="geometry-credit">Геометрия: {String(reach.metadata.attribution ?? reach.name)}. {typeof reach.metadata.source_url === 'string' && /^https?:\/\//.test(reach.metadata.source_url) && <a href={reach.metadata.source_url} target="_blank" rel="noreferrer">Источник данных ↗</a>}</p>}<p>Один полностью перемешанный участок, течение и продольная дисперсия; без притоков, реакций, подпора и поперечного смешения. Озёра и водохранилища не моделируются. Толщина линии не означает ширину загрязнения.</p><p>Демонстрация задаёт синтетические параметры: Qr = 10 м³/с, q = 0,1 м³/с, cb = 10 мг/л, ce = 100 мг/л, u = 0,25 м/с, D = 5 м²/с, источник в начале Дона, длительность 4 ч. Кнопка демонстрации заменяет текущие условия этими значениями.</p></details>
           </div>
-          <div className="simulation-actions"><button className="primary" type="submit" disabled={mode === 'river' && (!reach || !sourceValid)}>{status === 'loading' ? 'Запустить новый расчёт' : variant && !incompatibleDraft ? 'Рассчитать Б' : 'Рассчитать'}</button>{status === 'loading' && <button type="button" onClick={() => { request.current++; controller.current?.abort(); setStatus('cancelled'); }}>Отменить ожидание</button>}<span>Изменённые условия применяются по кнопке</span></div>
+          <div className="simulation-actions"><button className="primary" type="submit" disabled={mode === 'river' && (!reach || !sourceValid)}>{status === 'loading' ? 'Запустить новый расчёт' : variant && !incompatibleDraft ? 'Рассчитать Б' : 'Рассчитать'}</button>{status === 'loading' && <button type="button" onClick={() => { setInteractionKey(value => value + 1); request.current++; controller.current?.abort(); setStatus('cancelled'); }}>Отменить ожидание</button>}<span>Изменённые условия применяются по кнопке</span></div>
         </form>
       </aside>
       <section className="model-canvas" aria-label="Рабочая область модели">
@@ -529,7 +548,7 @@ export default function Simulation() {
             <div className="simulation-selection"><label htmlFor="simulation-segment">Расчётный сегмент</label><select id="simulation-segment" value={selected} onChange={event => setSelected(Number(event.target.value))}>{result.distances_m.map((distance, index) => <option key={index} value={index}>{index + 1} · {format(distance, 0)} м</option>)}</select><p aria-live={playing ? 'off' : 'polite'}><strong data-testid="selected-concentration">{format(values[selected], 4)} мг/л</strong><span>{format(result.distances_m[selected], 0)} м от источника · {formatTime(shownHours)}</span></p></div>
             {valuesA && valuesB && <dl className="comparison-values" aria-label="Сравнение выбранного сегмента"><div><dt>А</dt><dd data-testid="comparison-a">{format(valuesA[selected], 4)} мг/л</dd></div><div><dt>Б</dt><dd data-testid="comparison-b">{format(valuesB[selected], 4)} мг/л</dd></div><div><dt>Б − А</dt><dd data-testid="comparison-delta">{format(valuesB[selected] - valuesA[selected], 4)} мг/л</dd></div></dl>}
             <button className="profile-toggle" aria-controls="model-profile" aria-expanded={profileOpen} onClick={() => setProfileOpen(value => !value)}>{profileOpen ? 'Свернуть профиль' : 'Профиль и показатели'}<span aria-hidden="true">{profileOpen ? '−' : '↗'}</span></button>
-          </aside> : !pickingSource && !result ? <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p></div> : null}
+          </aside> : !pickingSource && !result ? <div className="map-start-hint"><strong>Увидеть распространение по руслу</strong><p>Запустите демонстрацию: 4 модельных часа, синтетическая нагрузка и параметры потока.</p><p>Выгрузка CSV доступна после завершения расчёта.</p><button type="button" disabled>Скачать C(x) CSV</button><button type="button" disabled>Скачать C(t) CSV</button></div> : null}
           {showingResult && result && values && <aside id="model-profile" className={`profile-drawer${profileOpen ? ' is-open' : ''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={parametersOpen}>
             <div className="profile-drawer-heading"><h2>Профиль и показатели</h2>{profileOpen && concentrationLegend}<button className="profile-close" aria-label="Закрыть профиль" onClick={() => setProfileOpen(false)}>×</button></div>
             <div className="profile-tabs" role="group" aria-label="Вид графика"><button aria-pressed={profileView === 'space'} onClick={() => setProfileView('space')}>По расстоянию C(x)</button><button aria-pressed={profileView === 'time'} onClick={() => setProfileView('time')}>Во времени C(t)</button></div>
@@ -537,6 +556,7 @@ export default function Simulation() {
               {comparison && <p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}
               <details><summary>Таблица профиля</summary><div className="simulation-table"><table aria-label="Рассчитанный профиль"><thead><tr><th>Сегмент</th><th>Расстояние, м</th>{comparison ? <><th>А, мг/л</th><th>Б, мг/л</th><th>Б − А, мг/л</th></> : <th>Концентрация, мг/л</th>}</tr></thead><tbody>{result.distances_m.map((distance, index) => <tr key={index}><td>{index + 1}</td><td>{format(distance, 0)}</td>{valuesA && valuesB ? <><td>{format(valuesA[index], 4)}</td><td>{format(valuesB[index], 4)}</td><td>{format(valuesB[index] - valuesA[index], 4)}</td></> : <td>{format(values[index], 4)}</td>}</tr>)}</tbody></table></div></details>
             </section>}
+            <ResultExports result={result} a={comparison ? baseline : null} b={comparison ? latestResult : null} hour={shownHours} selected={selected} />
             <p className="simulation-hint" data-testid="numerical-accuracy">{result.inputs.load_mode === 'finite' ? 'Короткие импульсы пригодны для качественной иллюстрации переноса. Количественную точность пика необходимо отдельно проверять уточнением пространственного и временного шагов. ' : 'Численная точность требует отдельной проверки уточнением пространственного и временного шагов. '}Допуск сохранения траектории не ограничивает погрешность численной схемы и неопределённость физических исходных данных.</p>
             <details className="model-explanation"><summary>Почему меняется окраска?</summary><p>При постоянном поступлении консервативного вещества за фронтом возникает плато: вещество не распадается, поток постоянно приносит его новую массу.</p><p>После окончания нагрузки область повышенной концентрации продолжает двигаться и растягиваться вдоль реки. Максимум может находиться ниже по течению, а ближние сегменты уже возвращаться к фону.</p><p>Меняется только концентрация поступающей воды; расход, скорость и геометрия постоянны. Закрытие водовыпуска и гидравлическая волна не рассчитываются. Толщина линии — условный знак, не рассчитанная ширина пятна.</p></details>
             <p className="simulation-hint">{comparison ? `Показатели сценария ${activeScenario}` : "Показатели расчёта"}</p><dl className="simulation-summary"><div><dt>Площадь сечения</dt><dd>{format(result.derived.area_m2)} м²</dd></div><div><dt>Нагрузка выпуска в активный период</dt><dd>{format(result.derived.load_kg_s, 4)} кг/с</dd></div><div><dt>Нагрузка сверх фона в активный период</dt><dd>{format(result.derived.excess_load_kg_s, 4)} кг/с</dd></div><div><dt>{result.inputs.load_mode === 'finite' ? 'Плато при неограниченном поступлении' : 'Установившаяся концентрация'}</dt><dd>{format(result.derived.steady_mg_l, 4)} мг/л</dd></div></dl>

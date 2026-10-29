@@ -1,0 +1,38 @@
+import { expect, test } from '@playwright/test';
+
+test('an explicitly applied same-form import supersedes an older library open', async ({ page }) => {
+  const id = '00000000-0000-4000-8000-000000000019';
+  const reach = { id: 'don-olkhovets', name: 'Дон', length_m: 1000, distances_m: [0, 500, 1000], geometry: { type: 'LineString', coordinates: [[39, 52], [39.001, 52.001], [39.002, 52.002]] }, metadata: { geometry_sha256: 'a'.repeat(64), downstream_geometry_sha256: 'b'.repeat(64) } };
+  const conditions = { river_flow_m3_s: 10, effluent_flow_m3_s: .1, background_mg_l: 10, effluent_mg_l: 50, velocity_m_s: .25, dispersion_m2_s: 5, duration_hours: .1, length_m: 500, reach_id: null, source_distance_m: 0, load_mode: 'continuous', load_duration_hours: null };
+  const saved = { id, name: 'Старая отложенная запись', created_at: '2026-10-29T12:00:00Z', format_version: 1, model_id: 'conservative-1d-advection-dispersion-v1', geometry_mode: 'synthetic', geometry_version: 'synthetic-wgs84-meridian-v1', geometry_sha256: null, downstream_geometry_sha256: null, reach_id: null, reach_name: 'Синтетический участок', geometry_source: {}, conditions, load_mode: 'continuous', compatibility: { compatible: true, reasons: [] } };
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [reach] } }));
+  await page.route('**/api/v1/scenarios?*', route => route.fulfill({ json: { items: [saved], total: 1, limit: 20, offset: 0 } }));
+  let release!: () => void;
+  await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
+  await page.route('**/api/v1/scenario-files/validate', route => route.fulfill({ json: { document: route.request().postDataJSON(), compatibility: { compatible: true, reasons: [] } } }));
+  let calculations = 0, writes = 0;
+  page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; if (request.url().endsWith('/scenarios') && request.method() === 'POST') writes++; });
+  await page.goto('/#model');
+  await expect(page.getByLabel('Подготовленный участок')).toHaveValue(reach.id);
+  await page.locator('.saved-scenarios summary').click();
+  await page.getByLabel('Название сохраняемых условий').fill('Текущие условия для переноса');
+  await page.getByRole('button', { name: `Открыть «${saved.name}»`, exact: true }).click();
+  await expect.poll(() => !!release).toBeTruthy();
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Выгрузить текущие условия JSON', exact: true }).click();
+  const stream = await (await pending).createReadStream(); const pieces: Buffer[] = [];
+  for await (const piece of stream!) pieces.push(Buffer.from(piece));
+  const bytes = Buffer.concat(pieces);
+  await page.getByLabel('Импортировать условия JSON').setInputFiles({ name: 'текущие.json', mimeType: 'application/json', buffer: bytes });
+  await expect(page.getByTestId('conditions-preview')).toContainText('Совместимо');
+  await page.getByRole('button', { name: 'Применить к форме', exact: true }).click();
+  await expect(page.getByText('Условия файла применены к форме. Расчёт и сохранение выполняются отдельно.', { exact: true })).toBeVisible();
+  const response = page.waitForResponse(reply => reply.url().endsWith(`/scenarios/${id}`));
+  release(); await response;
+  await expect(page.getByTestId('library-error')).toContainText('более новое действие');
+  await expect(page.getByLabel('Геометрия сценария')).toHaveValue('river');
+  await expect(page.getByLabel('Концентрация стоков ce, мг/л')).toHaveValue('100');
+  expect(calculations).toBe(0); expect(writes).toBe(0);
+});

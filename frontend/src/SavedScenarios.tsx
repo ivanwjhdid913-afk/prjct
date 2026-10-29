@@ -1,19 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { responseData, validCompatibility, validPage, validSaved, type SavePayload, type SavedScenario, type ScenarioPage } from './scenarioStorage';
 import './savedScenarios.css';
+import type { ConditionsDocument } from './scenarioExchange';
+import { documentFromSaved, downloadConditions } from './scenarioExchange';
+import ConditionsTransfer from './ConditionsTransfer';
 
-type Props = { draftKey: string; getConditions: () => SavePayload; onOpen: (scenario: SavedScenario) => void };
-export default function SavedScenarios({ draftKey, getConditions, onOpen }: Props) {
+type Props = { draftKey: string; getConditions: () => SavePayload; onOpen: (scenario: SavedScenario) => void;
+  interactionKey?: number; getDocument?: (name: string) => ConditionsDocument; onApplyConditions?: (document: ConditionsDocument) => void };
+export default function SavedScenarios({ draftKey, getConditions, onOpen, interactionKey = 0, getDocument, onApplyConditions }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [name, setName] = useState('');
   const [page, setPage] = useState<ScenarioPage | null>(null);
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState<'save' | 'open' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'open' | 'export' | null>(null);
   const [error, setError] = useState('');
+  const [listError, setListError] = useState('');
   const [notice, setNotice] = useState('');
   const key = useRef(draftKey); key.current = draftKey;
+  const interaction = useRef(interactionKey); interaction.current = interactionKey;
   const open = useRef(onOpen); open.current = onOpen;
   const action = useRef(0);
   const controller = useRef<AbortController | null>(null);
@@ -28,8 +34,8 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
       .then(responseData).then(data => {
         if (!active) return;
         if (!validPage(data, offset)) throw new Error('Сервер вернул некорректный список условий.');
-        setPage(data);
-      }).catch(reason => { if (active) setError(abort.signal.aborted ? 'Истекло время загрузки списка. Повторите запрос.' : reason instanceof Error ? reason.message : 'Не удалось загрузить список.'); })
+        setPage(data); setListError('');
+      }).catch(reason => { if (active) setListError(abort.signal.aborted ? 'Истекло время загрузки списка. Повторите запрос.' : reason instanceof Error ? reason.message : 'Не удалось загрузить список.'); })
       .finally(() => { window.clearTimeout(timer); if (active) setLoading(false); });
     return () => { active = false; window.clearTimeout(timer); abort.abort(); };
   }, [expanded, offset, revision]);
@@ -38,7 +44,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
     action.current++; controller.current?.abort(); setBusy(null);
     setNotice('Ожидание отменено. Если сохраняли условия, обновите список: запись могла сохраниться на сервере.');
   }
-  async function perform(kind: 'save' | 'open', id?: string) {
+  async function perform(kind: 'save' | 'open' | 'export', id?: string) {
     setError(''); setNotice('');
     let payload: SavePayload | undefined;
     const title = name.trim();
@@ -47,7 +53,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
       try { payload = getConditions(); }
       catch (reason) { setError(reason instanceof Error ? reason.message : 'Заполните корректные условия расчёта.'); return; }
     }
-    const token = ++action.current, before = key.current;
+    const token = ++action.current, before = key.current, beforeInteraction = interaction.current;
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     const timer = window.setTimeout(() => { abort.abort(); }, 10_000);
     setBusy(kind);
@@ -58,6 +64,11 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
       });
       const data = await responseData(response);
       if (token !== action.current || abort.signal.aborted) return;
+      if (kind === 'export') {
+        const document = documentFromSaved(data); downloadConditions(document);
+        setNotice(`Выгружены сохранённые условия «${document.name}». Текущая форма не использована.`);
+        return;
+      }
       if (!validCompatibility(data)) throw new Error('Сервер вернул некорректную запись условий.');
       if (!data.compatibility.compatible) throw new Error(`Условия недоступны для этой версии: ${data.compatibility.reasons.join(' ')} Исходная запись сохранена.`);
       if (!validSaved(data)) throw new Error('Версия или содержимое условий не поддерживаются. Исходная запись сохранена.');
@@ -65,6 +76,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
         setNotice(`Сохранены условия «${data.name}».${before !== key.current ? ' После отправки форма изменилась; сохранён отправленный набор.' : ''}`);
         setOffset(0); setRevision(value => value + 1);
       } else {
+        if (beforeInteraction !== interaction.current) throw new Error('Выполнено более новое действие. Открытие отменено; повторите его явно.');
         if (before !== key.current) throw new Error('Условия формы изменены во время ожидания. Открытие отменено; повторите его явно.');
         open.current(data); setName(data.name);
         setNotice(`Открыты условия «${data.name}». Нажмите «Рассчитать» для нового результата. Сохранённая запись не изменяется.`);
@@ -84,17 +96,20 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen }: Prop
     <div data-testid="library-status" role="status">{notice}</div>
     {error && <p data-testid="library-error" role="alert">{error}</p>}
     {busy && <button type="button" onClick={cancel}>Отменить ожидание библиотеки</button>}
-    <div className="library-list-heading"><strong>Библиотека</strong><button type="button" disabled={loading} onClick={() => { setError(''); setRevision(value => value + 1); }}>Обновить список</button></div>
+    {getDocument && onApplyConditions && <ConditionsTransfer name={name} draftKey={draftKey} interactionKey={interactionKey} getDocument={getDocument} onApply={onApplyConditions} onAppliedName={setName} />}
+    <div className="library-list-heading"><strong>Библиотека</strong><button type="button" disabled={loading} onClick={() => { setListError(''); setRevision(value => value + 1); }}>Обновить список</button></div>
+    {listError && <p data-testid="library-list-error" role="alert">{listError}</p>}
     {loading && <p role="status">Загружаем условия…</p>}
     {!loading && page?.total === 0 && <p>Сохранённых условий пока нет.</p>}
     {page && <><ul aria-label="Сохранённые сценарии" aria-busy={loading}>
       {page.items.map(item => <li key={item.id}>
         <strong>{item.name}</strong><span>{item.reach_name} · {item.load_mode === 'finite' ? 'Ограниченный период' : 'Постоянная нагрузка'}</span>
         <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
-        <button type="button" disabled={!!busy || loading} aria-label={`Открыть «${item.name}»`} onClick={() => { void perform('open', item.id); }}>Открыть</button>
+        <div className="library-item-actions"><button type="button" disabled={!!busy || loading} aria-label={`Открыть «${item.name}»`} onClick={() => { void perform('open', item.id); }}>Открыть</button>
+          <button type="button" disabled={!!busy || loading} aria-label={`Выгрузить JSON «${item.name}»`} onClick={() => { void perform('export', item.id); }}>JSON ↓</button></div>
       </li>)}
-    </ul><div className="library-pagination"><button type="button" aria-label="Предыдущие сохранённые условия" disabled={loading || offset === 0} onClick={() => { setError(''); setOffset(Math.max(0, offset - 20)); }}>←</button>
+    </ul><div className="library-pagination"><button type="button" aria-label="Предыдущие сохранённые условия" disabled={loading || offset === 0} onClick={() => { setListError(''); setOffset(Math.max(0, offset - 20)); }}>←</button>
       <span>{page.total === 0 ? '0' : `${page.offset + 1}–${page.offset + page.items.length}`} из {page.total}</span>
-      <button type="button" aria-label="Следующие сохранённые условия" disabled={loading || offset + 20 >= page.total} onClick={() => { setError(''); setOffset(offset + 20); }}>→</button></div></>}
+      <button type="button" aria-label="Следующие сохранённые условия" disabled={loading || offset + 20 >= page.total} onClick={() => { setListError(''); setOffset(offset + 20); }}>→</button></div></>}
   </details>;
 }
