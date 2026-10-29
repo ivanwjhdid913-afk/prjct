@@ -354,6 +354,7 @@ export default function Simulation() {
   }
   function createVariant() {
     if (!baseline) return;
+    setInteractionKey(value => value + 1);
     stopRequest(); setPlaying(false); setMode(baseline.reach_id ? 'river' : 'synthetic');
     if (baseline.reach_id) setReachId(baseline.reach_id);
     finishPicking(); setDraftPreview(false); setSourceCoordinate(baseline.source_coordinate ?? null); setSource(String(baseline.source_distance_m ?? 0));

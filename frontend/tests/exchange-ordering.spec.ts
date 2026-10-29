@@ -1,5 +1,39 @@
 import { expect, test } from '@playwright/test';
 
+test('creating B with unchanged A conditions supersedes an older library open without altering A', async ({ page }) => {
+  const id = '00000000-0000-4000-8000-000000000029';
+  const conditions = { river_flow_m3_s: 10, effluent_flow_m3_s: .1, background_mg_l: 10, effluent_mg_l: 50, velocity_m_s: .25, dispersion_m2_s: 5, duration_hours: .1, length_m: 500, reach_id: null, source_distance_m: 0, load_mode: 'continuous', load_duration_hours: null };
+  const saved = { id, name: 'Поздняя запись', created_at: '2026-10-30T12:00:00Z', format_version: 1, model_id: 'conservative-1d-advection-dispersion-v1', geometry_mode: 'synthetic', geometry_version: 'synthetic-wgs84-meridian-v1', geometry_sha256: null, downstream_geometry_sha256: null, reach_id: null, reach_name: 'Синтетический участок', geometry_source: {}, conditions, load_mode: 'continuous', compatibility: { compatible: true, reasons: [] } };
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/v1/scenarios?*', route => route.fulfill({ json: { items: [saved], total: 1, limit: 20, offset: 0 } }));
+  let release!: () => void;
+  await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
+  await page.goto('/#model');
+  const response = page.waitForResponse(reply => reply.url().endsWith('/api/v1/simulations'));
+  await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
+  const baseline = await (await response).json();
+  await expect(page.locator('.simulation-segment')).toHaveCount(100);
+  await page.getByRole('button', { name: 'Закрепить как А', exact: true }).click();
+  // Normalize even hidden form values to the completed A before starting the old open.
+  await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();
+  await page.locator('.saved-scenarios summary').click();
+  await page.getByRole('button', { name: `Открыть «${saved.name}»`, exact: true }).click();
+  await expect.poll(() => !!release).toBeTruthy();
+  await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();
+  await expect(page.getByLabel('Концентрация стоков ce, мг/л')).toHaveValue(String(baseline.inputs.effluent_mg_l));
+  release();
+  await expect(page.getByTestId('library-error')).toContainText('более новое действие');
+  await expect(page.getByLabel('Геометрия сценария')).toHaveValue('river');
+  await expect(page.getByLabel('Концентрация стоков ce, мг/л')).toHaveValue(String(baseline.inputs.effluent_mg_l));
+  const next = page.waitForResponse(reply => reply.url().endsWith('/api/v1/simulations'));
+  await page.getByRole('button', { name: 'Рассчитать Б', exact: true }).click();
+  const variant = await (await next).json();
+  expect(variant.concentrations_mg_l).toEqual(baseline.concentrations_mg_l);
+  await page.getByLabel('Время от начала сценария').fill('2');
+  await expect(page.getByTestId('comparison-delta')).toHaveText('0,0000 мг/л');
+});
+
 test('an explicitly applied same-form import supersedes an older library open', async ({ page }) => {
   const id = '00000000-0000-4000-8000-000000000019';
   const reach = { id: 'don-olkhovets', name: 'Дон', length_m: 1000, distances_m: [0, 500, 1000], geometry: { type: 'LineString', coordinates: [[39, 52], [39.001, 52.001], [39.002, 52.002]] }, metadata: { geometry_sha256: 'a'.repeat(64), downstream_geometry_sha256: 'b'.repeat(64) } };
