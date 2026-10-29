@@ -13,11 +13,13 @@ from app.models import ObservationPoint, WaterBody
 from app.simulation import router as simulation_router
 from app.scenarios import router as scenarios_router
 from app.scenario_files import router as scenario_files_router
+from app.discharge_data import router as discharge_data_router
 
 app = FastAPI(title="Water observations", version="0.1.0")
 app.include_router(simulation_router)
 app.include_router(scenarios_router)
 app.include_router(scenario_files_router)
+app.include_router(discharge_data_router)
 
 
 class WaterBodyView(BaseModel):

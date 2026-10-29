@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './styles.css';
 import ObservationPoints from './ObservationPoints';
 import Simulation from './Simulation';
+import DischargeData from './DischargeData';
 
 const kinds = { river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
 type WaterBody = { id: string; name: string; kind: keyof typeof kinds; is_synthetic: boolean };
@@ -27,6 +28,7 @@ function isWaterPage(value: unknown): value is WaterPage {
 
 export default function App() {
   const [modelOpen, setModelOpen] = useState(() => location.hash === '#model');
+  const [dataOpen, setDataOpen] = useState(() => location.hash === '#discharge-data');
   const [waterBodyId, setWaterBodyId] = useState(() => location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null);
   const returnTarget = useRef<HTMLButtonElement | null>(null);
   const returnId = useRef<string | null>(null);
@@ -44,7 +46,8 @@ export default function App() {
       const id = location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null;
       setWaterBodyId(id);
       setModelOpen(location.hash === '#model');
-      if (!id && location.hash !== '#model') window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
+      setDataOpen(location.hash === '#discharge-data');
+      if (!id && location.hash !== '#model' && location.hash !== '#discharge-data') window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
     }
     window.addEventListener('hashchange', navigate);
     return () => window.removeEventListener('hashchange', navigate);
@@ -114,8 +117,8 @@ export default function App() {
         <span className="edition">Учебный проект</span>
       </header>
       <main id="content" tabIndex={-1} className={modelOpen ? 'model-main' : undefined}>
-        <nav className="section-nav" aria-label="Разделы приложения"><a href="#" aria-current={!modelOpen ? 'page' : undefined}>Каталог</a><a href="#model" aria-current={modelOpen ? 'page' : undefined}>Моделирование</a></nav>
-        {modelOpen ? <Simulation /> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
+        <nav className="section-nav" aria-label="Разделы приложения"><a href="#" aria-current={!modelOpen && !dataOpen ? 'page' : undefined}>Каталог</a><a href="#model" aria-current={modelOpen ? 'page' : undefined}>Моделирование</a><a href="#discharge-data" aria-current={dataOpen ? 'page' : undefined}>Исходные данные</a></nav>
+        {modelOpen ? <Simulation /> : dataOpen ? <DischargeData /> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
         <section className="introduction" aria-labelledby="page-title">
           <p className="eyebrow">Реестр / Водные объекты</p>
           <h1 id="page-title">Водные объекты<span className="title-dot">.</span></h1>

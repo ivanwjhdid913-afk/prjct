@@ -1,0 +1,73 @@
+.discharge-section { padding: 38px 0 16px; }
+.discharge-heading { max-width: 850px; margin-bottom: 26px; }
+.discharge-heading h1 { font-size: clamp(32px, 4vw, 48px); letter-spacing: -1.5px; max-width: 700px; }
+.discharge-caution { border-left: 3px solid #9c783f; background: #f4efe2; padding: 18px 22px; line-height: 1.6; font-size: 14px; }
+.discharge-caution p { margin: 5px 0 0; }
+.discharge-overview { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 25px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.discharge-overview strong { font-size: 26px; font-weight: 550; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.discharge-overview small { display: block; color: var(--muted); margin-top: 5px; font-size: 12px; }
+.discharge-map-absent { font-size: 13px; line-height: 1.6; color: var(--muted); padding: 14px 0; margin: 0 0 12px; }
+.discharge-passports { display: grid; gap: 12px; }
+.discharge-card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; scroll-margin-top: 20px; }
+.discharge-card summary { display: flex; align-items: center; gap: 20px; padding: 20px 24px; cursor: pointer; min-height: 88px; }
+.discharge-card summary::after { content: '+'; font-size: 24px; color: var(--muted); margin-left: auto; }
+.discharge-card[open] summary::after { content: '−'; }
+.discharge-card-name { font-size: 18px; font-weight: 600; max-width: 62%; }
+.discharge-card-name small { display: block; font-size: 12px; font-weight: 400; margin-top: 6px; color: var(--muted); }
+.discharge-status { font-size: 12px; font-weight: 550; background: #f1eee5; color: #6b5229; padding: 6px 10px; border-radius: 4px; margin-left: auto; }
+.discharge-status.ready { background: #e4efe5; color: #365944; }
+.discharge-card-body { border-top: 1px solid var(--line); padding: 24px; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.discharge-conclusion { margin: 0 0 20px; font-size: 16px; max-width: 90ch; }
+.discharge-facts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin: 0 0 24px; }
+.discharge-section dt { font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+.discharge-section dd { margin: 0; }
+.discharge-facts small { display: block; color: var(--muted); margin-top: 5px; }
+.discharge-section h3 { font-size: 16px; margin: 24px 0 12px; }
+.discharge-section h4 { margin: 18px 0 8px; }
+.discharge-section a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.discharge-evidence { list-style: none; padding: 0; margin: 0; }
+.discharge-evidence li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.discharge-evidence p { margin: 0 0 6px; }
+.discharge-quantity { padding: 12px 16px; background: #f5f7f2; display: grid; gap: 3px; }
+.discharge-quantity strong { font-size: 20px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.discharge-quantity small, .discharge-citation, .discharge-conversion { font-size: 12px; color: var(--muted); }
+.discharge-limitations { padding: 0 18px 12px; border-left: 3px solid #a9946b; }
+.discharge-no-calc { font-size: 12px; color: var(--muted); }
+.discharge-matrix { margin-top: 40px; }
+.discharge-matrix > p, .discharge-sources > p { font-size: 14px; line-height: 1.65; color: var(--muted); }
+.discharge-table-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: white; max-height: 580px; }
+.discharge-table-scroll table { border-collapse: collapse; table-layout: fixed; min-width: 860px; width: 100%; font-size: 12px; }
+.discharge-table-scroll th, .discharge-table-scroll td { text-align: left; vertical-align: top; padding: 14px 12px; border: 1px solid var(--line); width: 20%; line-height: 1.5; }
+.discharge-table-scroll th { font-weight: 600; background: #f4f6f1; }
+.discharge-table-scroll thead th { position: sticky; top: 0; z-index: 1; }
+.discharge-table-scroll small { display: block; color: var(--muted); line-height: 1.55; font-size: 11px; margin-top: 5px; }
+.matrix-state { display: inline-block; font-weight: 600; }
+.matrix-state.partial { color: #80602e; }
+.matrix-state.available { color: #315e51; }
+.discharge-sources { margin-top: 40px; }
+.discharge-sources details { border-bottom: 1px solid var(--line); padding: 14px 0; }
+.discharge-sources summary { cursor: pointer; font-size: 14px; line-height: 1.6; padding: 7px 0; }
+.discharge-sources details > div { padding: 12px 20px; background: white; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.discharge-sha { font-family: Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.discharge-next { margin: 32px 0; padding: 24px; border-top: 2px solid var(--accent); background: #eaf0e7; }
+.discharge-next h2 { font-size: 19px; }
+.discharge-next p { font-size: 14px; line-height: 1.7; margin-bottom: 0; }
+.discharge-map { height: 330px; }
+.discharge-map-panel { margin: 20px 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.discharge-map-panel p { padding: 0 16px; font-size: 13px; }
+.discharge-marker { background: white; border: 2px solid #84602a; border-radius: 4px; color: #765320; display: grid; place-items: center; font-size: 26px; }
+.discharge-marker.outfall { border-radius: 50%; border-color: #175a86; color: #175a86; }
+.discharge-map .leaflet-control-zoom a { height: 44px; width: 44px; line-height: 44px; }
+@media(max-width:760px) {
+  .discharge-section { padding-top: 24px; }
+  .discharge-heading h1 { letter-spacing: -.8px; }
+  .discharge-card summary { padding: 17px 16px; flex-wrap: wrap; gap: 12px; }
+  .discharge-card-name { max-width: calc(100% - 28px); font-size: 17px; flex-basis: calc(100% - 28px); order: 0; }
+  .discharge-card summary::after { order: 1; }
+  .discharge-status { order: 2; margin-left: 0; }
+  .discharge-card-body { padding: 18px 16px; }
+  .discharge-facts { grid-template-columns: 1fr; gap: 8px; }
+  .discharge-overview { gap: 18px 24px; }
+  .discharge-caution { padding: 16px; }
+  .discharge-next { padding: 20px 16px; }
+}
