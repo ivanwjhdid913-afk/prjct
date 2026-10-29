@@ -16,11 +16,8 @@ from app.db import get_session
 from app.models import SavedScenario
 from app.river import prepared_reach
 from app.simulation import SimulationRequest
+from app.scenario_versions import FORMAT_VERSION, MODEL_ID, RIVER_VERSION, SYNTHETIC_VERSION
 
-FORMAT_VERSION = 1
-MODEL_ID = 'conservative-1d-advection-dispersion-v1'
-RIVER_VERSION = 'river-wgs84-v1'
-SYNTHETIC_VERSION = 'synthetic-wgs84-meridian-v1'
 MAX_BODY_BYTES = 8192
 router = APIRouter(prefix='/api/v1/scenarios', tags=['saved conditions'])
 
@@ -117,18 +114,30 @@ def current_geometry(conditions: SimulationRequest, version: str, checksum: str 
 
 
 def compatibility(row: SavedScenario) -> Compatibility:
+    return conditions_compatibility(format_version=row.format_version, model_id=row.model_id,
+                                    geometry_mode=row.geometry_mode, geometry_version=row.geometry_version,
+                                    geometry_sha256=row.geometry_sha256,
+                                    downstream_geometry_sha256=row.downstream_geometry_sha256,
+                                    reach_id=row.reach_id, conditions=row.conditions)
+
+
+def conditions_compatibility(*, format_version, model_id, geometry_mode, geometry_version,
+                             geometry_sha256, downstream_geometry_sha256, reach_id, conditions) -> Compatibility:
+    """One compatibility policy for saved records and untrusted portable files."""
     reasons = []
-    if row.format_version != FORMAT_VERSION:
+    if format_version != FORMAT_VERSION:
         reasons.append('Версия формата сценария не поддерживается; исходная запись сохранена.')
-    if row.model_id != MODEL_ID:
+    if model_id != MODEL_ID:
         reasons.append('Версия численной модели изменилась; исходная запись сохранена.')
     try:
-        conditions = SimulationRequest.model_validate(row.conditions)
-        if conditions.reach_id != row.reach_id or (conditions.reach_id is not None) != (row.geometry_mode == 'river'):
+        parameters = SimulationRequest.model_validate(conditions)
+        if parameters.reach_id != reach_id or (parameters.reach_id is not None) != (geometry_mode == 'river'):
             raise ValueError('Сведения о геометрии и условия записи не согласованы.')
-        reach = current_geometry(conditions, row.geometry_version, row.geometry_sha256)
-        if reach and row.downstream_geometry_sha256 != reach['metadata']['downstream_geometry_sha256']:
+        reach = current_geometry(parameters, geometry_version, geometry_sha256)
+        if reach and downstream_geometry_sha256 != reach['metadata']['downstream_geometry_sha256']:
             reasons.append('Геометрия проверенного продолжения участка изменилась; источник не перенесён.')
+        if not reach and downstream_geometry_sha256 is not None:
+            reasons.append('Синтетический участок не должен содержать контрольную сумму продолжения.')
     except ValidationError:
         reasons.append('Сохранённые условия не соответствуют текущим правилам проверки.')
     except ValueError as error:

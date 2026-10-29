@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse
 
 from app.transport import MAX_RESPONSE_BYTES, _resolution_limit, simulate
 from app.river import prepared_reach, prepared_reaches
+from app.scenario_versions import FORMAT_VERSION, MODEL_ID
 
 
 class SimulationInput(BaseModel):
@@ -58,6 +59,8 @@ class SimulationRequest(SimulationInput):
 
 
 class SimulationResult(BaseModel):
+    format_version: int = FORMAT_VERSION
+    model_id: str = MODEL_ID
     inputs: SimulationInput
     derived: dict[str, float]
     distances_m: list[float]
