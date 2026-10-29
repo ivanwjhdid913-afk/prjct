@@ -71,13 +71,19 @@ test('document text is literal and malicious source links are rejected', async (
   await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0);
 });
 
-for (const kind of ['invalid-coordinate','bad-reference','bad-period','null-number','unknown-version']) test(`invalid data is rejected: ${kind}`, async ({ page }) => {
+for (const kind of ['invalid-coordinate','bad-reference','bad-period','null-number','unknown-version','false-ready','unsupported-match','unsourced-data','invalid-evidence-period','array-kind','raw-url-control']) test(`invalid data is rejected: ${kind}`, async ({ page }) => {
   const data: any = dataset();
   if (kind === 'invalid-coordinate') data.items[0].coordinates = { longitude: 400, latitude: 52, crs: 'EPSG:4326', kind: 'enterprise', description: 'test', source_id: 'primary', locator: 'p1' };
   if (kind === 'bad-reference') data.items[0].evidence[0].source_id = 'missing';
   if (kind === 'bad-period') data.sources[0].checked_on = '2026-02-31';
   if (kind === 'null-number') data.items[0].evidence[0].quantity.value = null;
   if (kind === 'unknown-version') data.format_version = 2;
+  if (kind === 'false-ready') data.items[0].readiness = 'ready';
+  if (kind === 'unsupported-match') data.items[0].prepared_reach = { status: 'matched', reach_id: 'nonexistent', explanation: 'Непроверенное совпадение' };
+  if (kind === 'unsourced-data') data.items[0].matrix.river_flow = { status: 'available', note: 'Заявлено без источника', source_ids: [] };
+  if (kind === 'invalid-evidence-period') data.items[0].evidence[0].period = '2023–2022';
+  if (kind === 'array-kind') data.items[0].coordinates = { longitude: 39.6, latitude: 52.6, crs: 'EPSG:4326', kind: ['enterprise'], description: 'Территория предприятия', source_id: 'primary', locator: 'p1' };
+  if (kind === 'raw-url-control') data.sources[0].url = 'https://example.org/\nattack';
   await page.route('**/api/v1/discharge-data', route => route.fulfill({ json: data }));
   await page.goto('/#discharge-data'); await expect(page.getByRole('alert')).toContainText('Некорректный набор');
   await expect(page.locator('.discharge-marker')).toHaveCount(0);

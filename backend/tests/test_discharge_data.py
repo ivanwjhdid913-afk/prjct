@@ -54,6 +54,19 @@ def test_explicit_unknown_values_remain_null(valid_catalog):
     assert catalog.sources[0].published_on is None
 
 
+def test_empty_catalog_is_explicit_and_does_not_invent_evidence(valid_catalog):
+    empty = {'format_version': 1, 'checked_on': '2026-10-30', 'sources': [], 'items': []}
+    assert Catalog.model_validate(empty).model_dump(mode='json') == empty
+    valid_catalog['items'] = []
+    assert Catalog.model_validate(valid_catalog).items == []
+
+
+def test_nonempty_evidence_still_requires_resolved_sources(valid_catalog):
+    valid_catalog['sources'] = []
+    with pytest.raises(ValidationError):
+        Catalog.model_validate(valid_catalog)
+
+
 @pytest.mark.parametrize('change', [
     lambda d: d.update(format_version=True),
     lambda d: d.update(format_version=2),

@@ -180,8 +180,8 @@ class Item(StrictModel):
 class Catalog(StrictModel):
     format_version: Literal[1]
     checked_on: ISODate
-    sources: list[Source] = Field(min_length=1)
-    items: list[Item] = Field(min_length=1)
+    sources: list[Source]
+    items: list[Item]
 
     @field_validator('format_version', mode='before')
     @classmethod

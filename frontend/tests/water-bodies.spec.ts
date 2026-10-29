@@ -96,6 +96,8 @@ for (const width of [375, 768, 1024, 1440]) {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Моделирование', exact: true })).toBeFocused();
     await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Исходные данные', exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Обновить список' })).toBeFocused();
     expect(errors).toEqual([]);
     if (width === 375 || width === 1440) {
