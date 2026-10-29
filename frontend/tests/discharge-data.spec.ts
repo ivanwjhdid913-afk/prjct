@@ -99,4 +99,3 @@ test('phone catalog has readable cards and locally scrolling matrix without page
   await matrix.focus(); await expect(matrix).toBeFocused();
   await page.keyboard.press('ArrowRight');
 });
-
