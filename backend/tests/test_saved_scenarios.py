@@ -157,7 +157,7 @@ async def test_saved_conditions_bounds_streamed_request_before_json_parsing(clie
     ('downstream_geometry_sha256', 'f' * 64, 'продолжения'),
     ('geometry_version', 'river-wgs84-v2', 'Версия'),
     ('model_id', 'future-numerics-v2', 'модели'),
-    ('format_version', 2, 'формата'),
+    ('format_version', 3, 'формата'),
 ])
 async def test_open_incompatible_record_explains_reason_and_preserves_original(client, session, column, value, reason):
     sent = await payload(client, 'don-olkhovets')
@@ -273,3 +273,4 @@ async def test_json_charset_remains_supported(client):
     response = await client.post('/api/v1/scenarios', content=json.dumps(sent),
                                  headers={'content-type': 'application/json; charset=UTF-8'})
     assert response.status_code == 201
+

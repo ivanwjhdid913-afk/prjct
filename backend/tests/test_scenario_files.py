@@ -59,12 +59,12 @@ async def test_completed_calculation_declares_supported_model_and_format(client)
     assert response.status_code == 200
     result = response.json()
     assert result['model_id'] == 'conservative-1d-advection-dispersion-v1'
-    assert result['format_version'] == 1
+    assert result['format_version'] == 2
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(('change', 'reason'), [
-    ({'format_version': 2}, 'формата'),
+    ({'format_version': 3}, 'формата'),
     ({'model_id': 'future-model-v2'}, 'модели'),
     ({'geometry_version': 'river-wgs84-v2'}, 'Версия'),
     ({'geometry_sha256': '0' * 64}, 'Геометрия участка'),

@@ -48,7 +48,7 @@ class SavedScenario(Base):
     __table_args__ = (
         CheckConstraint('length(trim(name)) BETWEEN 1 AND 120', name='saved_scenario_name'),
         CheckConstraint("geometry_mode IN ('river', 'synthetic')", name='saved_scenario_geometry_mode'),
-        CheckConstraint("load_mode IN ('continuous', 'finite')", name='saved_scenario_load_mode'),
+        CheckConstraint("load_mode IN ('continuous', 'finite', 'profile')", name='saved_scenario_load_mode'),
         CheckConstraint('format_version > 0', name='saved_scenario_format'),
         CheckConstraint("jsonb_typeof(conditions) = 'object' AND octet_length(conditions::text) <= 4096",
                         name='saved_scenario_conditions_size'),

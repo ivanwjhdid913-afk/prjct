@@ -80,7 +80,7 @@ def _compress_trajectory(data: array, mandatory: set[int], amplitudes: list[floa
 def validate_parameters(params: dict) -> dict:
     required = set(PARAMETER_LIMITS)
     if (not isinstance(params, dict) or not required <= set(params)
-            or set(params) - required - {'load_mode', 'load_duration_hours'}):
+            or set(params) - required - {'load_mode', 'load_duration_hours', 'load_intervals'}):
         raise ValueError('Нужны восемь физических параметров и допустимые настройки нагрузки.')
     result = {}
     for name, (low, high) in PARAMETER_LIMITS.items():
@@ -91,8 +91,35 @@ def validate_parameters(params: dict) -> dict:
         result[name] = float(value)
     mode = params.get('load_mode', 'continuous')
     duration = params.get('load_duration_hours')
-    if mode not in ('continuous', 'finite'):
-        raise ValueError('load_mode: допустимы continuous или finite.')
+    if mode not in ('continuous', 'finite', 'profile'):
+        raise ValueError('load_mode: допустимы continuous, finite или profile.')
+    rows = params.get('load_intervals')
+    if mode != 'profile' and rows is not None:
+        raise ValueError('load_intervals: интервалы допустимы только в режиме profile.')
+    if mode == 'profile':
+        if duration is not None:
+            raise ValueError('Для профиля load_duration_hours должен быть null.')
+        if not isinstance(rows, list) or len(rows) > 12:
+            raise ValueError('load_intervals: нужен явный список не более 12 интервалов.')
+        normalized = []
+        previous_end = 0.
+        for index, row in enumerate(rows):
+            prefix = f'load_intervals[{index}]'
+            if not isinstance(row, dict) or set(row) != {'start_hours', 'end_hours', 'effluent_mg_l'}:
+                raise ValueError(prefix + ': нужны начало, конец и концентрация.')
+            for name in ('start_hours', 'end_hours', 'effluent_mg_l'):
+                value = row[name]
+                upper = 10000 if name == 'effluent_mg_l' else result['duration_hours']
+                if (isinstance(value, bool) or not isinstance(value, (int, float))
+                        or not math.isfinite(value) or not 0 <= value <= upper):
+                    raise ValueError(prefix + f'.{name}: требуется конечное число от 0 до {upper:g}.')
+            if row['start_hours'] >= row['end_hours']:
+                raise ValueError(prefix + ': конец должен быть позже начала.')
+            if row['start_hours'] < previous_end:
+                raise ValueError(prefix + ': нарушен порядок или есть перекрытие с предыдущим интервалом.')
+            previous_end = row['end_hours']
+            normalized.append({key: float(value) for key, value in row.items()})
+        result['load_intervals'] = normalized
     if mode == 'continuous' and duration is not None:
         raise ValueError('Для непрерывной нагрузки load_duration_hours должен быть null.')
     if mode == 'finite' and (isinstance(duration, bool) or not isinstance(duration, (int, float))
@@ -114,7 +141,8 @@ def _integrate(*, initial: list[float], u: float, dispersion: float,
                dx: float, dt: float, steps_per_frame: int, frames: int,
                inflow_per_area: float, load_end_seconds: float | None = None,
                state_callback: Callable[[float, list[float]], None] | None = None,
-               keep_snapshots: bool = True) -> dict:
+               keep_snapshots: bool = True,
+               inflow_intervals: list[tuple[float, float, float]] | None = None) -> dict:
     """Integrate a specified initial profile; inlet is flux, outlet c_x=0.
 
     Internal entry point also permits an independent exact eigenmode test.
@@ -172,10 +200,25 @@ def _integrate(*, initial: list[float], u: float, dispersion: float,
         if state_callback is not None:
             state_callback(end_seconds, current)
 
+    profile_steps = _profile_steps(dt, frames * steps_per_frame, inflow_intervals) if inflow_intervals is not None else None
+    profile_cursor = 0
+    factor_cache = {dt: nominal}
     for frame in range(frames):
         for substep in range(steps_per_frame):
             index = frame * steps_per_frame + substep
-            if index == stop_index and split:
+            if profile_steps is not None:
+                nominal_end = (index + 1) * dt
+                while profile_cursor < len(profile_steps):
+                    step_dt, end, flux = profile_steps[profile_cursor]
+                    coefficients = factor_cache.get(step_dt)
+                    if coefficients is None:
+                        coefficients = factor_cache[step_dt] = factors(step_dt)
+                    coefficients = (*coefficients[:-1], step_dt * flux / dx)
+                    advance(step_dt, coefficients, True, end)
+                    profile_cursor += 1
+                    if end == nominal_end:
+                        break
+            elif index == stop_index and split:
                 # Exact event time, independent of output frames and normal steps.
                 # Each piece uses a constant inlet flux; do not trapezoidally
                 # smear the source discontinuity across either piece.
@@ -186,6 +229,30 @@ def _integrate(*, initial: list[float], u: float, dispersion: float,
         if keep_snapshots:
             snapshots.append(current.copy())
     return {'snapshots': snapshots, 'final_state': current, 'outflow_per_area': outgoing, 'steps': steps, 'dt_s': max_dt}
+
+
+def _profile_steps(dt: float, steps: int, intervals: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
+    """Split the unchanged nominal time grid at exact source boundaries."""
+    horizon = steps * dt
+    events = sorted({t for a, b, _ in intervals for t in (a, b) if 0 < t < horizon})
+    result, cursor = [], 0
+    for index in range(steps):
+        start, end = index * dt, (index + 1) * dt
+        points = []
+        while cursor < len(events) and events[cursor] <= end:
+            if events[cursor] > start:
+                points.append(events[cursor])
+            cursor += 1
+        if not points or points[-1] != end:
+            points.append(end)
+        left = start
+        for right in points:
+            # The right-hand row wins at a touching half-open boundary.
+            flux = next((value for a, b, value in intervals if a <= left < b), 0.)
+            step_dt = (dt if left == start else dt - (left - start)) if right == end else right - left
+            result.append((step_dt, right, flux))
+            left = right
+    return result
 
 
 def _load_switch(dt: float, load_end_seconds: float | None) -> tuple[int | None, float]:
@@ -223,9 +290,22 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     cb, ce = p['background_mg_l'] * .001, p['effluent_mg_l'] * .001
     u, dispersion = p['velocity_m_s'], p['dispersion_m2_s']
     length, seconds = p['length_m'], p['duration_hours'] * 3600
+    is_profile = p['load_mode'] == 'profile'
+    event_hours = {}
+    for hours in [0., p['duration_hours'],
+                  *[row[key] for row in p.get('load_intervals', []) for key in ('start_hours', 'end_hours')]]:
+        event_seconds = hours * 3600
+        if event_seconds in event_hours and event_hours[event_seconds] != hours:
+            # Distinct valid input doubles can become identical after unit
+            # conversion. Never silently drop that pulse or its gap.
+            raise _resolution_limit('близкие события нельзя различить с машинной точностью.')
+        event_hours[event_seconds] = hours
+    intervals = [(row['start_hours'] * 3600, row['end_hours'] * 3600,
+                  qe * (row['effluent_mg_l'] * .001 - cb))
+                 for row in p.get('load_intervals', [])]
     active_seconds = p['load_duration_hours'] * 3600 if p['load_mode'] == 'finite' else seconds
     # A full-duration pulse follows precisely the existing continuous arithmetic.
-    load_end = active_seconds if active_seconds < seconds else None
+    load_end = active_seconds if active_seconds < seconds and not is_profile else None
     flow = qr + qe
     area = flow / u
     excess_load = qe * (ce - cb)
@@ -241,7 +321,16 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     steps_per_frame = math.ceil(seconds / 48 / dt_limit)
     steps = 48 * steps_per_frame
     dt = seconds / steps
-    if _load_switch(dt, load_end)[1] > 0:
+    # Event splitting can only add work. Reject the nominal grid before
+    # materializing its schedule (which otherwise could be vastly too large).
+    if n > MAX_CELLS or steps > MAX_STEPS or n * steps > MAX_UPDATES:
+        raise ValueError('Слишком большой размер вычислений: уменьшите длину или длительность; '
+                         'снизьте скорость либо увеличьте дисперсию. '
+                         f'Сетка: {n} ячеек, шагов: {steps}, операций ячейка-шаг: {n * steps}.')
+    profile_steps = _profile_steps(dt, steps, [(a, b, flux / area) for a, b, flux in intervals]) if is_profile else None
+    if profile_steps is not None:
+        steps = len(profile_steps)
+    elif _load_switch(dt, load_end)[1] > 0:
         steps += 1
     updates = n * steps
     if n > MAX_CELLS or steps > MAX_STEPS or updates > MAX_UPDATES:
@@ -255,13 +344,24 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     stop_index, before_stop = _load_switch(dt, load_end)
     legacy_frames = {i * steps_per_frame + int(before_stop > 0 and i * steps_per_frame > stop_index): i
                      for i in range(49)}
+    if profile_steps is not None:
+        endpoint_indices = {end: i + 1 for i, (_, end, _) in enumerate(profile_steps)}
+        legacy_frames = {0: 0} | {endpoint_indices[i * steps_per_frame * dt]: i for i in range(1, 49)}
+    profile_neighbors = {}
+    if is_profile:
+        event_indices = {endpoint_indices[t]: hours for t, hours in event_hours.items() if 0 < t < seconds}
+        for index, hours in event_indices.items():
+            for neighbor, direction in ((index - 1, -math.inf), (index + 1, math.inf)):
+                if neighbor not in event_indices:
+                    profile_neighbors[neighbor] = hours, direction
     mandatory = set(legacy_frames)
+    previous_values, directions = None, [0] * 100
     minimum, maximum = [math.inf] * 100, [-math.inf] * 100
     min_index, max_index = [0] * 100, [0] * 100
     reference_count = 0
 
     def capture(t, state):
-        nonlocal reference_count
+        nonlocal reference_count, previous_values
         index = reference_count
         hours = t / 3600
         if index in legacy_frames:
@@ -273,13 +373,19 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
                 hours = 0.
             elif legacy_frames[index] == 48:
                 hours = p['duration_hours']
+        if is_profile and t in event_hours:
+            hours = event_hours[t]
+            mandatory.add(index)
         if load_end is not None and t == load_end:
             hours = p['load_duration_hours']
             mandatory.add(index)
         offset = index * 101
-        trajectory[offset] = hours
         values = [(cb + math.fsum(state[i:i + per_segment]) / per_segment) * 1000
                   for i in range(0, 100 * per_segment, per_segment)]
+        if index in profile_neighbors:
+            event, direction = profile_neighbors[index]
+            if direction < 0 or values != previous_values:
+                hours = _event_neighbor_hour(hours, event, direction, p['duration_hours'])
         if before_stop > 0:
             event_index = stop_index + 1
             if index == event_index - 1:
@@ -291,6 +397,17 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
                 if hours != endpoint:
                     raise _resolution_limit('близкие моменты нельзя различить с машинной точностью.')
         trajectory[offset] = hours
+        if is_profile and previous_values is not None:
+            # Each reversal is retained, including weaker later pulses. With
+            # an exact plateau the last plateau state is the turning point.
+            for j, value in enumerate(values):
+                delta = value - previous_values[j]
+                direction = (delta > 0) - (delta < 0)
+                if direction and directions[j] and direction != directions[j]:
+                    mandatory.add(index - 1)
+                if direction:
+                    directions[j] = direction
+        previous_values = values
         for j, value in enumerate(values):
             trajectory[offset + j + 1] = value
             if value < minimum[j]:
@@ -306,7 +423,8 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     run = _integrate(initial=[0.] * n, u=u, dispersion=dispersion, dx=dx, dt=dt,
                      steps_per_frame=steps_per_frame, frames=48,
                      inflow_per_area=excess_load / area, load_end_seconds=load_end,
-                     state_callback=capture, keep_snapshots=False)
+                     state_callback=capture, keep_snapshots=False,
+                     inflow_intervals=[(a, b, flux / area) for a, b, flux in intervals] if is_profile else None)
     mandatory.update(min_index)
     mandatory.update(max_index)
     amplitudes = [max(abs(low - p['background_mg_l']), abs(high - p['background_mg_l']))
@@ -327,20 +445,24 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
     times = [trajectory[i * 101] for i in selected]
     rows = [list(trajectory[i * 101 + 1:(i + 1) * 101]) for i in selected]
     excess_stored = area * dx * math.fsum(run['final_state'])
-    excess_in = excess_load * active_seconds
+    excess_in = (math.fsum(flux * (b - a) for a, b, flux in intervals) if is_profile
+                 else excess_load * active_seconds)
+    absolute_excess_in = (math.fsum(abs(flux) * (b - a) for a, b, flux in intervals) if is_profile
+                          else abs(excess_in))
     excess_out = area * run['outflow_per_area']
     excess_error = excess_stored - (excess_in - excess_out)
     initial_mass = area * dx * n * cb
     final_mass = initial_mass + excess_stored
     # After cessation the water flow and background mass flux continue unchanged.
-    full_in = ((qr * cb + qe * ce) * seconds if load_end is None
+    full_in = ((qr * cb + qe * ce) * seconds if load_end is None and not is_profile
                else flow * cb * seconds + excess_in)
     full_out = flow * cb * seconds + excess_out
     mass_error = final_mass - initial_mass - (full_in - full_out)
     return {
         'inputs': p,
-        'derived': dict(total_flow_m3_s=flow, area_m2=area, load_kg_s=qe * ce,
-                        excess_load_kg_s=excess_load, steady_mg_l=steady * 1000,
+        'derived': dict(total_flow_m3_s=flow, area_m2=area, load_kg_s=None if is_profile else qe * ce,
+                        excess_load_kg_s=None if is_profile else excess_load,
+                        steady_mg_l=None if is_profile else steady * 1000,
                         travel_hours=length / u / 3600),
         'distances_m': [(i + .5) * length / 100 for i in range(100)],
         'times_hours': times,
@@ -354,7 +476,9 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
                                    max_gap_seconds=max(b - a for a, b in zip(times, times[1:])) * 3600,
                                    memory_limit_bytes=MAX_REFERENCE_BYTES, reference_memory_bytes=reference_bytes,
                                    max_response_bytes=MAX_RESPONSE_BYTES, compression_checks=checks),
-        'scale_mg_l': [min(cb, steady) * 1000, max(cb, steady) * 1000],
+        'scale_mg_l': ([min([p['background_mg_l']] + [(qr * cb + qe * r['effluent_mg_l'] * .001) / flow * 1000 for r in p['load_intervals']]),
+                        max([p['background_mg_l']] + [(qr * cb + qe * r['effluent_mg_l'] * .001) / flow * 1000 for r in p['load_intervals']])]
+                       if is_profile else [min(cb, steady) * 1000, max(cb, steady) * 1000]),
         'diagnostics': dict(method='exponential-fitted finite volume / Crank-Nicolson',
                             cells=n, steps=run['steps'], cell_updates=updates, dx_m=dx, dt_s=run['dt_s'],
                             cell_peclet=u * dx / dispersion, buffer_m=buffer_cells * dx,
@@ -364,6 +488,6 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
                             excess_outgoing_kg=excess_out,
                             mass_error_kg=mass_error, excess_mass_error_kg=excess_error,
                             relative_mass_error=abs(mass_error) / max(abs(full_in), initial_mass, 1e-30),
-                            relative_excess_mass_error=abs(excess_error) / max(abs(excess_in), 1e-30),
+                            relative_excess_mass_error=abs(excess_error) / max(absolute_excess_in, 1e-30),
                             runtime_seconds=time.perf_counter() - started),
     }

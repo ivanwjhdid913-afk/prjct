@@ -3,10 +3,11 @@ import json
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_serializer
 
-from app.scenarios import Compatibility, ScenarioCreate, conditions_compatibility
+from app.scenarios import Compatibility, ScenarioCreate, conditions_compatibility, validate_versioned_load
 from app.simulation import SimulationRequest
+from app.scenario_versions import FORMAT_VERSION
 
 MAX_FILE_BYTES = 8192
 router = APIRouter(prefix='/api/v1/scenario-files', tags=['condition files'])
@@ -41,13 +42,27 @@ class ConditionsDocument(BaseModel):
 
     @field_validator('conditions', mode='before')
     @classmethod
-    def complete_conditions(cls, value):
+    def complete_conditions(cls, value, info: ValidationInfo):
         # API defaults remain backwards compatible, while a portable snapshot
         # must state every condition explicitly rather than silently invent it.
         if isinstance(value, dict):
+            version = info.data.get('format_version')
+            validate_versioned_load(version, value)
             missing = set(SimulationRequest.model_fields) - value.keys()
+            if version != FORMAT_VERSION and value.get('load_mode') in ('continuous', 'finite'):
+                missing.discard('load_intervals')
             if missing:
                 raise ValueError('Неполные условия файла: отсутствуют ' + ', '.join(sorted(missing)) + '.')
+        return value
+
+    @model_serializer(mode='wrap')
+    def preserve_legacy_snapshot(self, handler):
+        value = handler(self)
+        if self.format_version == 1 and 'load_intervals' not in self.conditions.model_fields_set:
+            value['conditions'].pop('load_intervals', None)
+        elif 'load_intervals' in self.conditions.model_fields_set:
+            value['conditions']['load_intervals'] = (None if self.conditions.load_intervals is None else
+                                                   [row.model_dump(mode='json') for row in self.conditions.load_intervals])
         return value
 
 

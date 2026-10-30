@@ -6,13 +6,20 @@ from threading import Lock
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator, model_serializer
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
 from app.transport import MAX_RESPONSE_BYTES, _resolution_limit, simulate
 from app.river import prepared_reach, prepared_reaches
 from app.scenario_versions import FORMAT_VERSION, MODEL_ID
+
+
+class LoadInterval(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True, allow_inf_nan=False)
+    start_hours: float = Field(ge=0, le=48)
+    end_hours: float = Field(gt=0, le=48)
+    effluent_mg_l: float = Field(ge=0, le=10000)
 
 
 class SimulationInput(BaseModel):
@@ -26,11 +33,43 @@ class SimulationInput(BaseModel):
     dispersion_m2_s: float = Field(ge=0.1, le=100)
     length_m: float = Field(ge=100, le=20000)
     duration_hours: float = Field(ge=0.1, le=48)
-    load_mode: Literal['continuous', 'finite'] = 'continuous'
+    load_mode: Literal['continuous', 'finite', 'profile'] = 'continuous'
     load_duration_hours: float | None = Field(default=None, gt=0)
+    load_intervals: list[LoadInterval] | None = Field(default=None, max_length=12)
+
+    @model_serializer(mode='wrap')
+    def serialize_load(self, handler):
+        result = handler(self)
+        if self.load_mode != 'profile':
+            result.pop('load_intervals', None)
+        return result
 
     @model_validator(mode='after')
     def load_conditions(self):
+        if self.load_mode != 'profile' and self.load_intervals is not None:
+            raise ValueError('Интервалы допустимы только в режиме профиля.')
+        if self.load_mode == 'profile':
+            if self.load_intervals is None:
+                raise ValueError('Профилю нужен явный список интервалов, включая пустой список.')
+            if self.load_duration_hours is not None:
+                raise ValueError('Для профиля load_duration_hours должен быть null.')
+            errors = []
+            previous_end = 0.
+            for index, row in enumerate(self.load_intervals):
+                message = None
+                field = 'start_hours'
+                if row.start_hours >= row.end_hours:
+                    message, field = 'Конец интервала должен быть позже начала.', 'end_hours'
+                elif row.end_hours > self.duration_hours:
+                    message, field = 'Интервал выходит за горизонт расчёта.', 'end_hours'
+                elif row.start_hours < previous_end:
+                    message = 'Нарушен порядок или есть перекрытие с предыдущим интервалом.'
+                if message:
+                    errors.append(dict(type='value_error', loc=('load_intervals', index, field),
+                                       input=getattr(row, field), ctx={'error': ValueError(message)}))
+                previous_end = row.end_hours
+            if errors:
+                raise ValidationError.from_exception_data(type(self).__name__, errors)
         if self.load_mode == 'continuous' and self.load_duration_hours is not None:
             raise ValueError('Для непрерывной нагрузки load_duration_hours должен быть null.')
         if self.load_mode == 'finite' and (self.load_duration_hours is None
@@ -62,7 +101,7 @@ class SimulationResult(BaseModel):
     format_version: int = FORMAT_VERSION
     model_id: str = MODEL_ID
     inputs: SimulationInput
-    derived: dict[str, float]
+    derived: dict[str, float | None]
     distances_m: list[float]
     times_hours: list[float]
     concentrations_mg_l: list[list[float]]
@@ -76,6 +115,13 @@ class SimulationResult(BaseModel):
     source_coordinate: tuple[float, float] | None = None
     reach_metadata: dict | None = None
     segment_geometries: list[LineGeometry] | None = None
+
+    @model_serializer(mode='wrap')
+    def serialize_versioned_inputs(self, handler):
+        result = handler(self)
+        if self.format_version >= 2 and self.inputs.load_mode != 'profile':
+            result['inputs']['load_intervals'] = None
+        return result
 
 
 router = APIRouter()

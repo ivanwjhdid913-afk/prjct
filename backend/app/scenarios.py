@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -44,8 +44,15 @@ class ScenarioCreate(BaseModel):
     @field_validator('format_version')
     @classmethod
     def supported_format(cls, value):
-        if value != FORMAT_VERSION:
+        if value not in (1, FORMAT_VERSION):
             raise ValueError('Не поддерживается версия формата сценария.')
+        return value
+
+    @model_validator(mode='before')
+    @classmethod
+    def explicit_versioned_load(cls, value):
+        if isinstance(value, dict) and isinstance(value.get('conditions'), dict):
+            validate_versioned_load(value.get('format_version'), value['conditions'])
         return value
 
     @field_validator('model_id')
@@ -62,7 +69,7 @@ class ScenarioSummary(BaseModel):
     name: str
     reach_name: str
     geometry_mode: Literal['river', 'synthetic']
-    load_mode: Literal['continuous', 'finite']
+    load_mode: Literal['continuous', 'finite', 'profile']
     created_at: datetime
 
 
@@ -125,11 +132,12 @@ def conditions_compatibility(*, format_version, model_id, geometry_mode, geometr
                              geometry_sha256, downstream_geometry_sha256, reach_id, conditions) -> Compatibility:
     """One compatibility policy for saved records and untrusted portable files."""
     reasons = []
-    if format_version != FORMAT_VERSION:
+    if format_version not in (1, FORMAT_VERSION):
         reasons.append('Версия формата сценария не поддерживается; исходная запись сохранена.')
     if model_id != MODEL_ID:
         reasons.append('Версия численной модели изменилась; исходная запись сохранена.')
     try:
+        validate_versioned_load(format_version, conditions)
         parameters = SimulationRequest.model_validate(conditions)
         if parameters.reach_id != reach_id or (parameters.reach_id is not None) != (geometry_mode == 'river'):
             raise ValueError('Сведения о геометрии и условия записи не согласованы.')
@@ -145,6 +153,15 @@ def conditions_compatibility(*, format_version, model_id, geometry_mode, geometr
     return Compatibility(compatible=not reasons, reasons=reasons)
 
 
+def validate_versioned_load(format_version, conditions):
+    """Format 1 predates profiles; format 2 must explicitly carry schedule state."""
+    if format_version == 1:
+        if conditions.get('load_mode') == 'profile':
+            raise ValueError('График нагрузки требует формат условий версии 2.')
+    elif format_version == FORMAT_VERSION and 'load_intervals' not in conditions:
+        raise ValueError('Неполные условия: отсутствует load_intervals; для прежних режимов укажите null.')
+
+
 def detail(row: SavedScenario) -> ScenarioDetail:
     return ScenarioDetail(**ScenarioSummary.model_validate(row).model_dump(),
                           format_version=row.format_version, model_id=row.model_id,
@@ -155,6 +172,15 @@ def detail(row: SavedScenario) -> ScenarioDetail:
 
 
 def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
+    stored_conditions = data.conditions.model_dump(mode='json')
+    if data.format_version == FORMAT_VERSION:
+        stored_conditions['load_intervals'] = (None if data.conditions.load_intervals is None else
+                                               [row.model_dump(mode='json') for row in data.conditions.load_intervals])
+    if data.format_version == 1 and 'load_intervals' not in data.conditions.model_fields_set:
+        stored_conditions.pop('load_intervals', None)
+    # Match the JSONB text-size constraint before attempting a write, with a clear error.
+    if len(json.dumps(stored_conditions, ensure_ascii=False).encode('utf-8')) > 4096:
+        raise HTTPException(422, 'Условия превышают 4096 байт. Сократите числовую запись интервалов.')
     try:
         reach = current_geometry(data.conditions, data.geometry_version, data.geometry_sha256)
     except ValueError as error:
@@ -168,7 +194,7 @@ def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
         geometry_sha256=data.geometry_sha256,
         downstream_geometry_sha256=metadata.get('downstream_geometry_sha256'),
         reach_id=data.conditions.reach_id, reach_name=reach['name'] if reach else 'Синтетический участок',
-        load_mode=data.conditions.load_mode, conditions=data.conditions.model_dump(mode='json'),
+        load_mode=data.conditions.load_mode, conditions=stored_conditions,
         geometry_source={key: metadata[key] for key in source_keys if key in metadata},
     )
     try:

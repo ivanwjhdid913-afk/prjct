@@ -22,7 +22,7 @@ async def test_real_simulation_contract_geometry_and_database_preserved(client, 
     assert len(response.content) <= 5 * 1024 * 1024
     result = response.json()
     assert result['provenance'] == 'synthetic'
-    assert result['inputs'] == PARAMS | dict(load_mode='continuous', load_duration_hours=None)
+    assert result['inputs'] == PARAMS | dict(load_mode='continuous', load_duration_hours=None, load_intervals=None)
     assert result['derived']['area_m2'] == pytest.approx(40.4)
     assert result['derived']['load_kg_s'] == pytest.approx(0.010)
     assert result['derived']['excess_load_kg_s'] == pytest.approx(0.009)
@@ -150,7 +150,7 @@ async def test_finite_load_contract_and_mass_balance(client):
     response = await client.post('/api/v1/simulations', json=params)
     assert response.status_code == 200, response.text
     result = response.json()
-    assert result['inputs'] == params
+    assert result['inputs'] == params | dict(load_intervals=None)
     assert result['concentrations_mg_l'][-1][0] == pytest.approx(10, abs=1e-7)
     assert result['diagnostics']['excess_incoming_kg'] == pytest.approx(.009 * 1800)
     assert result['diagnostics']['relative_excess_mass_error'] < 1e-9

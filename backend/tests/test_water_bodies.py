@@ -82,7 +82,7 @@ def test_database_rejects_invalid_objects(session, name, kind):
 
 
 def test_migration_and_postgis_are_present(session):
-    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
+    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0004"
     assert session.scalar(text("SELECT postgis_version()"))
 
 
@@ -175,3 +175,4 @@ async def test_invalid_search_parameters_are_rejected(client, params):
 @pytest.mark.anyio
 async def test_maximum_search_length_is_accepted(client):
     assert (await client.get("/api/v1/water-bodies", params={"q": "я" * 120})).status_code == 200
+
