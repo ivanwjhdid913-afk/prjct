@@ -98,3 +98,9 @@ test('rapid source creation and mode edits keep each source flow attached to its
   await page.getByRole('button',{name:'Удалить выбранный источник',exact:true}).click();
  }
 });
+
+
+test('phone keeps both source markers visible above an open profile',async({page})=>{
+ await page.setViewportSize({width:375,height:667});await prepare(page);await page.getByRole('button',{name:'Добавить источник',exact:true}).click();await page.getByLabel('Положение выбранного источника, м от начала участка',{exact:true}).fill('1200');await mock(page);await run(page);await page.getByRole('button',{name:'Профиль и показатели',exact:true}).click();
+ await expect.poll(async()=>page.evaluate(()=>{const top=document.querySelector('.multiple-map')!.getBoundingClientRect().top,bottom=document.querySelector('.multiple-profile')!.getBoundingClientRect().top;return [...document.querySelectorAll('.multiple-map-source')].every(e=>{const r=e.getBoundingClientRect();return r.top>=top&&r.bottom<=bottom;});})).toBeTruthy();
+});
