@@ -16,7 +16,8 @@ from app.db import get_session
 from app.models import SavedScenario
 from app.river import prepared_reach
 from app.simulation import SimulationRequest
-from app.scenario_versions import FORMAT_VERSION, MODEL_ID, RIVER_VERSION, SYNTHETIC_VERSION
+from app.multiple_simulation import MultipleSimulationRequest, validate_multiple_geometry
+from app.scenario_versions import FORMAT_VERSION, MODEL_ID, MULTIPLE_FORMAT_VERSION, MULTIPLE_MODEL_ID, RIVER_VERSION, SYNTHETIC_VERSION
 
 MAX_BODY_BYTES = 8192
 router = APIRouter(prefix='/api/v1/scenarios', tags=['saved conditions'])
@@ -30,7 +31,7 @@ class ScenarioCreate(BaseModel):
     model_id: str = Field(max_length=80)
     geometry_version: str = Field(max_length=64)
     geometry_sha256: str | None = Field(pattern='^[0-9a-f]{64}$')
-    conditions: SimulationRequest
+    conditions: SimulationRequest | MultipleSimulationRequest
 
     @field_validator('name', mode='before')
     @classmethod
@@ -44,7 +45,7 @@ class ScenarioCreate(BaseModel):
     @field_validator('format_version')
     @classmethod
     def supported_format(cls, value):
-        if value not in (1, FORMAT_VERSION):
+        if value not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION):
             raise ValueError('Не поддерживается версия формата сценария.')
         return value
 
@@ -58,9 +59,17 @@ class ScenarioCreate(BaseModel):
     @field_validator('model_id')
     @classmethod
     def supported_model(cls, value):
-        if value != MODEL_ID:
+        if value not in (MODEL_ID, MULTIPLE_MODEL_ID):
             raise ValueError('Обозначение модели изменилось. Обновите страницу перед сохранением.')
         return value
+
+    @model_validator(mode='after')
+    def matching_model(self):
+        multiple = isinstance(self.conditions, MultipleSimulationRequest)
+        if (multiple and (self.format_version != MULTIPLE_FORMAT_VERSION or self.model_id != MULTIPLE_MODEL_ID)
+                or not multiple and (self.format_version == MULTIPLE_FORMAT_VERSION or self.model_id != MODEL_ID)):
+            raise ValueError('Формат и модель должны соответствовать физической постановке условий.')
+        return self
 
 
 class ScenarioSummary(BaseModel):
@@ -69,7 +78,7 @@ class ScenarioSummary(BaseModel):
     name: str
     reach_name: str
     geometry_mode: Literal['river', 'synthetic']
-    load_mode: Literal['continuous', 'finite', 'profile']
+    load_mode: Literal['continuous', 'finite', 'profile', 'multiple']
     created_at: datetime
 
 
@@ -97,7 +106,7 @@ class ScenarioPage(BaseModel):
     offset: int
 
 
-def current_geometry(conditions: SimulationRequest, version: str, checksum: str | None):
+def current_geometry(conditions: SimulationRequest | MultipleSimulationRequest, version: str, checksum: str | None):
     if conditions.reach_id is None:
         if version != SYNTHETIC_VERSION or checksum is not None:
             raise ValueError('Версия синтетической геометрии не поддерживается.')
@@ -107,6 +116,9 @@ def current_geometry(conditions: SimulationRequest, version: str, checksum: str 
     reach, line = prepared_reach(conditions.reach_id)
     if checksum != reach['metadata']['geometry_sha256']:
         raise ValueError('Геометрия участка изменилась. Сохранение отменено; обновите участок и проверьте источник.')
+    if isinstance(conditions, MultipleSimulationRequest):
+        validate_multiple_geometry(conditions)
+        return reach
     if line.length_m - conditions.source_distance_m < 100:
         raise ValueError('Ниже сценарного источника должно оставаться не менее 100 м подготовленного русла.')
     # Same geometric guard as calculation(), without integrating or allocating a trajectory.
@@ -132,13 +144,14 @@ def conditions_compatibility(*, format_version, model_id, geometry_mode, geometr
                              geometry_sha256, downstream_geometry_sha256, reach_id, conditions) -> Compatibility:
     """One compatibility policy for saved records and untrusted portable files."""
     reasons = []
-    if format_version not in (1, FORMAT_VERSION):
+    if format_version not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION):
         reasons.append('Версия формата сценария не поддерживается; исходная запись сохранена.')
-    if model_id != MODEL_ID:
+    expected_model = MULTIPLE_MODEL_ID if isinstance(conditions,dict) and 'sources' in conditions else MODEL_ID
+    if model_id != expected_model:
         reasons.append('Версия численной модели изменилась; исходная запись сохранена.')
     try:
         validate_versioned_load(format_version, conditions)
-        parameters = SimulationRequest.model_validate(conditions)
+        parameters = (MultipleSimulationRequest if isinstance(conditions,dict) and 'sources' in conditions else SimulationRequest).model_validate(conditions)
         if parameters.reach_id != reach_id or (parameters.reach_id is not None) != (geometry_mode == 'river'):
             raise ValueError('Сведения о геометрии и условия записи не согласованы.')
         reach = current_geometry(parameters, geometry_version, geometry_sha256)
@@ -154,7 +167,13 @@ def conditions_compatibility(*, format_version, model_id, geometry_mode, geometr
 
 
 def validate_versioned_load(format_version, conditions):
-    """Format 1 predates profiles; format 2 must explicitly carry schedule state."""
+    """Format and forcing identity are explicit; old snapshots retain old physics."""
+    if not isinstance(conditions, dict):
+        raise ValueError('Условия должны быть объектом.')
+    if 'sources' in conditions and format_version in (1, FORMAT_VERSION):
+        raise ValueError('Несколько источников требуют формат условий версии 3 и новую модель.')
+    if format_version == MULTIPLE_FORMAT_VERSION and 'sources' not in conditions:
+        raise ValueError('Формат 3 требует полного списка источников новой модели.')
     if format_version == 1:
         if conditions.get('load_mode') == 'profile':
             raise ValueError('График нагрузки требует формат условий версии 2.')
@@ -194,7 +213,7 @@ def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
         geometry_sha256=data.geometry_sha256,
         downstream_geometry_sha256=metadata.get('downstream_geometry_sha256'),
         reach_id=data.conditions.reach_id, reach_name=reach['name'] if reach else 'Синтетический участок',
-        load_mode=data.conditions.load_mode, conditions=stored_conditions,
+        load_mode='multiple' if isinstance(data.conditions, MultipleSimulationRequest) else data.conditions.load_mode, conditions=stored_conditions,
         geometry_source={key: metadata[key] for key in source_keys if key in metadata},
     )
     try:

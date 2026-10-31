@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationIn
 
 from app.scenarios import Compatibility, ScenarioCreate, conditions_compatibility, validate_versioned_load
 from app.simulation import SimulationRequest
+from app.multiple_simulation import MultipleSimulationRequest
 from app.scenario_versions import FORMAT_VERSION
 
 MAX_FILE_BYTES = 8192
@@ -26,7 +27,7 @@ class ConditionsDocument(BaseModel):
     reach_id: str | None = Field(min_length=1, max_length=80)
     reach_name: str = Field(min_length=1, max_length=200)
     geometry_source: dict[str, str | int | float | bool | None]
-    conditions: SimulationRequest
+    conditions: SimulationRequest | MultipleSimulationRequest
 
     @field_validator('name', mode='before')
     @classmethod
@@ -48,8 +49,9 @@ class ConditionsDocument(BaseModel):
         if isinstance(value, dict):
             version = info.data.get('format_version')
             validate_versioned_load(version, value)
-            missing = set(SimulationRequest.model_fields) - value.keys()
-            if version != FORMAT_VERSION and value.get('load_mode') in ('continuous', 'finite'):
+            multiple = 'sources' in value
+            missing = set((MultipleSimulationRequest if multiple else SimulationRequest).model_fields) - value.keys()
+            if not multiple and version != FORMAT_VERSION and value.get('load_mode') in ('continuous', 'finite'):
                 missing.discard('load_intervals')
             if missing:
                 raise ValueError('Неполные условия файла: отсутствуют ' + ', '.join(sorted(missing)) + '.')
@@ -58,6 +60,8 @@ class ConditionsDocument(BaseModel):
     @model_serializer(mode='wrap')
     def preserve_legacy_snapshot(self, handler):
         value = handler(self)
+        if isinstance(self.conditions, MultipleSimulationRequest):
+            return value
         if self.format_version == 1 and 'load_intervals' not in self.conditions.model_fields_set:
             value['conditions'].pop('load_intervals', None)
         elif 'load_intervals' in self.conditions.model_fields_set:

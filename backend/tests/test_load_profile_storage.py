@@ -105,7 +105,7 @@ async def test_legacy_modes_keep_versioned_library_snapshot(client, version, mod
 
 @pytest.mark.anyio
 async def test_unknown_format_legacy_preview_remains_readable_and_incompatible(client):
-    sent = document(3, False)
+    sent = document(4, False)
     response = await client.post('/api/v1/scenario-files/validate', json=sent)
     assert response.status_code == 200, response.text
     assert response.json()['document'] == sent
@@ -135,7 +135,7 @@ def test_0004_preserves_legacy_rows_and_blocks_destructive_profile_downgrade():
         assert downgrade.returncode != 0
         assert 'saved load profiles exist' in downgrade.stderr
         with engine.connect() as connection:
-            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0004'
+            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0005'
             assert connection.scalar(text('SELECT conditions FROM saved_scenarios WHERE id=:id'), {'id': ids[1]}) == sent['conditions']
             assert connection.scalar(text('SELECT count(*) FROM saved_scenarios')) == 2
     finally:

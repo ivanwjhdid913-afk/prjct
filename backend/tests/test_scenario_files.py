@@ -64,7 +64,7 @@ async def test_completed_calculation_declares_supported_model_and_format(client)
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(('change', 'reason'), [
-    ({'format_version': 3}, 'формата'),
+    ({'format_version': 4}, 'формата'),
     ({'model_id': 'future-model-v2'}, 'модели'),
     ({'geometry_version': 'river-wgs84-v2'}, 'Версия'),
     ({'geometry_sha256': '0' * 64}, 'Геометрия участка'),
