@@ -12,3 +12,5 @@
  .multiple-time-top{min-height:23px}.multiple-scale{font-size:9px;line-height:1.1}
  .multiple-scale small{line-height:1.1}.multiple-play-row>label{font-size:9px!important;line-height:1.1}
 }
+
+.multiple-play-row>button:hover:not(:disabled),.multiple-play-row>button:focus-visible{background:#24665c;color:#fff}
