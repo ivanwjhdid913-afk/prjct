@@ -1,4 +1,4 @@
-import { validConditions, type Conditions } from './scenarioStorage';
+import { SCENARIO_FORMAT, validConditions, type Conditions } from './scenarioStorage';
 
 export const MAX_CONDITIONS_FILE_BYTES = 8192;
 export type ConditionsDocument = {
@@ -19,6 +19,8 @@ export function validDocument(v: unknown): v is ConditionsDocument {
     || typeof v.geometry_version !== 'string' || !v.geometry_version || v.geometry_version.length > 64
     || typeof v.reach_name !== 'string' || !v.reach_name || v.reach_name.length > 200
     || !record(v.geometry_source) || !validConditions(v.conditions)) return false;
+  if ((v.format_version === 1 && v.conditions.load_mode === 'profile')
+    || (v.format_version === SCENARIO_FORMAT && !Object.hasOwn(v.conditions, 'load_intervals'))) return false;
   return v.geometry_mode === 'synthetic'
     ? v.reach_id === null && v.geometry_sha256 === null && v.downstream_geometry_sha256 === null && v.conditions.reach_id == null
     : v.geometry_mode === 'river' && typeof v.reach_id === 'string' && v.reach_id === v.conditions.reach_id
@@ -33,13 +35,13 @@ export function validDocumentValidation(v: unknown): v is DocumentValidation {
 }
 export function documentFromSaved(v: unknown): ConditionsDocument {
   if (!record(v) || !record(v.conditions)) throw new Error('Сервер вернул неполную сохранённую запись.');
-  const conditions = { ...v.conditions, reach_id: v.conditions.reach_id ?? null, source_distance_m: v.conditions.source_distance_m ?? 0 };
+  const conditions = { ...structuredClone(v.conditions), reach_id: v.conditions.reach_id ?? null, source_distance_m: v.conditions.source_distance_m ?? 0 };
   const document = {
     name: v.name, format_version: v.format_version, model_id: v.model_id,
     geometry_mode: v.geometry_mode, geometry_version: v.geometry_version,
     geometry_sha256: v.geometry_sha256, downstream_geometry_sha256: v.downstream_geometry_sha256 ?? null,
     reach_id: v.reach_id ?? v.conditions.reach_id ?? null, reach_name: v.reach_name,
-    geometry_source: v.geometry_source ?? {}, conditions,
+    geometry_source: structuredClone(v.geometry_source ?? {}), conditions,
   };
   if (!validDocument(document)) throw new Error('Сохранённая запись не содержит полного переносимого набора условий.');
   return document;

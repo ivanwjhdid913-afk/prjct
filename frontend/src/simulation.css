@@ -349,3 +349,8 @@ main.model-main { max-width: none; padding: 0; height: calc(100dvh - 52px); disp
 .result-exports > div { display:flex; gap:8px; flex-wrap:wrap; }
 .result-exports button { min-height:44px; font-size:12px; flex:1; }
 .map-start-hint > button { min-height:32px; font-size:10px; margin-top:6px; }
+.completed-source-profile { margin-top:12px; border-top:1px solid var(--line); padding-top:8px; }
+.completed-source-profile > summary { cursor:pointer; min-height:44px; display:flex; align-items:center; font-size:12px; font-weight:600; }
+.completed-source-events { list-style:none; margin:6px 0; padding:0; display:grid; gap:4px; }
+.completed-source-events button { min-height:44px; width:100%; font-size:11px; text-align:left; }
+.completed-source-profile .source-load-chart { max-width:440px; margin:12px auto; }

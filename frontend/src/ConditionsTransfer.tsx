@@ -76,11 +76,19 @@ export default function ConditionsTransfer({ name, draftKey, interactionKey, get
       <dl><dt>Модель / формат</dt><dd>{preview.document.model_id} / {preview.document.format_version}</dd>
         <dt>Источник от начала, м</dt><dd>{preview.document.conditions.source_distance_m ?? 0}</dd>
         <dt>Расход реки / стоков, м³/с</dt><dd>{preview.document.conditions.river_flow_m3_s} / {preview.document.conditions.effluent_flow_m3_s}</dd>
-        <dt>Фон / стоки, мг/л</dt><dd>{preview.document.conditions.background_mg_l} / {preview.document.conditions.effluent_mg_l}</dd>
+        <dt>Фон, мг/л</dt><dd>{preview.document.conditions.background_mg_l}</dd>
+        {preview.document.conditions.load_mode !== 'profile' && <><dt>Стоки, мг/л</dt><dd>{preview.document.conditions.effluent_mg_l}</dd></>}
         <dt>Скорость, м/с / дисперсия, м²/с</dt><dd>{preview.document.conditions.velocity_m_s} / {preview.document.conditions.dispersion_m2_s}</dd>
-        <dt>Горизонт / период нагрузки, ч</dt><dd>{preview.document.conditions.duration_hours} / {preview.document.conditions.load_mode === 'finite' ? preview.document.conditions.load_duration_hours : 'постоянная'}</dd>
+        <dt>Горизонт / период нагрузки, ч</dt><dd>{preview.document.conditions.duration_hours} / {preview.document.conditions.load_mode === 'profile' ? 'График нагрузки' : preview.document.conditions.load_mode === 'finite' ? preview.document.conditions.load_duration_hours : 'постоянная'}</dd>
         {preview.document.geometry_mode === 'synthetic' && <><dt>Длина, м</dt><dd>{preview.document.conditions.length_m}</dd></>}
       </dl>
+      {preview.document.conditions.load_mode === 'profile' && <>
+        <table aria-label="График нагрузки из файла"><caption>График нагрузки</caption>
+          <thead><tr><th>Начало, ч</th><th>Конец, ч</th><th>Стоки, мг/л</th></tr></thead>
+          <tbody>{preview.document.conditions.load_intervals?.map((row, index) => <tr key={index}><td>{row.start_hours}</td><td>{row.end_hours}</td><td>{row.effluent_mg_l}</td></tr>)}</tbody>
+        </table>
+        <p>{preview.document.conditions.load_intervals?.length ? 'Интервалы включают начало и не включают конец. Между интервалами концентрация стоков равна фону.' : 'Интервалов нет: концентрация стоков равна фону на всём горизонте.'}</p>
+      </>}
       <p>{preview.compatibility.compatible ? 'Совместимо с текущей моделью и геометрией.' : preview.compatibility.reasons.join(' ')}</p>
       <button type="button" disabled={!preview.compatibility.compatible} onClick={apply}>Применить к форме</button>
       <button type="button" onClick={() => { setPreview(null); setError(''); setNotice('Предварительный просмотр закрыт. Условия формы не изменены.'); }}>Закрыть просмотр</button>

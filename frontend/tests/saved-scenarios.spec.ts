@@ -30,7 +30,7 @@ test('opens conditions without calculating and saves edited form as a new immuta
   await page.getByLabel('Название сохраняемых условий').fill('Новый вариант');
   const post = page.waitForRequest(r => r.url().endsWith('/scenarios') && r.method() === 'POST');
   await page.getByRole('button', { name: 'Сохранить как новый сценарий', exact: true }).click();
-  expect((await post).postDataJSON()).toEqual({ name: 'Новый вариант', format_version: 1, model_id: model, geometry_version: 'synthetic-wgs84-meridian-v1', geometry_sha256: null, conditions: { ...conditions, effluent_mg_l: 25.125 } });
+  expect((await post).postDataJSON()).toEqual({ name: 'Новый вариант', format_version: 2, model_id: model, geometry_version: 'synthetic-wgs84-meridian-v1', geometry_sha256: null, conditions: { ...conditions, effluent_mg_l: 25.125, load_intervals: null } });
   await expect(page.getByTestId('library-status')).toContainText('Сохранены');
   await expect(page.getByText(/массивы концентраций.*не сохраняются/i)).toBeVisible();
 });

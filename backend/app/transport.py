@@ -83,13 +83,16 @@ def validate_parameters(params: dict) -> dict:
             or set(params) - required - {'load_mode', 'load_duration_hours', 'load_intervals'}):
         raise ValueError('Нужны восемь физических параметров и допустимые настройки нагрузки.')
     result = {}
+    mode = params.get('load_mode', 'continuous')
     for name, (low, high) in PARAMETER_LIMITS.items():
         value = params[name]
+        if name == 'effluent_mg_l' and mode == 'profile' and value is None:
+            result[name] = None
+            continue
         if (isinstance(value, bool) or not isinstance(value, (int, float))
                 or not low <= value <= high or not math.isfinite(value)):
             raise ValueError(f'{name}: требуется конечное число от {low:g} до {high:g}.')
         result[name] = float(value)
-    mode = params.get('load_mode', 'continuous')
     duration = params.get('load_duration_hours')
     if mode not in ('continuous', 'finite', 'profile'):
         raise ValueError('load_mode: допустимы continuous, finite или profile.')
@@ -287,7 +290,10 @@ def simulate(params: dict, *, spatial_refinement: float = 1.,
         if not math.isfinite(factor) or factor < 1 or factor > 8:
             raise ValueError('Коэффициент уточнения должен быть от 1 до 8.')
     qr, qe = p['river_flow_m3_s'], p['effluent_flow_m3_s']
-    cb, ce = p['background_mg_l'] * .001, p['effluent_mg_l'] * .001
+    cb = p['background_mg_l'] * .001
+    # Profiles use their rows exclusively; this value only serves unused legacy
+    # forcing arithmetic, while inputs retain the explicit inactive null.
+    ce = cb if p['load_mode'] == 'profile' else p['effluent_mg_l'] * .001
     u, dispersion = p['velocity_m_s'], p['dispersion_m2_s']
     length, seconds = p['length_m'], p['duration_hours'] * 3600
     is_profile = p['load_mode'] == 'profile'

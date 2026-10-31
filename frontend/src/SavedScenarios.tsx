@@ -103,7 +103,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen, intera
     {!loading && page?.total === 0 && <p>Сохранённых условий пока нет.</p>}
     {page && <><ul aria-label="Сохранённые сценарии" aria-busy={loading}>
       {page.items.map(item => <li key={item.id}>
-        <strong>{item.name}</strong><span>{item.reach_name} · {item.load_mode === 'finite' ? 'Ограниченный период' : 'Постоянная нагрузка'}</span>
+        <strong>{item.name}</strong><span>{item.reach_name} · {item.load_mode === 'profile' ? 'График нагрузки' : item.load_mode === 'finite' ? 'Ограниченный период' : 'Постоянная нагрузка'}</span>
         <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
         <div className="library-item-actions"><button type="button" disabled={!!busy || loading} aria-label={`Открыть «${item.name}»`} onClick={() => { void perform('open', item.id); }}>Открыть</button>
           <button type="button" disabled={!!busy || loading} aria-label={`Выгрузить JSON «${item.name}»`} onClick={() => { void perform('export', item.id); }}>JSON ↓</button></div>

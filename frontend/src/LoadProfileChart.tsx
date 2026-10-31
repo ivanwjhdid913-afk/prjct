@@ -10,7 +10,7 @@ export default function LoadProfileChart({ conditions, hour, label = 'Конце
   const duration = conditions.duration_hours;
   const events = sourceEvents(conditions).filter(event => event.hour >= 0 && event.hour <= duration);
   const maximum = Math.max(conditions.background_mg_l, ...(conditions.load_mode === 'profile'
-    ? (conditions.load_intervals ?? []).map(row => row.effluent_mg_l) : [conditions.effluent_mg_l]));
+    ? (conditions.load_intervals ?? []).map(row => row.effluent_mg_l) : [conditions.effluent_mg_l!]));
   const top = maximum > 0 ? maximum * 1.12 : 1;
   const x = (time: number) => 48 + time / duration * 198;
   const y = (value: number) => 128 - value / top * 98;

@@ -8,6 +8,10 @@ import { riverCoordinate } from './riverCoordinate';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
 import SavedScenarios from './SavedScenarios';
 import ResultExports from './ResultExports';
+import LoadProfileEditor from './LoadProfileEditor';
+import LoadProfileChart from './LoadProfileChart';
+import { intervalDrafts, validateIntervalDraft, type IntervalDraft } from './loadProfileDraft';
+import { sourceConcentrationAt, sourceEvents, validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
 import { MODEL_ID, SCENARIO_FORMAT, RIVER_VERSION, SYNTHETIC_VERSION, validConditions, type Conditions, type SavePayload, type SavedScenario } from './scenarioStorage';
 
 const fields = [
@@ -21,8 +25,7 @@ const fields = [
   { key: 'duration_hours', label: 'Длительность, ч', initial: 24, min: .1, max: 48, help: 'Общее модельное время, включая перенос после окончания нагрузки.' },
 ] as const;
 type Key = typeof fields[number]['key'];
-type LoadMode = 'continuous' | 'finite';
-type Inputs = Record<Key, number> & { load_mode?: LoadMode; load_duration_hours?: number | null };
+type Inputs = Omit<Record<Key, number>, 'effluent_mg_l'> & { effluent_mg_l: number | null; load_mode?: LoadMode; load_duration_hours?: number | null; load_intervals?: LoadInterval[] | null };
 type Draft = Record<Key, string>;
 type Line = { type: 'LineString'; coordinates: [number, number][] };
 type Reach = { id: string; name: string; length_m: number; geometry: Line; distances_m: number[]; metadata: Record<string, unknown> };
@@ -31,7 +34,7 @@ type Result = {
   inputs: Inputs;
   reach_id?: string | null; source_distance_m?: number; source_coordinate?: [number, number] | null;
   reach_metadata?: Record<string, unknown> | null; segment_geometries?: Line[] | null;
-  derived: { total_flow_m3_s: number; area_m2: number; load_kg_s: number; excess_load_kg_s: number; steady_mg_l: number; travel_hours: number };
+  derived: { total_flow_m3_s: number; area_m2: number; load_kg_s: number | null; excess_load_kg_s: number | null; steady_mg_l: number | null; travel_hours: number };
   distances_m: number[]; times_hours: number[]; concentrations_mg_l: number[][];
   geometry: { type: 'LineString'; coordinates: [number, number][] };
   scale_mg_l: [number, number];
@@ -59,10 +62,10 @@ function validReach(value: unknown): value is Reach {
 function validResult(value: unknown): value is Result {
   if (!value || typeof value !== 'object') return false;
   const row = value as Result;
-  return !!row.inputs && fields.every(field => finite(row.inputs[field.key]))
-    && (row.inputs.load_mode == null || row.inputs.load_mode === 'continuous' || row.inputs.load_mode === 'finite')
-    && (row.inputs.load_mode === 'finite' ? finite(row.inputs.load_duration_hours) && row.inputs.load_duration_hours > 0 && row.inputs.load_duration_hours <= row.inputs.duration_hours : row.inputs.load_duration_hours == null)
-    && !!row.derived && ['total_flow_m3_s', 'area_m2', 'load_kg_s', 'excess_load_kg_s', 'steady_mg_l', 'travel_hours'].every(key => finite(row.derived[key as keyof Result['derived']]))
+  return !!row.inputs && fields.every(field => field.key === 'effluent_mg_l' && row.inputs.load_mode === 'profile' || finite(row.inputs[field.key]))
+    && validLoadProfile(row.inputs)
+    && !!row.derived && ['total_flow_m3_s', 'area_m2', 'travel_hours'].every(key => finite(row.derived[key as keyof Result['derived']]))
+    && ['load_kg_s','excess_load_kg_s','steady_mg_l'].every(key => row.inputs.load_mode === 'profile' ? row.derived[key as keyof Result['derived']] === null : finite(row.derived[key as keyof Result['derived']]))
     && Array.isArray(row.distances_m) && row.distances_m.length > 0 && row.distances_m.length <= 200 && row.distances_m.every(finite)
     && validTimes(row.times_hours, row.inputs.duration_hours)
     && (row.temporal_resolution === undefined || validTemporalResolution(row.temporal_resolution, row.times_hours.length))
@@ -218,6 +221,7 @@ export default function Simulation() {
   const [mobileLayout, setMobileLayout] = useState(() => window.matchMedia('(max-width: 760px)').matches);
   const [loadMode, setLoadMode] = useState<LoadMode>('continuous');
   const [loadDuration, setLoadDuration] = useState('0.5');
+  const [intervalRows, setIntervalRows] = useState<IntervalDraft[]>([]);
   const profileWasOpen = useRef(false);
   const parametersWereOpen = useRef(false);
   useEffect(() => {
@@ -256,6 +260,7 @@ export default function Simulation() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [draft, setDraft] = useState<Draft>({ ...initialDraft, duration_hours: '4' });
+  const intervalCheck = validateIntervalDraft(intervalRows, Number(draft.duration_hours));
   const [latestResult, setResult] = useState<Result | null>(null);
   const [baseline, setBaseline] = useState<Result | null>(null);
   const [variant, setVariant] = useState(false);
@@ -359,7 +364,9 @@ export default function Simulation() {
     if (baseline.reach_id) setReachId(baseline.reach_id);
     finishPicking(); setDraftPreview(false); setSourceCoordinate(baseline.source_coordinate ?? null); setSource(String(baseline.source_distance_m ?? 0));
     setLoadMode(baseline.inputs.load_mode ?? 'continuous'); setLoadDuration(String(baseline.inputs.load_duration_hours ?? .5));
-    setDraft(Object.fromEntries(fields.map(field => [field.key, String(baseline.inputs[field.key])])) as Draft);
+    setIntervalRows(intervalDrafts(baseline.inputs.load_intervals ?? []));
+    setDraft(previous => Object.fromEntries(fields.map(field => [field.key,
+      field.key === 'effluent_mg_l' && baseline.inputs.effluent_mg_l === null ? previous.effluent_mg_l : String(baseline.inputs[field.key])])) as Draft);
     setResult(baseline); setVariant(true); setHasB(false); setActiveScenario('Б'); setTime(0); setSelected(0);
   }
   useEffect(() => {
@@ -376,14 +383,17 @@ export default function Simulation() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [playing, speed, clockResult]);
-  const stale = latestResult !== null && (loadMode !== (latestResult.inputs.load_mode ?? 'continuous') || (loadMode === 'finite' && Number(loadDuration) !== latestResult.inputs.load_duration_hours) || (mode === 'river' ? reachId !== latestResult.reach_id || Number(source) !== latestResult.source_distance_m || !sourceValid : !!latestResult.reach_id) || fields.some(field => (mode !== 'river' || field.key !== 'length_m') && (draft[field.key].trim() === '' || Number(draft[field.key]) !== latestResult.inputs[field.key])));
+  const stale = latestResult !== null && (loadMode !== (latestResult.inputs.load_mode ?? 'continuous') || (loadMode === 'finite' && Number(loadDuration) !== latestResult.inputs.load_duration_hours) || (loadMode === 'profile' && JSON.stringify(intervalCheck.intervals) !== JSON.stringify(latestResult.inputs.load_intervals)) || (mode === 'river' ? reachId !== latestResult.reach_id || Number(source) !== latestResult.source_distance_m || !sourceValid : !!latestResult.reach_id) || fields.some(field => (mode !== 'river' || field.key !== 'length_m') && (loadMode !== 'profile' || field.key !== 'effluent_mg_l') && (draft[field.key].trim() === '' || Number(draft[field.key]) !== latestResult.inputs[field.key])));
 
   function conditionsToSave(): SavePayload {
     if (!form.current?.reportValidity() || pickPending || pickingSource || (mode === 'river' && (!reach || !sourceValid)))
       throw new Error('Завершите выбор источника и заполните корректные условия расчёта.');
+    if (loadMode === 'profile' && intervalCheck.intervals === null) throw new Error('Исправьте отмеченные строки графика нагрузки.');
     const conditions = {
-      ...Object.fromEntries(fields.filter(field => mode !== 'river' || field.key !== 'length_m').map(field => [field.key, Number(draft[field.key])])),
+      ...Object.fromEntries(fields.filter(field => mode !== 'river' || field.key !== 'length_m').map(field => [field.key,
+        field.key === 'effluent_mg_l' && loadMode === 'profile' ? null : Number(draft[field.key])])),
       load_mode: loadMode, load_duration_hours: loadMode === 'finite' ? Number(loadDuration) : null,
+      load_intervals: loadMode === 'profile' ? intervalCheck.intervals : null,
       ...(mode === 'river' ? { reach_id: reach!.id, source_distance_m: Number(source) } : {}),
     };
     if (!validConditions(conditions)) throw new Error('Проверьте условия: числа, диапазоны и длительность периода загрязнения.');
@@ -410,14 +420,16 @@ export default function Simulation() {
     setMode(conditions.reach_id ? 'river' : 'synthetic');
     if (conditions.reach_id) setReachId(conditions.reach_id);
     setSource(String(conditions.source_distance_m ?? 0)); setSourceCoordinate(null);
-    setDraft(Object.fromEntries(fields.map(field => [field.key, String(conditions[field.key] ?? initialDraft[field.key])])) as Draft);
+    setDraft(previous => Object.fromEntries(fields.map(field => [field.key,
+      field.key === 'effluent_mg_l' && conditions.effluent_mg_l === null ? previous.effluent_mg_l : String(conditions[field.key] ?? initialDraft[field.key])])) as Draft);
     setLoadMode(conditions.load_mode); setLoadDuration(String(conditions.load_duration_hours ?? .5));
+    setIntervalRows(intervalDrafts(conditions.load_intervals ?? []));
     const geometryChanged = !latestResult || (conditions.reach_id ?? null) !== (latestResult.reach_id ?? null)
       || (conditions.source_distance_m ?? 0) !== (latestResult.source_distance_m ?? 0);
     setDraftPreview(!!conditions.reach_id && geometryChanged); setPlaying(false);
     setVariant(!!baseline);
   }
-  const savedDraftKey = JSON.stringify([mode, reachId, source, draft, loadMode, loadDuration, pickingSource, pickPending]);
+  const savedDraftKey = JSON.stringify([mode, reachId, source, draft, loadMode, loadDuration, intervalRows, pickingSource, pickPending]);
   function conditionsDocument(name: string) {
     const payload = conditionsToSave();
     const metadata = mode === 'river' ? reach!.metadata : {};
@@ -429,19 +441,25 @@ export default function Simulation() {
     };
   }
 
-  async function calculate(demonstration: false | true | 'finite' = false) {
+  async function calculate(demonstration: false | true | 'finite' | 'profile' = false) {
     const chosenReach = demonstration ? demoReach : reach;
     if (demonstration ? !chosenReach : !form.current?.reportValidity() || (mode === 'river' && !sourceValid)) return;
+    if (!demonstration && loadMode === 'profile' && intervalCheck.intervals === null) {
+      const invalid = form.current?.querySelector<HTMLInputElement>('.load-profile-editor input[aria-invalid="true"]');
+      invalid?.closest('details')?.setAttribute('open', ''); invalid?.focus(); return;
+    }
     setInteractionKey(value => value + 1);
-    const nextDraft = demonstration ? { ...initialDraft, duration_hours: demonstration === 'finite' ? '6' : '4' } : draft;
-    const nextLoadMode = demonstration ? (demonstration === 'finite' ? 'finite' : 'continuous') : loadMode;
+    const nextDraft = demonstration ? { ...initialDraft, duration_hours: demonstration === 'finite' || demonstration === 'profile' ? '6' : '4' } : draft;
+    const nextLoadMode = demonstration ? (demonstration === 'profile' ? 'profile' : demonstration === 'finite' ? 'finite' : 'continuous') : loadMode;
     const nextLoadDuration = nextLoadMode === 'finite' ? (demonstration ? .5 : Number(loadDuration)) : null;
+    const nextIntervals = nextLoadMode === 'profile' ? demonstration ? [{ start_hours: 0, end_hours: .5, effluent_mg_l: 100 }, { start_hours: 2, end_hours: 2.5, effluent_mg_l: 60 }] : intervalCheck.intervals! : null;
     const nextMode = demonstration ? 'river' : mode;
     finishPicking();
-    if (demonstration) { setSourceCoordinate(null); setComparisonExitReason(''); setVariant(false); setHasB(false); setMode('river'); setReachId(chosenReach!.id); setSource('0'); setDraft(nextDraft); setLoadMode(nextLoadMode); setLoadDuration('.5'); }
+    if (demonstration) { setSourceCoordinate(null); setComparisonExitReason(''); setVariant(false); setHasB(false); setMode('river'); setReachId(chosenReach!.id); setSource('0'); setDraft(nextDraft); setLoadMode(nextLoadMode); setLoadDuration('.5'); setIntervalRows(intervalDrafts(nextIntervals ?? [])); }
     setParametersOpen(false);
     setPlaying(false);
-    const inputs = { ...Object.fromEntries(fields.filter(field => nextMode !== 'river' || field.key !== 'length_m').map(field => [field.key, Number(nextDraft[field.key])])), load_mode: nextLoadMode, load_duration_hours: nextLoadDuration };
+    const inputs = { ...Object.fromEntries(fields.filter(field => nextMode !== 'river' || field.key !== 'length_m').map(field => [field.key,
+      field.key === 'effluent_mg_l' && nextLoadMode === 'profile' ? null : Number(nextDraft[field.key])])), load_mode: nextLoadMode, load_duration_hours: nextLoadDuration, ...(nextIntervals !== null ? { load_intervals: nextIntervals } : {}) };
     const payload = nextMode === 'river' ? { ...inputs, reach_id: chosenReach!.id, source_distance_m: demonstration ? 0 : Number(source) } : inputs;
     const id = ++request.current;
     const requestedGeometryRevision = geometryEditRevision.current;
@@ -484,8 +502,23 @@ export default function Simulation() {
   const profile = values ? profilePoints(values) : '';
   const loadEnd = (item: Result) => item.inputs.load_mode === 'finite' ? item.inputs.load_duration_hours! : null;
   const sourceState = (item: Result) => loadEnd(item) !== null && shownHours >= loadEnd(item)! ? 'Повышенная нагрузка завершена' : 'Повышенная нагрузка действует';
-  const sourceDescription = (item: Result) => item.derived.excess_load_kg_s === 0 ? 'Добавочной нагрузки нет' : item.derived.excess_load_kg_s < 0 ? (loadEnd(item) !== null && shownHours >= loadEnd(item)! ? 'Период пониженной концентрации завершён' : 'Поступает вода ниже фоновой концентрации') : sourceState(item);
-  const loadMarkers = (comparison && baseline && latestResult ? [{ item: baseline, label: 'А' }, { item: latestResult, label: 'Б' }] : result ? [{ item: result, label: '' }] : []).filter(({ item }) => loadEnd(item) !== null);
+  const sourceDescription = (item: Result) => {
+    const concentration = sourceConcentrationAt(item.inputs, shownHours);
+    if (item.inputs.load_mode === 'profile') {
+      const state = item.inputs.effluent_flow_m3_s === 0 || concentration === item.inputs.background_mg_l
+        ? 'Добавочной нагрузки нет' : concentration > item.inputs.background_mg_l
+          ? 'Период повышенной концентрации' : 'Период пониженной концентрации';
+      return `${state} · ce = ${format(concentration, 4)} мг/л`;
+    }
+    return item.derived.excess_load_kg_s === 0 ? 'Добавочной нагрузки нет' : item.derived.excess_load_kg_s! < 0 ? (loadEnd(item) !== null && shownHours >= loadEnd(item)! ? 'Период пониженной концентрации завершён' : 'Поступает вода ниже фоновой концентрации') : sourceState(item);
+  };
+  const loadMarkers = (comparison && baseline && latestResult ? [{ item: baseline, label: 'А' }, { item: latestResult, label: 'Б' }] : result ? [{ item: result, label: '' }] : [])
+    .flatMap(({ item, label }) => sourceEvents(item.inputs).map(event => ({ item, label, ...event })));
+  const draftLoad = { load_mode: loadMode, load_duration_hours: loadMode === 'finite' ? Number(loadDuration) : null,
+    load_intervals: loadMode === 'profile' ? intervalCheck.intervals : null, background_mg_l: Number(draft.background_mg_l),
+    effluent_mg_l: loadMode === 'profile' ? null : Number(draft.effluent_mg_l), duration_hours: Number(draft.duration_hours) };
+  const draftLoadComplete = draft.background_mg_l.trim() !== '' && draft.duration_hours.trim() !== ''
+    && (loadMode === 'profile' || draft.effluent_mg_l.trim() !== '');
   const showingPreview = mode === 'river' && !!reach && (draftPreview || !result);
   const showingResult = !!result && !showingPreview;
   const concentrationLegend = <div className="simulation-legend" data-testid="concentration-scale"><strong>Концентрация · мг/л</strong><div aria-hidden="true" className="simulation-gradient" style={span === 0 ? { background: color(scale[0], scale) } : undefined} /><span>{format(scale[0], 4)}</span>{span !== 0 && <span>{format(scale[1], 4)}</span>}<small>{span === 0 ? 'Концентрация одинакова на всём участке и во все моменты расчёта.' : comparison ? 'Общая постоянная шкала А и Б.' : 'Постоянная шкала этого расчёта.'} Цвет не означает нормативную оценку.</small></div>;
@@ -519,12 +552,14 @@ export default function Simulation() {
             </section>}
             <div className="parameter-section-title">Нагрузка и поток <span>Заданы пользователем</span></div>
             <section className="load-settings" aria-label="Временной режим нагрузки">
-              <label htmlFor="load-mode">Режим нагрузки</label><select id="load-mode" value={loadMode} onChange={event => { setLoadMode(event.target.value as LoadMode); setPlaying(false); }}><option value="continuous">Постоянная нагрузка</option><option value="finite">Ограниченный период загрязнения</option></select>
+              <label htmlFor="load-mode">Режим нагрузки</label><select id="load-mode" value={loadMode} onChange={event => { setLoadMode(event.target.value as LoadMode); setPlaying(false); }}><option value="continuous">Постоянная нагрузка</option><option value="finite">Ограниченный период загрязнения</option><option value="profile">График концентрации стоков</option></select>
               {loadMode === 'finite' && <><label htmlFor="load-duration">Период загрязнения, ч</label><input id="load-duration" type="number" required min={0.000001} max={Number(draft.duration_hours)} step="any" value={loadDuration} onChange={event => { setLoadDuration(event.target.value); setPlaying(false); }} aria-describedby="load-help" /></>}
-              <p id="load-help">{loadMode === 'finite' ? 'От начала до заданного времени действует ce, затем поступающая вода имеет концентрацию cb. Расход воды сохраняется: это не закрытие водовыпуска и не гидравлическая волна.' : 'При постоянной нагрузке и гидравлике после прохождения фронта возможно плато. Оно не означает ошибку модели.'}</p>
+              <p id="load-help">{loadMode === 'profile' ? 'До 12 периодов ce(t); в промежутках — фон cb. На общей границе действует следующий период. Меняется только концентрация: расход воды сохраняется, закрытие выпуска и гидравлическая волна не рассчитываются.' : loadMode === 'finite' ? 'От начала до заданного времени действует ce, затем поступающая вода имеет концентрацию cb. Расход воды сохраняется: это не закрытие водовыпуска и не гидравлическая волна.' : 'При постоянной нагрузке и гидравлике после прохождения фронта возможно плато. Оно не означает ошибку модели.'}</p>
+              {loadMode === 'profile' && <><LoadProfileEditor rows={intervalRows} duration={Number(draft.duration_hours)} onChange={rows => { setIntervalRows(rows); setPlaying(false); }} />{draftLoadComplete && validLoadProfile(draftLoad) ? <LoadProfileChart conditions={draftLoad} /> : <p className="simulation-field-error">Исправьте строки и параметры, чтобы показать график источника.</p>}</>}
               <button type="button" disabled={!demoReach || status === 'loading'} onClick={() => { void calculate('finite'); }}>Демонстрация периода</button><small>Синтетические параметры на Дону: нагрузка 0,5 ч, расчёт 6 ч. Заменяет условия формы.</small>
+              <button type="button" disabled={!demoReach || status === 'loading'} onClick={() => { void calculate('profile'); }}>Демонстрация двух периодов</button><small>Синтетические параметры на Дону: 0–0,5 ч — 100 мг/л; 2–2,5 ч — 60 мг/л. Горизонт 6 ч, прочее время — фон. Заменяет условия формы.</small>
             </section>
-            <div className="simulation-fields">{fields.map(field => <div className="simulation-field" key={field.key}>
+            <div className="simulation-fields">{fields.filter(field => loadMode !== 'profile' || field.key !== 'effluent_mg_l').map(field => <div className="simulation-field" key={field.key}>
               <label htmlFor={field.key}>{field.label}</label><input id={field.key} type="number" required step="any" min={field.min} max={field.max} value={mode === 'river' && field.key === 'length_m' ? (reach ? String(Number(displayLength.toFixed(3))) : '') : draft[field.key]} readOnly={mode === 'river' && field.key === 'length_m'} aria-describedby={`${field.key}-help${fieldErrors[field.key] ? ` ${field.key}-error` : ''}`} aria-invalid={!!fieldErrors[field.key]} onChange={event => { setDraft(current => ({ ...current, [field.key]: event.target.value })); setPlaying(false); }} />
               <p id={`${field.key}-help`} className="field-help">{mode === 'river' && field.key === 'length_m' ? 'Определяется руслом ниже источника.' : field.help} От {format(field.min, field.min < 1 ? 2 : 0)} до {format(field.max, 0)}.</p>{fieldErrors[field.key] && <p className="simulation-field-error" id={`${field.key}-error`}>{fieldErrors[field.key]}</p>}
             </div>)}</div>
@@ -557,20 +592,24 @@ export default function Simulation() {
               {comparison && <p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}
               <details><summary>Таблица профиля</summary><div className="simulation-table"><table aria-label="Рассчитанный профиль"><thead><tr><th>Сегмент</th><th>Расстояние, м</th>{comparison ? <><th>А, мг/л</th><th>Б, мг/л</th><th>Б − А, мг/л</th></> : <th>Концентрация, мг/л</th>}</tr></thead><tbody>{result.distances_m.map((distance, index) => <tr key={index}><td>{index + 1}</td><td>{format(distance, 0)}</td>{valuesA && valuesB ? <><td>{format(valuesA[index], 4)}</td><td>{format(valuesB[index], 4)}</td><td>{format(valuesB[index] - valuesA[index], 4)}</td></> : <td>{format(values[index], 4)}</td>}</tr>)}</tbody></table></div></details>
             </section>}
+            <details className="completed-source-profile"><summary>Сохранённый график источника ce(t)</summary>
+              {comparison && baseline && latestResult ? <><LoadProfileChart conditions={baseline.inputs} hour={shownHours} label="А · сохранённый график источника ce(t)" /><LoadProfileChart conditions={latestResult.inputs} hour={shownHours} label="Б · сохранённый график источника ce(t)" /></> : <LoadProfileChart conditions={result.inputs} hour={shownHours} label="Сохранённый график источника ce(t)" />}
+              {loadMarkers.length > 0 && <ul className="completed-source-events">{loadMarkers.map(event => <li key={`${event.label}-${event.hour}`}><button type="button" onClick={() => { setPlaying(false); setTime(event.hour); }}>{event.label ? event.label + ' · ' : ''}{format(event.hour, 6)} ч · {event.kind === 'start' ? 'начало периода' : 'окончание периода'} · ce {format(event.concentration_mg_l, 4)} мг/л</button></li>)}</ul>}
+            </details>
             <ResultExports result={result} a={comparison ? baseline : null} b={comparison ? latestResult : null} hour={shownHours} selected={selected} />
-            <p className="simulation-hint" data-testid="numerical-accuracy">{result.inputs.load_mode === 'finite' ? 'Короткие импульсы пригодны для качественной иллюстрации переноса. Количественную точность пика необходимо отдельно проверять уточнением пространственного и временного шагов. ' : 'Численная точность требует отдельной проверки уточнением пространственного и временного шагов. '}Допуск сохранения траектории не ограничивает погрешность численной схемы и неопределённость физических исходных данных.</p>
+            <p className="simulation-hint" data-testid="numerical-accuracy">{result.inputs.load_mode === 'finite' || result.inputs.load_mode === 'profile' ? 'Короткие импульсы пригодны для качественной иллюстрации переноса. Количественную точность пика необходимо отдельно проверять уточнением пространственного и временного шагов. ' : 'Численная точность требует отдельной проверки уточнением пространственного и временного шагов. '}Допуск сохранения траектории не ограничивает погрешность численной схемы и неопределённость физических исходных данных.</p>
             <details className="model-explanation"><summary>Почему меняется окраска?</summary><p>При постоянном поступлении консервативного вещества за фронтом возникает плато: вещество не распадается, поток постоянно приносит его новую массу.</p><p>После окончания нагрузки область повышенной концентрации продолжает двигаться и растягиваться вдоль реки. Максимум может находиться ниже по течению, а ближние сегменты уже возвращаться к фону.</p><p>Меняется только концентрация поступающей воды; расход, скорость и геометрия постоянны. Закрытие водовыпуска и гидравлическая волна не рассчитываются. Толщина линии — условный знак, не рассчитанная ширина пятна.</p></details>
-            <p className="simulation-hint">{comparison ? `Показатели сценария ${activeScenario}` : "Показатели расчёта"}</p><dl className="simulation-summary"><div><dt>Площадь сечения</dt><dd>{format(result.derived.area_m2)} м²</dd></div><div><dt>Нагрузка выпуска в активный период</dt><dd>{format(result.derived.load_kg_s, 4)} кг/с</dd></div><div><dt>Нагрузка сверх фона в активный период</dt><dd>{format(result.derived.excess_load_kg_s, 4)} кг/с</dd></div><div><dt>{result.inputs.load_mode === 'finite' ? 'Плато при неограниченном поступлении' : 'Установившаяся концентрация'}</dt><dd>{format(result.derived.steady_mg_l, 4)} мг/л</dd></div></dl>
-            <p className="simulation-hint">L/u = {format(result.derived.travel_hours, 3)} ч — характерное время переноса, не точное время первого появления вещества. {result.inputs.load_mode === 'finite' ? 'Конечный период создаёт проходящий импульс; после его ухода концентрация возвращается к фону.' : 'Установившийся профиль постоянен вдоль участка.'}</p>
-            <details className="simulation-used-inputs"><summary>Параметры показанного расчёта</summary><dl><div><dt>Режим нагрузки</dt><dd>{result.inputs.load_mode === 'finite' ? `Ограниченный период · ${format(result.inputs.load_duration_hours!, 6)} ч` : 'Постоянная нагрузка'}</dd></div>{fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{format(result.inputs[field.key], 3)}</dd></div>)}</dl></details>
+            <p className="simulation-hint">{comparison ? `Показатели сценария ${activeScenario}` : "Показатели расчёта"}</p><dl className="simulation-summary"><div><dt>Площадь сечения</dt><dd>{format(result.derived.area_m2)} м²</dd></div>{result.inputs.load_mode === 'profile' ? <><div><dt>Нагрузка выпуска в выбранный момент</dt><dd>{format(result.inputs.effluent_flow_m3_s * sourceConcentrationAt(result.inputs, shownHours) / 1000, 4)} кг/с</dd></div><div><dt>Добавочная нагрузка в выбранный момент</dt><dd>{format(result.inputs.effluent_flow_m3_s * (sourceConcentrationAt(result.inputs, shownHours) - result.inputs.background_mg_l) / 1000, 4)} кг/с</dd></div><div><dt>Вход после полного смешения в выбранный момент</dt><dd>{format((result.inputs.river_flow_m3_s * result.inputs.background_mg_l + result.inputs.effluent_flow_m3_s * sourceConcentrationAt(result.inputs, shownHours)) / result.derived.total_flow_m3_s, 4)} мг/л</dd></div></> : <><div><dt>Нагрузка выпуска в активный период</dt><dd>{format(result.derived.load_kg_s!, 4)} кг/с</dd></div><div><dt>Нагрузка сверх фона в активный период</dt><dd>{format(result.derived.excess_load_kg_s!, 4)} кг/с</dd></div><div><dt>{result.inputs.load_mode === 'finite' ? 'Плато при неограниченном поступлении' : 'Установившаяся концентрация'}</dt><dd>{format(result.derived.steady_mg_l!, 4)} мг/л</dd></div></>}</dl>
+            <p className="simulation-hint">L/u = {format(result.derived.travel_hours, 3)} ч — характерное время переноса, не точное время первого появления вещества. {result.inputs.load_mode === 'profile' ? 'Раздельные периоды создают переносимые импульсы; они могут растягиваться и перекрываться ниже по течению.' : result.inputs.load_mode === 'finite' ? 'Конечный период создаёт проходящий импульс; после его ухода концентрация возвращается к фону.' : 'Установившийся профиль постоянен вдоль участка.'}</p>
+            <details className="simulation-used-inputs"><summary>Параметры показанного расчёта</summary><dl><div><dt>Режим нагрузки</dt><dd>{result.inputs.load_mode === 'profile' ? `График · ${result.inputs.load_intervals!.length} периодов` : result.inputs.load_mode === 'finite' ? `Ограниченный период · ${format(result.inputs.load_duration_hours!, 6)} ч` : 'Постоянная нагрузка'}</dd></div>{fields.filter(field => result.inputs.load_mode !== 'profile' || field.key !== 'effluent_mg_l').map(field => <div key={field.key}><dt>{field.label}</dt><dd>{format(result.inputs[field.key]!, 3)}</dd></div>)}{result.inputs.load_mode === 'profile' && result.inputs.load_intervals!.map((row, index) => <div key={index}><dt>Период {index + 1}, ч · ce, мг/л</dt><dd>{String(row.start_hours)}–{String(row.end_hours)} · {String(row.effluent_mg_l)}</dd></div>)}</dl></details>
             <p className="simulation-hint" data-testid="temporal-resolution">{result.temporal_resolution ? <>Сохранено {result.temporal_resolution.saved_states} моментов из {result.temporal_resolution.reference_states} внутренних состояний. Погрешность временной интерполяции относительно внутренних состояний: до {format(100 * result.temporal_resolution.interpolation_relative_tolerance)}% амплитуды отклонения от фона в каждом сегменте, абсолютный порог {result.temporal_resolution.interpolation_absolute_tolerance_mg_l.toExponential()} мг/л. Максимальный внутренний шаг — {format(result.temporal_resolution.reference_max_step_seconds, 3)} с; промежуток сохранённых моментов — до {format(result.temporal_resolution.max_gap_seconds, 3)} с. Это оценка сохранения расчётной траектории, а не точности физической модели.</> : 'Точность временного разрешения для этого результата не указана. Между сохранёнными моментами используется линейная интерполяция.'}</p>
             <p className="simulation-result-origin">{result.reach_id ? `${String(result.reach_metadata?.name ?? 'Реальное русло')} · источник на ${format(result.source_distance_m ?? 0, 1)} м. Геометрия из документированного источника.` : 'Синтетическая геометрия.'} Нагрузка и гидрология заданы пользователем. Концентрации рассчитаны; проверка по наблюдениям не выполнена.</p>
           </aside>}
         </div>
         <footer className="model-timeline" aria-label="Управление модельным временем">
           <div className="timeline-buttons"><button disabled={!result} type="button" className="playback-button" onClick={() => { if (result && !playing && time >= clockResult!.inputs.duration_hours) setTime(0); setPlaying(value => !value); }}><span aria-hidden="true">{playing ? 'Ⅱ' : '▶'}</span>{playing ? 'Пауза' : 'Воспроизвести'}</button><div className="playback-speed"><label htmlFor="playback-speed">Скорость воспроизведения</label><select id="playback-speed" value={speed} disabled={!result} onChange={event => setSpeed(Number(event.target.value))}><option value="0.5">0,5×</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></div></div>
-          <div className="simulation-time"><label htmlFor="simulation-time">Время от начала сценария</label><output htmlFor="simulation-time">{formatTime(shownHours)}</output><div className="timeline-track"><input id="simulation-time" type="range" min={0} max={clockResult?.inputs.duration_hours ?? Number(draft.duration_hours)} step="any" value={time} disabled={!result} onChange={event => { setPlaying(false); setTime(Number(event.target.value)); }} aria-valuetext={formatTime(shownHours)} />{loadMarkers.map(({ item, label }) => <span key={label} className="load-end-marker" data-testid="load-end-marker" data-hour={loadEnd(item)} style={{ left: `${100 * loadEnd(item)! / item.inputs.duration_hours}%` }} title={`${label ? label + ' · ' : ''}Окончание нагрузки: ${format(loadEnd(item)!, 6)} ч`} aria-label={`${label ? label + ' · ' : ''}Окончание нагрузки: ${format(loadEnd(item)!, 6)} ч`} />)}</div><span>0 ч</span><span>{result ? `${format(result.inputs.duration_hours)} ч` : 'Ожидает расчёта'}</span></div>
-          <p className="source-status" data-testid="source-status">{comparison && baseline && latestResult ? `А: ${sourceDescription(baseline)} · Б: ${sourceDescription(latestResult)}` : result ? sourceDescription(result) : ''}{loadMarkers.length > 0 && <span className="load-end-caption">{loadMarkers.map(({ item, label }) => `${label ? label + ' · ' : ''}конец ${format(loadEnd(item)!, 6).replace(/0+$/, '').replace(/,$/, '')} ч`).join(' / ')}</span>}</p>
+          <div className="simulation-time"><label htmlFor="simulation-time">Время от начала сценария</label><output htmlFor="simulation-time">{formatTime(shownHours)}</output><div className="timeline-track"><input id="simulation-time" type="range" min={0} max={clockResult?.inputs.duration_hours ?? Number(draft.duration_hours)} step="any" value={time} disabled={!result} onChange={event => { setPlaying(false); setTime(Number(event.target.value)); }} aria-valuetext={formatTime(shownHours)} />{loadMarkers.map(({ item, label, hour, kind }) => <span key={`${label}-${hour}`} role="img" className="load-end-marker" data-testid="load-end-marker" data-hour={hour} style={{ left: `${100 * hour / item.inputs.duration_hours}%` }} title={`${label ? label + ' · ' : ''}${kind === 'start' ? 'Начало периода' : 'Окончание нагрузки'}: ${format(hour, 6)} ч`} aria-label={`${label ? label + ' · ' : ''}${kind === 'start' ? 'Начало периода' : 'Окончание нагрузки'}: ${format(hour, 6)} ч`} />)}</div><span>0 ч</span><span>{result ? `${format(result.inputs.duration_hours)} ч` : 'Ожидает расчёта'}</span></div>
+          <p className="source-status" data-testid="source-status">{comparison && baseline && latestResult ? `А: ${sourceDescription(baseline)} · Б: ${sourceDescription(latestResult)}` : result ? sourceDescription(result) : ''}{loadMarkers.length > 0 && <span className="load-end-caption">{loadMarkers.length <= 4 ? loadMarkers.map(({ hour, label, kind }) => `${label ? label + ' · ' : ''}${kind === 'start' ? 'начало' : 'конец'} ${format(hour, 6).replace(/0+$/, '').replace(/,$/, '')} ч`).join(' / ') : `${loadMarkers.length} событий источников на шкале времени`}</span>}</p>
           <p className="timeline-note">{result ? 'Линейная интерполяция рассчитанных моментов. Карта, профиль и числа синхронизированы.' : 'Сначала запустите расчёт. Воспроизведение начнётся по вашей команде.'}</p>
         </footer>
       </section>

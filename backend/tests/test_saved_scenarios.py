@@ -273,4 +273,3 @@ async def test_json_charset_remains_supported(client):
     response = await client.post('/api/v1/scenarios', content=json.dumps(sent),
                                  headers={'content-type': 'application/json; charset=UTF-8'})
     assert response.status_code == 201
-

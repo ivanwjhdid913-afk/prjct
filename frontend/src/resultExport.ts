@@ -1,4 +1,5 @@
 import { valuesAtHour } from './scenarioComparison';
+import { sourceEvents, validLoadProfile } from './loadProfile';
 
 export type ExportResult = {
   inputs: Record<string, unknown> & { length_m: number; duration_hours: number };
@@ -33,6 +34,7 @@ function provenance(result: ExportResult, label: string) {
     geometry_source: Object.fromEntries(['name', 'source', 'source_url', 'attribution', 'license', 'license_url', 'crs', 'snapshot_date', 'osm_way_id', 'osm_way_version', 'osm_way_timestamp', 'raw_sha256'].filter(key => result.reach_metadata && key in result.reach_metadata).map(key => [key, result.reach_metadata![key]])),
     source_distance_m: result.source_distance_m ?? 0, source_coordinate: result.source_coordinate ?? null,
     inputs: result.inputs, temporal_resolution: result.temporal_resolution ?? null,
+    source_events: validLoadProfile(result.inputs) ? sourceEvents(result.inputs) : null,
   };
 }
 export function buildResultCsv(selection: ExportSelection): string {
@@ -50,7 +52,7 @@ export function buildResultCsv(selection: ExportSelection): string {
     csv_format_version: 1, kind: kind === 'space' ? 'C(x)' : 'C(t)',
     selected_time_hours: kind === 'space' ? hour : null,
     selected_segment_index: kind === 'time' ? selected + 1 : null,
-    units: { time: 'hours', distance: 'm_from_scenario_source', concentration: 'mg/l', river_flow_m3_s: 'm3/s', effluent_flow_m3_s: 'm3/s', velocity_m_s: 'm/s', dispersion_m2_s: 'm2/s' },
+    units: { time: 'hours', distance: 'm_from_scenario_source', concentration: 'mg/l', river_flow_m3_s: 'm3/s', effluent_flow_m3_s: 'm3/s', velocity_m_s: 'm/s', dispersion_m2_s: 'm2/s', start_hours: 'hours', end_hours: 'hours', effluent_mg_l: 'mg/l', source_events_hour: 'hours', source_events_concentration_mg_l: 'mg/l' },
     concentration_meaning: 'calculated_segment_mean_not_observation',
     time_meaning: 'saved_state_or_linear_interpolation_not_additional_integrator_step',
     provenance: 'scenario_parameters_not_confirmed_industrial_discharge',

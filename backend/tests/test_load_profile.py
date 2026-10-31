@@ -1,3 +1,4 @@
+import json
 import math
 
 import pytest
@@ -158,6 +159,61 @@ def test_profile_ignores_scalar_and_scale_includes_every_inlet():
     b = simulate(profile(*rows, effluent_mg_l=10000.))
     assert a['concentrations_mg_l'] == b['concentrations_mg_l']
     assert a['scale_mg_l'] == pytest.approx([(10 * 10 + .1 * 0) / 10.1, (10 * 10 + .1 * 60) / 10.1])
+
+
+def test_profile_null_scalar_is_explicit_unused_state_and_numerically_identical():
+    rows = [interval(0., .05, 60.)]
+    null = simulate(profile(*rows, effluent_mg_l=None, length_m=500., duration_hours=.1))
+    legacy = simulate(profile(*rows, length_m=500., duration_hours=.1))
+    assert null['inputs']['effluent_mg_l'] is None
+    for field in ('concentrations_mg_l', 'times_hours', 'scale_mg_l', 'derived'):
+        assert null[field] == legacy[field]
+
+
+@pytest.mark.parametrize('mode', ['continuous', 'finite'])
+def test_legacy_modes_do_not_accept_null_scalar(mode):
+    with pytest.raises(ValueError):
+        validate_parameters(BASE | dict(effluent_mg_l=None, load_mode=mode,
+                                         load_duration_hours=.5 if mode == 'finite' else None))
+
+
+@pytest.mark.parametrize('ce', [-1., 10001., math.inf, math.nan, '', True])
+def test_profile_still_rejects_invalid_explicit_scalar(ce):
+    with pytest.raises(ValueError):
+        validate_parameters(profile(interval(0., .5, 60.), effluent_mg_l=ce))
+
+
+@pytest.mark.anyio
+async def test_null_profile_scalar_api_library_and_json_roundtrip(client):
+    body = profile(interval(0., .05, 60.), effluent_mg_l=None, length_m=500., duration_hours=.1)
+    response = await client.post('/api/v1/simulations', json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()['inputs']['effluent_mg_l'] is None
+    conditions = body | dict(load_duration_hours=None, reach_id=None, source_distance_m=0.)
+    document = dict(name='Профиль без единственного ce', format_version=2,
+                    model_id='conservative-1d-advection-dispersion-v1', geometry_mode='synthetic',
+                    geometry_version='synthetic-wgs84-meridian-v1', geometry_sha256=None,
+                    downstream_geometry_sha256=None, reach_id=None, reach_name='Синтетический участок',
+                    geometry_source={}, conditions=conditions)
+    validated = await client.post('/api/v1/scenario-files/validate', json=document)
+    assert validated.status_code == 200, validated.text
+    assert validated.json()['document'] == document
+    payload = {key: document[key] for key in ('name', 'format_version', 'model_id', 'geometry_version', 'geometry_sha256', 'conditions')}
+    saved = await client.post('/api/v1/scenarios', json=payload)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()['conditions'] == conditions
+    for mode in ('continuous', 'finite'):
+        response = await client.post('/api/v1/simulations', json=body | dict(load_mode=mode,
+            load_intervals=None, load_duration_hours=.05 if mode == 'finite' else None))
+        assert response.status_code == 422, response.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('ce', [-1., 10001., math.inf, math.nan, '', True])
+async def test_api_profile_rejects_bad_explicit_scalar_instead_of_ignoring_it(client, ce):
+    body = profile(interval(0., .05, 60.), effluent_mg_l=ce, length_m=500., duration_hours=.1)
+    response = await client.post('/api/v1/simulations', content=json.dumps(body), headers={'content-type': 'application/json'})
+    assert response.status_code == 422, response.text
 
 
 @pytest.mark.parametrize('limit', ['MAX_REFERENCE_BYTES', 'MAX_OUTPUT_STATES', 'MAX_COMPRESSION_CHECKS'])

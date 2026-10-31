@@ -175,4 +175,3 @@ async def test_invalid_search_parameters_are_rejected(client, params):
 @pytest.mark.anyio
 async def test_maximum_search_length_is_accepted(client):
     assert (await client.get("/api/v1/water-bodies", params={"q": "я" * 120})).status_code == 200
-

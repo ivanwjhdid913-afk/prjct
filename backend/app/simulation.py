@@ -28,7 +28,7 @@ class SimulationInput(BaseModel):
     river_flow_m3_s: float = Field(ge=0.1, le=1000)
     effluent_flow_m3_s: float = Field(ge=0, le=100)
     background_mg_l: float = Field(ge=0, le=10000)
-    effluent_mg_l: float = Field(ge=0, le=10000)
+    effluent_mg_l: float | None = Field(ge=0, le=10000)
     velocity_m_s: float = Field(ge=0.02, le=2)
     dispersion_m2_s: float = Field(ge=0.1, le=100)
     length_m: float = Field(ge=100, le=20000)
@@ -46,6 +46,8 @@ class SimulationInput(BaseModel):
 
     @model_validator(mode='after')
     def load_conditions(self):
+        if self.load_mode != 'profile' and self.effluent_mg_l is None:
+            raise ValueError('Для постоянной и конечной нагрузки нужна концентрация стоков ce.')
         if self.load_mode != 'profile' and self.load_intervals is not None:
             raise ValueError('Интервалы допустимы только в режиме профиля.')
         if self.load_mode == 'profile':
