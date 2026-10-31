@@ -12,7 +12,7 @@ import LoadProfileEditor from './LoadProfileEditor';
 import LoadProfileChart from './LoadProfileChart';
 import { intervalDrafts, validateIntervalDraft, type IntervalDraft } from './loadProfileDraft';
 import { sourceConcentrationAt, sourceEvents, validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
-import { MODEL_ID, SCENARIO_FORMAT, RIVER_VERSION, SYNTHETIC_VERSION, validConditions, type Conditions, type SavePayload, type SavedScenario } from './scenarioStorage';
+import { MODEL_ID, SCENARIO_FORMAT, RIVER_VERSION, SYNTHETIC_VERSION, validConditions, isMultipleConditions, type ScenarioConditions, type Conditions, type SavePayload, type SavedScenario } from './scenarioStorage';
 
 const fields = [
   { key: 'river_flow_m3_s', label: 'Расход реки Qr, м³/с', initial: 10, min: .1, max: 1000, help: 'Поток воды выше условного источника.' },
@@ -213,7 +213,8 @@ function ReachPreview({ reach, distance, point, suspended, picking, onPick }: { 
   return <div className={`reach-preview${picking ? ' is-picking' : ''}`} data-reach-id={reach.id} data-source-coordinate={JSON.stringify(shownPoint)} inert={suspended}><div ref={host} tabIndex={-1} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
 }
 
-export default function Simulation() {
+type Restorable = { name?: string; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
+export default function Simulation({initialScenario,onOpenMultiple}:{initialScenario?:Restorable;onOpenMultiple?:(scenario:Restorable)=>void}={}) {
   const [mode, setMode] = useState('river');
   const [parametersOpen, setParametersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -385,7 +386,7 @@ export default function Simulation() {
   }, [playing, speed, clockResult]);
   const stale = latestResult !== null && (loadMode !== (latestResult.inputs.load_mode ?? 'continuous') || (loadMode === 'finite' && Number(loadDuration) !== latestResult.inputs.load_duration_hours) || (loadMode === 'profile' && JSON.stringify(intervalCheck.intervals) !== JSON.stringify(latestResult.inputs.load_intervals)) || (mode === 'river' ? reachId !== latestResult.reach_id || Number(source) !== latestResult.source_distance_m || !sourceValid : !!latestResult.reach_id) || fields.some(field => (mode !== 'river' || field.key !== 'length_m') && (loadMode !== 'profile' || field.key !== 'effluent_mg_l') && (draft[field.key].trim() === '' || Number(draft[field.key]) !== latestResult.inputs[field.key])));
 
-  function conditionsToSave(): SavePayload {
+  function conditionsToSave(): SavePayload & {conditions:Conditions} {
     if (!form.current?.reportValidity() || pickPending || pickingSource || (mode === 'river' && (!reach || !sourceValid)))
       throw new Error('Завершите выбор источника и заполните корректные условия расчёта.');
     if (loadMode === 'profile' && intervalCheck.intervals === null) throw new Error('Исправьте отмеченные строки графика нагрузки.');
@@ -404,7 +405,8 @@ export default function Simulation() {
       geometry_version: mode === 'river' ? RIVER_VERSION : SYNTHETIC_VERSION,
       geometry_sha256: checksum as string | null, conditions };
   }
-  function openSavedConditions(saved: Pick<SavedScenario, 'conditions' | 'geometry_sha256'> & { downstream_geometry_sha256?: string | null }) {
+  function openSavedConditions(saved: Restorable) {
+    if(isMultipleConditions(saved.conditions)) { if(!onOpenMultiple) throw new Error('Откройте редактор нескольких источников.'); onOpenMultiple(saved); return; }
     const conditions: Conditions = saved.conditions;
     if (conditions.reach_id != null) {
       const savedReach = reaches.find(item => item.id === conditions.reach_id);
@@ -429,6 +431,12 @@ export default function Simulation() {
     setDraftPreview(!!conditions.reach_id && geometryChanged); setPlaying(false);
     setVariant(!!baseline);
   }
+  const restoredScenario = useRef<Restorable | undefined>(undefined);
+  useEffect(() => {
+    if(!initialScenario || !reaches.length || restoredScenario.current===initialScenario) return;
+    restoredScenario.current=initialScenario;
+    try {openSavedConditions(initialScenario);} catch(error) {setStatus('error');setMessage(error instanceof Error?error.message:'Не удалось открыть условия.');}
+  },[initialScenario,reaches]);
   const savedDraftKey = JSON.stringify([mode, reachId, source, draft, loadMode, loadDuration, intervalRows, pickingSource, pickPending]);
   function conditionsDocument(name: string) {
     const payload = conditionsToSave();
@@ -536,7 +544,7 @@ export default function Simulation() {
         <div className="parameters-heading"><div><p className="eyebrow">Сценарий</p><h2 id="parameters-title">Условия расчёта</h2></div><button className="close-parameters" aria-label="Закрыть параметры" onClick={() => setParametersOpen(false)}>×</button></div>
         <form ref={form} onSubmit={event => { event.preventDefault(); void calculate(); }}>
           <div className="parameter-scroll">
-            <SavedScenarios draftKey={savedDraftKey} interactionKey={interactionKey} getConditions={conditionsToSave} getDocument={conditionsDocument} onApplyConditions={openSavedConditions} onOpen={openSavedConditions} />
+            <SavedScenarios initialName={initialScenario?.name} draftKey={savedDraftKey} interactionKey={interactionKey} getConditions={conditionsToSave} getDocument={conditionsDocument} onApplyConditions={openSavedConditions} onOpen={openSavedConditions} />
             <section className="scenario-comparison-controls" aria-label="Сценарии текущего сеанса">
               <p className="comparison-step">{baseline ? variant ? 'Б · редактируемый вариант' : 'А · закреплённый расчёт' : 'Начните с базового расчёта'}</p>
               {!baseline ? <button type="button" disabled={!result || status === 'loading'} onClick={pinBaseline}>Закрепить как А</button> : <><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" className="replace-baseline" disabled={!result || status === 'loading'} onClick={pinBaseline}>Заменить А показанным расчётом</button></>}

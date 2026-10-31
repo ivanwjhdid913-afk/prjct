@@ -116,5 +116,5 @@ test('portable documents and events cannot mutate their saved source snapshot', 
 });
 
 test('unknown formats keep a legacy preview and remain independent of v2 completeness', () => {
-  expect(validDocument({ ...documentFromSaved(saved), format_version: 3 })).toBe(true);
+  expect(validDocument({ ...documentFromSaved(saved), format_version: 4 })).toBe(true);
 });

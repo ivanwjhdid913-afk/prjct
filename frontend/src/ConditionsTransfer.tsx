@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { responseData } from './scenarioStorage';
+import { responseData, isMultipleConditions, type ScenarioConditions, type Conditions, type ScenarioSource } from './scenarioStorage';
 import { downloadConditions, MAX_CONDITIONS_FILE_BYTES, validDocumentValidation, type ConditionsDocument, type DocumentValidation } from './scenarioExchange';
 
 type Props = { name: string; draftKey: string; interactionKey: number;
@@ -73,25 +73,36 @@ export default function ConditionsTransfer({ name, draftKey, interactionKey, get
     {notice && <p role="status">{notice}</p>}
     {preview && <div className="conditions-preview" data-testid="conditions-preview">
       <strong>{preview.document.name}</strong><p>{preview.document.reach_name}</p>
-      <dl><dt>Модель / формат</dt><dd>{preview.document.model_id} / {preview.document.format_version}</dd>
-        <dt>Источник от начала, м</dt><dd>{preview.document.conditions.source_distance_m ?? 0}</dd>
-        <dt>Расход реки / стоков, м³/с</dt><dd>{preview.document.conditions.river_flow_m3_s} / {preview.document.conditions.effluent_flow_m3_s}</dd>
-        <dt>Фон, мг/л</dt><dd>{preview.document.conditions.background_mg_l}</dd>
-        {preview.document.conditions.load_mode !== 'profile' && <><dt>Стоки, мг/л</dt><dd>{preview.document.conditions.effluent_mg_l}</dd></>}
-        <dt>Скорость, м/с / дисперсия, м²/с</dt><dd>{preview.document.conditions.velocity_m_s} / {preview.document.conditions.dispersion_m2_s}</dd>
-        <dt>Горизонт / период нагрузки, ч</dt><dd>{preview.document.conditions.duration_hours} / {preview.document.conditions.load_mode === 'profile' ? 'График нагрузки' : preview.document.conditions.load_mode === 'finite' ? preview.document.conditions.load_duration_hours : 'постоянная'}</dd>
-        {preview.document.geometry_mode === 'synthetic' && <><dt>Длина, м</dt><dd>{preview.document.conditions.length_m}</dd></>}
-      </dl>
-      {preview.document.conditions.load_mode === 'profile' && <>
-        <table aria-label="График нагрузки из файла"><caption>График нагрузки</caption>
-          <thead><tr><th>Начало, ч</th><th>Конец, ч</th><th>Стоки, мг/л</th></tr></thead>
-          <tbody>{preview.document.conditions.load_intervals?.map((row, index) => <tr key={index}><td>{row.start_hours}</td><td>{row.end_hours}</td><td>{row.effluent_mg_l}</td></tr>)}</tbody>
-        </table>
-        <p>{preview.document.conditions.load_intervals?.length ? 'Интервалы включают начало и не включают конец. Между интервалами концентрация стоков равна фону.' : 'Интервалов нет: концентрация стоков равна фону на всём горизонте.'}</p>
-      </>}
+      <p>Модель / формат: {preview.document.model_id} / {preview.document.format_version}</p>
+      <ConditionPreview conditions={preview.document.conditions} synthetic={preview.document.geometry_mode==='synthetic'} />
       <p>{preview.compatibility.compatible ? 'Совместимо с текущей моделью и геометрией.' : preview.compatibility.reasons.join(' ')}</p>
       <button type="button" disabled={!preview.compatibility.compatible} onClick={apply}>Применить к форме</button>
       <button type="button" onClick={() => { setPreview(null); setError(''); setNotice('Предварительный просмотр закрыт. Условия формы не изменены.'); }}>Закрыть просмотр</button>
     </div>}
   </section>;
+}
+
+function LoadPreview({source, label='График нагрузки из файла'}:{source:Conditions|ScenarioSource;label?:string}) {
+  return <>
+    <dl><dt>Режим нагрузки</dt><dd>{source.load_mode==='profile'?'График нагрузки':source.load_mode==='finite'?'Ограниченный период':'Постоянная нагрузка'}</dd>
+      {source.load_mode!=='profile' && <><dt>Стоки, мг/л</dt><dd>{source.effluent_mg_l}</dd></>}
+      {source.load_mode==='finite' && <><dt>Период нагрузки, ч</dt><dd>{source.load_duration_hours}</dd></>}
+    </dl>
+    {source.load_mode==='profile' && <><table aria-label={label}><caption>График нагрузки</caption>
+      <thead><tr><th>Начало, ч</th><th>Конец, ч</th><th>Стоки, мг/л</th></tr></thead>
+      <tbody>{source.load_intervals?.map((row,index)=><tr key={index}><td>{row.start_hours}</td><td>{row.end_hours}</td><td>{row.effluent_mg_l}</td></tr>)}</tbody>
+    </table><p>{source.load_intervals?.length?'Интервалы включают начало и не включают конец. Между интервалами концентрация стоков равна фону.':'Интервалов нет: концентрация стоков равна фону на всём горизонте.'}</p></>}
+  </>;
+}
+function ConditionPreview({conditions,synthetic}:{conditions:ScenarioConditions;synthetic:boolean}) {
+  return <><dl><dt>Расход реки Qr выше всех источников, м³/с</dt><dd>{conditions.river_flow_m3_s}</dd>
+    <dt>Фон, мг/л</dt><dd>{conditions.background_mg_l}</dd>
+    <dt>Скорость, м/с / дисперсия, м²/с</dt><dd>{conditions.velocity_m_s} / {conditions.dispersion_m2_s}</dd>
+    <dt>Горизонт, ч</dt><dd>{conditions.duration_hours}</dd></dl>
+    {isMultipleConditions(conditions)?<ol aria-label="Источники из файла">{conditions.sources.map((source,index)=><li key={source.id}>
+      <strong>{index+1}. {source.name}</strong><dl><dt>Идентификатор</dt><dd>{source.id}</dd><dt>Положение вдоль русла, м</dt><dd>{source.source_distance_m}</dd><dt>Постоянный расход q, м³/с</dt><dd>{source.effluent_flow_m3_s}</dd></dl>
+      <LoadPreview source={source} label={`График нагрузки источника ${index+1} из файла`} />
+    </li>)}</ol>:<><dl><dt>Источник от начала, м</dt><dd>{conditions.source_distance_m??0}</dd><dt>Расход реки / стоков, м³/с</dt><dd>{conditions.river_flow_m3_s} / {conditions.effluent_flow_m3_s}</dd><dt>Горизонт / период нагрузки, ч</dt><dd>{conditions.duration_hours} / {conditions.load_mode==='profile'?'График нагрузки':conditions.load_mode==='finite'?conditions.load_duration_hours:'постоянная'}</dd>
+      {synthetic&&<><dt>Длина, м</dt><dd>{conditions.length_m}</dd></>}</dl><LoadPreview source={conditions}/></>}
+  </>;
 }

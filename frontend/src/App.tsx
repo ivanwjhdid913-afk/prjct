@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import './styles.css';
 import ObservationPoints from './ObservationPoints';
-import Simulation from './Simulation';
+import ModelWorkspace from './ModelWorkspace';
 const DischargeData = lazy(() => import('./DischargeData'));
 
 const kinds = { river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
@@ -118,7 +118,7 @@ export default function App() {
       </header>
       <main id="content" tabIndex={-1} className={modelOpen ? 'model-main' : undefined}>
         <nav className="section-nav" aria-label="Разделы приложения"><a href="#" aria-current={!modelOpen && !dataOpen ? 'page' : undefined}>Каталог</a><a href="#model" aria-current={modelOpen ? 'page' : undefined}>Моделирование</a><a href="#discharge-data" aria-current={dataOpen ? 'page' : undefined}>Исходные данные</a></nav>
-        {modelOpen ? <Simulation /> : dataOpen ? <Suspense fallback={<p role="status">Загружаем паспорта данных…</p>}><DischargeData /></Suspense> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
+        {modelOpen ? <ModelWorkspace /> : dataOpen ? <Suspense fallback={<p role="status">Загружаем паспорта данных…</p>}><DischargeData /></Suspense> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
         <section className="introduction" aria-labelledby="page-title">
           <p className="eyebrow">Реестр / Водные объекты</p>
           <h1 id="page-title">Водные объекты<span className="title-dot">.</span></h1>

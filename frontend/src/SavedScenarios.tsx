@@ -5,11 +5,11 @@ import type { ConditionsDocument } from './scenarioExchange';
 import { documentFromSaved, downloadConditions } from './scenarioExchange';
 import ConditionsTransfer from './ConditionsTransfer';
 
-type Props = { draftKey: string; getConditions: () => SavePayload; onOpen: (scenario: SavedScenario) => void;
+type Props = { initialName?: string; draftKey: string; getConditions: () => SavePayload; onOpen: (scenario: SavedScenario) => void;
   interactionKey?: number; getDocument?: (name: string) => ConditionsDocument; onApplyConditions?: (document: ConditionsDocument) => void };
-export default function SavedScenarios({ draftKey, getConditions, onOpen, interactionKey = 0, getDocument, onApplyConditions }: Props) {
+export default function SavedScenarios({ draftKey, getConditions, onOpen, interactionKey = 0, getDocument, onApplyConditions, initialName = '' }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [page, setPage] = useState<ScenarioPage | null>(null);
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -103,7 +103,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen, intera
     {!loading && page?.total === 0 && <p>Сохранённых условий пока нет.</p>}
     {page && <><ul aria-label="Сохранённые сценарии" aria-busy={loading}>
       {page.items.map(item => <li key={item.id}>
-        <strong>{item.name}</strong><span>{item.reach_name} · {item.load_mode === 'profile' ? 'График нагрузки' : item.load_mode === 'finite' ? 'Ограниченный период' : 'Постоянная нагрузка'}</span>
+        <strong>{item.name}</strong><span>{item.reach_name} · {item.load_mode === 'multiple' ? 'Несколько источников' : item.load_mode === 'profile' ? 'График нагрузки' : item.load_mode === 'finite' ? 'Ограниченный период' : 'Постоянная нагрузка'}</span>
         <time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
         <div className="library-item-actions"><button type="button" disabled={!!busy || loading} aria-label={`Открыть «${item.name}»`} onClick={() => { void perform('open', item.id); }}>Открыть</button>
           <button type="button" disabled={!!busy || loading} aria-label={`Выгрузить JSON «${item.name}»`} onClick={() => { void perform('export', item.id); }}>JSON ↓</button></div>

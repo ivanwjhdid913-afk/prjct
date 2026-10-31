@@ -1,4 +1,4 @@
-import { SCENARIO_FORMAT, validConditions, type Conditions } from './scenarioStorage';
+import { SCENARIO_FORMAT, MULTIPLE_FORMAT, isMultipleConditions, validScenarioConditions, type ScenarioConditions, type Conditions, type MultipleConditions } from './scenarioStorage';
 
 export const MAX_CONDITIONS_FILE_BYTES = 8192;
 export type ConditionsDocument = {
@@ -6,7 +6,7 @@ export type ConditionsDocument = {
   geometry_mode: 'river' | 'synthetic'; geometry_version: string;
   geometry_sha256: string | null; downstream_geometry_sha256: string | null;
   reach_id: string | null; reach_name: string; geometry_source: Record<string, unknown>;
-  conditions: Conditions;
+  conditions: ScenarioConditions;
 };
 export type DocumentValidation = { document: ConditionsDocument; compatibility: { compatible: boolean; reasons: string[] } };
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -18,9 +18,12 @@ export function validDocument(v: unknown): v is ConditionsDocument {
     || typeof v.model_id !== 'string' || !v.model_id || v.model_id.length > 80
     || typeof v.geometry_version !== 'string' || !v.geometry_version || v.geometry_version.length > 64
     || typeof v.reach_name !== 'string' || !v.reach_name || v.reach_name.length > 200
-    || !record(v.geometry_source) || !validConditions(v.conditions)) return false;
-  if ((v.format_version === 1 && v.conditions.load_mode === 'profile')
-    || (v.format_version === SCENARIO_FORMAT && !Object.hasOwn(v.conditions, 'load_intervals'))) return false;
+    || !record(v.geometry_source) || !validScenarioConditions(v.conditions)) return false;
+  if (isMultipleConditions(v.conditions)) {
+    if (v.format_version === 1 || v.format_version === SCENARIO_FORMAT) return false;
+  } else if ((v.format_version === 1 && v.conditions.load_mode === 'profile')
+    || (v.format_version === SCENARIO_FORMAT && !Object.hasOwn(v.conditions, 'load_intervals'))
+    || (v.format_version === MULTIPLE_FORMAT)) return false;
   return v.geometry_mode === 'synthetic'
     ? v.reach_id === null && v.geometry_sha256 === null && v.downstream_geometry_sha256 === null && v.conditions.reach_id == null
     : v.geometry_mode === 'river' && typeof v.reach_id === 'string' && v.reach_id === v.conditions.reach_id
@@ -33,9 +36,12 @@ export function validDocumentValidation(v: unknown): v is DocumentValidation {
     && c.reasons.every(reason => typeof reason === 'string' && reason.length <= 1000)
     && (c.compatible ? c.reasons.length === 0 : c.reasons.length > 0);
 }
+export function documentFromSaved(v: {conditions: Conditions}): ConditionsDocument & {conditions: Conditions};
+export function documentFromSaved(v: {conditions: MultipleConditions}): ConditionsDocument & {conditions: MultipleConditions};
+export function documentFromSaved(v: unknown): ConditionsDocument;
 export function documentFromSaved(v: unknown): ConditionsDocument {
   if (!record(v) || !record(v.conditions)) throw new Error('Сервер вернул неполную сохранённую запись.');
-  const conditions = { ...structuredClone(v.conditions), reach_id: v.conditions.reach_id ?? null, source_distance_m: v.conditions.source_distance_m ?? 0 };
+  const conditions = isMultipleConditions(v.conditions) ? structuredClone(v.conditions) : { ...structuredClone(v.conditions), reach_id: v.conditions.reach_id ?? null, source_distance_m: v.conditions.source_distance_m ?? 0 };
   const document = {
     name: v.name, format_version: v.format_version, model_id: v.model_id,
     geometry_mode: v.geometry_mode, geometry_version: v.geometry_version,

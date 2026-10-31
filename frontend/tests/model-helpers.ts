@@ -10,7 +10,8 @@ export function concentrationsAt(result: { times_hours: number[]; concentrations
 }
 
 export async function openParameters(page: Page) {
-  const toggle = page.getByRole('button', { name: 'Параметры', exact: true });
+  const toggle = page.getByRole('button', { name: 'Параметры', exact: true, includeHidden: true });
+  await toggle.waitFor({state:'attached'});
   if (await toggle.isVisible() && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
 }
 

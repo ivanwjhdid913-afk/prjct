@@ -1,12 +1,13 @@
 import { valuesAtHour } from './scenarioComparison';
 import { sourceEvents, validLoadProfile } from './loadProfile';
+import { isMultipleConditions } from './scenarioStorage';
 
 export type ExportResult = {
   inputs: Record<string, unknown> & { length_m: number; duration_hours: number };
   distances_m: number[]; times_hours: number[]; concentrations_mg_l: number[][];
   reach_id?: string | null; source_distance_m?: number; source_coordinate?: [number, number] | null;
   reach_metadata?: Record<string, unknown> | null; temporal_resolution?: unknown;
-  model_id?: string; format_version?: number;
+  model_id?: string; format_version?: number; source_coordinates?: unknown;
 };
 export type ExportSelection = { result: ExportResult; a?: ExportResult | null; b?: ExportResult | null; hour: number; selected: number; kind: 'space' | 'time' };
 
@@ -34,7 +35,8 @@ function provenance(result: ExportResult, label: string) {
     geometry_source: Object.fromEntries(['name', 'source', 'source_url', 'attribution', 'license', 'license_url', 'crs', 'snapshot_date', 'osm_way_id', 'osm_way_version', 'osm_way_timestamp', 'raw_sha256'].filter(key => result.reach_metadata && key in result.reach_metadata).map(key => [key, result.reach_metadata![key]])),
     source_distance_m: result.source_distance_m ?? 0, source_coordinate: result.source_coordinate ?? null,
     inputs: result.inputs, temporal_resolution: result.temporal_resolution ?? null,
-    source_events: validLoadProfile(result.inputs) ? sourceEvents(result.inputs) : null,
+    source_coordinates: result.source_coordinates ?? null,
+    source_events: isMultipleConditions(result.inputs) ? result.inputs.sources.map(source=>({id:source.id,name:source.name,source_distance_m:source.source_distance_m,events:sourceEvents({...source,background_mg_l:result.inputs.background_mg_l as number,duration_hours:result.inputs.duration_hours})})) : validLoadProfile(result.inputs) ? sourceEvents(result.inputs) : null,
   };
 }
 export function buildResultCsv(selection: ExportSelection): string {
@@ -46,13 +48,16 @@ export function buildResultCsv(selection: ExportSelection): string {
     throw new Error('Выберите допустимое модельное время.');
   if (!Number.isInteger(selected) || selected < 0 || selected >= primary.distances_m.length)
     throw new Error('Выберите расчётный сегмент.');
-  const columns = ['record_type', 'time_hours', 'distance_from_source_m', 'segment_index',
+  const multiple = isMultipleConditions(primary.inputs);
+  if (secondary && (multiple !== isMultipleConditions(secondary.inputs) || (multiple && (primary.model_id !== secondary.model_id || primary.reach_id !== secondary.reach_id || primary.inputs.duration_hours !== secondary.inputs.duration_hours || JSON.stringify(primary.distances_m) !== JSON.stringify(secondary.distances_m)))))
+    throw new Error('Для CSV сравнения нужны одинаковые модель, участок, сегменты и горизонт.');
+  const columns = ['record_type', 'time_hours', multiple ? 'distance_from_reach_start_m' : 'distance_from_source_m', 'segment_index',
     ...(secondary ? ['concentration_A_mg_l', 'concentration_B_mg_l', 'delta_B_minus_A_mg_l', 'method_A', 'method_B'] : ['concentration_mg_l', 'method']), 'metadata_json'];
   const metadata = {
-    csv_format_version: 1, kind: kind === 'space' ? 'C(x)' : 'C(t)',
+    csv_format_version: 1, coordinate_origin: multiple ? 'reach_start' : 'scenario_source', kind: kind === 'space' ? 'C(x)' : 'C(t)',
     selected_time_hours: kind === 'space' ? hour : null,
     selected_segment_index: kind === 'time' ? selected + 1 : null,
-    units: { time: 'hours', distance: 'm_from_scenario_source', concentration: 'mg/l', river_flow_m3_s: 'm3/s', effluent_flow_m3_s: 'm3/s', velocity_m_s: 'm/s', dispersion_m2_s: 'm2/s', start_hours: 'hours', end_hours: 'hours', effluent_mg_l: 'mg/l', source_events_hour: 'hours', source_events_concentration_mg_l: 'mg/l' },
+    units: { time: 'hours', distance: isMultipleConditions(primary.inputs) ? 'm_from_reach_start' : 'm_from_scenario_source', concentration: 'mg/l', river_flow_m3_s: 'm3/s', effluent_flow_m3_s: 'm3/s', velocity_m_s: 'm/s', dispersion_m2_s: 'm2/s', start_hours: 'hours', end_hours: 'hours', effluent_mg_l: 'mg/l', source_events_hour: 'hours', source_events_concentration_mg_l: 'mg/l' },
     concentration_meaning: 'calculated_segment_mean_not_observation',
     time_meaning: 'saved_state_or_linear_interpolation_not_additional_integrator_step',
     provenance: 'scenario_parameters_not_confirmed_industrial_discharge',
