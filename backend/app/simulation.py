@@ -207,9 +207,31 @@ def calculate(parameters: SimulationRequest) -> JSONResponse:
         calculation_lock.release()
 
 
-@router.post('/api/v1/simulations', response_model=SimulationResult,
+from app.multiple_simulation import MultipleSimulationRequest, MultipleSimulationResult, calculate_multiple
+
+
+def _request_schema(model):
+    """Inline local definitions in manually documented bounded-stream bodies.
+
+    Pydantic's #/$defs references point at the document root; nested unchanged
+    inside OpenAPI they would not resolve. These request types are nonrecursive.
+    """
+    schema = model.model_json_schema()
+    definitions = schema.pop('$defs', {})
+    def expand(value):
+        if isinstance(value, list):
+            return [expand(child) for child in value]
+        if isinstance(value, dict):
+            if '$ref' in value and value['$ref'].startswith('#/$defs/'):
+                return expand(definitions[value['$ref'].split('/')[-1]])
+            return {key: expand(child) for key, child in value.items()}
+        return value
+    return expand(schema)
+
+
+@router.post('/api/v1/simulations', response_model=SimulationResult | MultipleSimulationResult,
              openapi_extra={'requestBody': {'required': True, 'content': {
-                 'application/json': {'schema': SimulationRequest.model_json_schema()}}}})
+                 'application/json': {'schema': {'anyOf': [_request_schema(SimulationRequest), _request_schema(MultipleSimulationRequest)]}}}}})
 async def run_simulation(request: Request):
     # Read a bounded stream BEFORE JSON parsing, including chunked requests.
     body = bytearray()
@@ -219,7 +241,7 @@ async def run_simulation(request: Request):
         body.extend(chunk)
     try:
         data = json.loads(body)
-        parameters = SimulationRequest.model_validate(data)
+        parameters = (MultipleSimulationRequest if isinstance(data, dict) and 'sources' in data else SimulationRequest).model_validate(data)
     except (ValueError, ValidationError) as error:
         if isinstance(error, ValidationError):
             # Do not echo arbitrary payload values, NaN, or internal validation context.
@@ -228,7 +250,7 @@ async def run_simulation(request: Request):
         else:
             detail = 'Ожидается JSON с числовыми параметрами сценария.'
         raise HTTPException(422, detail) from None
-    return await run_in_threadpool(calculate, parameters)
+    return await run_in_threadpool(calculate_multiple if isinstance(parameters, MultipleSimulationRequest) else calculate, parameters)
 
 
 @router.get('/api/v1/river-reaches')
