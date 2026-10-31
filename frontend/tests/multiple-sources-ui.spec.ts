@@ -81,3 +81,20 @@ test('short phone keeps at least 100px of map exposed with the temporal profile 
  expect(exposed).toBeGreaterThanOrEqual(100);
  await expect(page.getByLabel('Время от начала сценария',{exact:true})).toBeInViewport();
 });
+
+
+test('rapid source creation and mode edits keep each source flow attached to its stable identifier',async({page})=>{
+ await prepare(page);
+ for(let i=0;i<8;i++){
+  await page.getByRole('button',{name:'Добавить источник',exact:true}).click();
+  await page.getByLabel('Расход стоков выбранного источника q, м³/с',{exact:true}).fill('.05');
+  await page.getByLabel('Режим нагрузки выбранного источника',{exact:true}).selectOption('profile');
+  await page.getByRole('button',{name:'Добавить период',exact:true}).click();
+  await expect(page.getByLabel('Расход стоков выбранного источника q, м³/с',{exact:true})).toHaveValue('.05');
+  await page.getByLabel('Выбрать источник 1',{exact:true}).click();
+  await expect(page.getByLabel('Расход стоков выбранного источника q, м³/с',{exact:true})).toHaveValue('.1');
+  await page.getByLabel('Выбрать источник 2',{exact:true}).click();
+  await expect(page.getByLabel('Расход стоков выбранного источника q, м³/с',{exact:true})).toHaveValue('.05');
+  await page.getByRole('button',{name:'Удалить выбранный источник',exact:true}).click();
+ }
+});
