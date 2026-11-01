@@ -1,9 +1,10 @@
+import type { AnalysisSettings } from './analysisSettings';
 import { intervalDrafts, validateIntervalDraft, type IntervalDraft } from './loadProfileDraft';
 import { validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
 import type { ScenarioConditions } from './scenarioStorage';
 
-export type RestorableConditions = { name?: string; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
+export type RestorableConditions = { name?: string; analysis_settings?: AnalysisSettings | null; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
 export type ScenarioSource = { id: string; name: string; source_distance_m: number; effluent_flow_m3_s: number; effluent_mg_l: number | null; load_mode: LoadMode; load_duration_hours: number | null; load_intervals: LoadInterval[] | null };
 export type MultipleInputs = {river_flow_m3_s:number;background_mg_l:number;velocity_m_s:number;dispersion_m2_s:number;duration_hours:number;reach_id:string;sources:ScenarioSource[]};
 export type SharedKey='river_flow_m3_s'|'background_mg_l'|'velocity_m_s'|'dispersion_m2_s'|'duration_hours';
@@ -45,6 +46,7 @@ export function validMultipleResult(value:unknown):value is MultipleResult{const
 export function multipleComparisonReason(a:MultipleResult,b:MultipleResult):string{
  if(a.model_id!==b.model_id)return 'Разные физические постановки нельзя сравнивать как одну модель.';
  if(a.reach_id!==b.reach_id)return 'Для сравнения нужен один подготовленный участок.';
+ if(a.reach_metadata.geometry_sha256!==b.reach_metadata.geometry_sha256||a.reach_metadata.downstream_geometry_sha256!==b.reach_metadata.downstream_geometry_sha256)return 'Для сравнения нужны одинаковые версии геометрии и проверенного продолжения.';
  if(a.inputs.duration_hours!==b.inputs.duration_hours)return 'Для сравнения нужен одинаковый горизонт расчёта.';
  if(a.inputs.length_m!==b.inputs.length_m||JSON.stringify(a.geometry)!==JSON.stringify(b.geometry)||JSON.stringify(a.distances_m)!==JSON.stringify(b.distances_m)||JSON.stringify(a.segment_geometries)!==JSON.stringify(b.segment_geometries))return 'Для сравнения нужны одинаковые полная область и сегменты.';
  return '';
