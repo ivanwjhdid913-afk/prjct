@@ -1,10 +1,12 @@
 // Identifies the supported condition format and numerical implementation.
 // Changing the implementation requires an explicit compatibility decision.
 import { validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
+import { validAnalysisSettings, type AnalysisSettings } from './analysisSettings';
 
 export const SCENARIO_FORMAT = 2;
 export const MODEL_ID = 'conservative-1d-advection-dispersion-v1';
 export const MULTIPLE_FORMAT = 3;
+export const ANALYSIS_FORMAT = 4;
 export const MULTIPLE_MODEL_ID = 'conservative-1d-lateral-inflow-v2';
 export const RIVER_VERSION = 'river-wgs84-v1';
 export const SYNTHETIC_VERSION = 'synthetic-wgs84-meridian-v1';
@@ -31,7 +33,7 @@ export function isMultipleConditions(v: ScenarioConditions | unknown): v is Mult
 }
 export type SavePayload = {
   format_version: number; model_id: string; geometry_version: string;
-  geometry_sha256: string | null; conditions: ScenarioConditions;
+  geometry_sha256: string | null; conditions: ScenarioConditions; analysis_settings?: AnalysisSettings | null;
 };
 export type ScenarioSummary = {
   id: string; name: string; reach_name: string; geometry_mode: 'river' | 'synthetic';
@@ -102,7 +104,9 @@ export function validScenarioConditions(v: unknown): v is ScenarioConditions {
 export function validSaved(v: unknown): v is SavedScenario {
   if (!validCompatibility(v)) return false;
   const multiple = isMultipleConditions(v.conditions);
-  if (multiple ? v.format_version!==MULTIPLE_FORMAT || v.model_id!==MULTIPLE_MODEL_ID || v.load_mode!=='multiple' || !validMultipleConditions(v.conditions)
+  if (v.format_version === ANALYSIS_FORMAT ? !multiple || !validAnalysisSettings(v.analysis_settings)
+      : v.analysis_settings != null) return false;
+  if (multiple ? ![MULTIPLE_FORMAT, ANALYSIS_FORMAT].includes(v.format_version) || v.model_id!==MULTIPLE_MODEL_ID || v.load_mode!=='multiple' || !validMultipleConditions(v.conditions)
       : !((v.format_version===1 || v.format_version===SCENARIO_FORMAT) && v.model_id===MODEL_ID && validConditions(v.conditions)
           && v.load_mode===v.conditions.load_mode && (v.format_version===1 ? v.conditions.load_mode!=='profile' : Object.hasOwn(v.conditions,'load_intervals')))) return false;
   return v.conditions.reach_id == null

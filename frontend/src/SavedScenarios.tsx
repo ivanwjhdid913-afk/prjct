@@ -88,7 +88,7 @@ export default function SavedScenarios({ draftKey, getConditions, onOpen, intera
   }
   return <details className="saved-scenarios" onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>Сохранённые условия</summary>
-    <p className="library-explanation">В базе сохраняются условия для повторного расчёта. Результаты, массивы концентраций и пара А/Б не сохраняются. Записи доступны после перезагрузки.</p>
+    <p className="library-explanation">В базе сохраняются условия для повторного расчёта и применённые настройки анализа нескольких источников. Результаты, массивы концентраций и пара А/Б не сохраняются. Записи доступны после перезагрузки.</p>
     <label htmlFor="saved-name">Название сохраняемых условий</label>
     <input id="saved-name" type="text" maxLength={120} value={name} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (!busy) void perform('save'); } }} placeholder="Например, короткий период на Дону" />
     <button type="button" disabled={!!busy} onClick={() => { void perform('save'); }}>{busy === 'save' ? 'Сохраняем условия…' : 'Сохранить как новый сценарий'}</button>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { responseData, isMultipleConditions, type ScenarioConditions, type Conditions, type ScenarioSource } from './scenarioStorage';
 import { downloadConditions, MAX_CONDITIONS_FILE_BYTES, validDocumentValidation, type ConditionsDocument, type DocumentValidation } from './scenarioExchange';
+import type { AnalysisSettings } from './analysisSettings';
 
 type Props = { name: string; draftKey: string; interactionKey: number;
   getDocument: (name: string) => ConditionsDocument; onApply: (document: ConditionsDocument) => void; onAppliedName: (name: string) => void };
@@ -63,7 +64,7 @@ export default function ConditionsTransfer({ name, draftKey, interactionKey, get
   return <section className="conditions-transfer" aria-label="Перенос условий">
     <h3>Перенос через файл</h3>
     <button type="button" onClick={exportForm}>Выгрузить текущие условия JSON</button>
-    <small>Название — в поле выше. В файл попадёт текущая валидная форма, без результатов и А/Б.</small>
+    <small>Название — в поле выше. В файл попадут валидные физические условия, без результатов и А/Б. Для нескольких источников — также применённые настройки анализа.</small>
     <label htmlFor="conditions-file">Импортировать условия JSON</label>
     <input ref={fileInput} id="conditions-file" type="file" accept=".json,application/json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void selectFile(file); }} />
     <small>До 8192 байт. Проверка и просмотр не запускают расчёт и не сохраняют запись.</small>
@@ -75,11 +76,22 @@ export default function ConditionsTransfer({ name, draftKey, interactionKey, get
       <strong>{preview.document.name}</strong><p>{preview.document.reach_name}</p>
       <p>Модель / формат: {preview.document.model_id} / {preview.document.format_version}</p>
       <ConditionPreview conditions={preview.document.conditions} synthetic={preview.document.geometry_mode==='synthetic'} />
+      {isMultipleConditions(preview.document.conditions) && <AnalysisPreview settings={preview.document.analysis_settings} />}
       <p>{preview.compatibility.compatible ? 'Совместимо с текущей моделью и геометрией.' : preview.compatibility.reasons.join(' ')}</p>
       <button type="button" disabled={!preview.compatibility.compatible} onClick={apply}>Применить к форме</button>
       <button type="button" onClick={() => { setPreview(null); setError(''); setNotice('Предварительный просмотр закрыт. Условия формы не изменены.'); }}>Закрыть просмотр</button>
     </div>}
   </section>;
+}
+
+function AnalysisPreview({ settings }: { settings?: AnalysisSettings | null }) {
+  return <div aria-label="Настройки анализа из файла">
+    <strong>Контрольные точки</strong>
+    {settings?.points.length ? <ul>{settings.points.map(point =>
+      <li key={point.id}>{point.name} — сегмент {point.segment_index + 1} из 100</li>,
+    )}</ul> : <p>Контрольные точки не заданы.</p>}
+    <p>Пользовательский порог: {settings?.threshold_mg_l == null ? 'не задан' : `${settings.threshold_mg_l} мг/л`}.</p>
+  </div>;
 }
 
 function LoadPreview({source, label='График нагрузки из файла'}:{source:Conditions|ScenarioSource;label?:string}) {

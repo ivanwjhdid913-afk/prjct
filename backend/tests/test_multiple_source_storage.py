@@ -87,7 +87,7 @@ def test_0005_preserves_legacy_snapshots_and_blocks_multiple_source_downgrade():
         assert rejected.returncode!=0
         assert 'saved multiple-source scenarios exist' in rejected.stderr
         with engine.connect() as connection:
-            assert connection.scalar(text('SELECT version_num FROM alembic_version'))=='0005'
+            assert connection.scalar(text('SELECT version_num FROM alembic_version'))=='0006'
             assert connection.scalar(text('SELECT conditions FROM saved_scenarios WHERE id=:id'),{'id':ids[0]})==sent['conditions']
         with engine.begin() as connection:
             connection.execute(text('DELETE FROM saved_scenarios WHERE id=:id'),{'id':ids[0]})

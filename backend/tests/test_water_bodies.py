@@ -82,7 +82,7 @@ def test_database_rejects_invalid_objects(session, name, kind):
 
 
 def test_migration_and_postgis_are_present(session):
-    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0005"
+    assert session.scalar(text("SELECT version_num FROM alembic_version")) == "0006"
     assert session.scalar(text("SELECT postgis_version()"))
 
 

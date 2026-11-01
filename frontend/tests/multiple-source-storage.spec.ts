@@ -22,7 +22,7 @@ expect(metadata.scenarios[0].inputs.sources).toEqual(conditions.sources);expect(
 });
 
 test('unknown multi-source versions remain readable as incompatible previews',()=>{
- const doc=documentFromSaved(saved);expect(validDocument({...doc,format_version:4})).toBe(true);
+ const doc=documentFromSaved(saved);expect(validDocument({...doc,format_version:5})).toBe(true);
  expect(validDocument({...doc,model_id:'future-model'})).toBe(true);expect(validSaved({...saved,model_id:'future-model'})).toBe(false);
 });
 

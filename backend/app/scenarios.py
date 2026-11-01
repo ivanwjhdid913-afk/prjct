@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_serializer, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -17,10 +17,55 @@ from app.models import SavedScenario
 from app.river import prepared_reach
 from app.simulation import SimulationRequest
 from app.multiple_simulation import MultipleSimulationRequest, validate_multiple_geometry
-from app.scenario_versions import FORMAT_VERSION, MODEL_ID, MULTIPLE_FORMAT_VERSION, MULTIPLE_MODEL_ID, RIVER_VERSION, SYNTHETIC_VERSION
+from app.scenario_versions import ANALYSIS_FORMAT_VERSION, FORMAT_VERSION, MODEL_ID, MULTIPLE_FORMAT_VERSION, MULTIPLE_MODEL_ID, RIVER_VERSION, SYNTHETIC_VERSION
 
 MAX_BODY_BYTES = 8192
 router = APIRouter(prefix='/api/v1/scenarios', tags=['saved conditions'])
+
+
+class ControlPoint(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+
+    id: str = Field(pattern=r'^[A-Za-z0-9_-]{1,64}$')
+    name: str = Field(min_length=1, max_length=80)
+    segment_index: int = Field(ge=0, le=99)
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def trim_name(cls, value):
+        if isinstance(value, str):
+            if any(ord(char) < 32 or 127 <= ord(char) <= 159 for char in value):
+                raise ValueError('Название точки не должно содержать управляющие символы.')
+            return value.strip()
+        return value
+
+
+class AnalysisSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True, allow_inf_nan=False)
+
+    points: list[ControlPoint] = Field(max_length=5)
+    threshold_mg_l: float | None = Field(ge=0)
+
+    @model_validator(mode='after')
+    def unique_and_bounded(self):
+        if len({point.id for point in self.points}) != len(self.points):
+            raise ValueError('Идентификаторы контрольных точек не должны повторяться.')
+        if len({point.segment_index for point in self.points}) != len(self.points):
+            raise ValueError('Один сегмент можно закрепить только один раз.')
+        if len(json.dumps(self.model_dump(mode='json'), ensure_ascii=False).encode('utf-8')) > 4096:
+            raise ValueError('Настройки анализа превышают 4096 байт.')
+        return self
+
+
+def validate_analysis_format(format_version, conditions, analysis_settings):
+    """Format 4 adds analysis only; formats 1–3 retain their original physics."""
+    if format_version == ANALYSIS_FORMAT_VERSION:
+        if not isinstance(conditions, MultipleSimulationRequest):
+            raise ValueError('Формат 4 предназначен для условий нескольких источников.')
+        if analysis_settings is None:
+            raise ValueError('Формат 4 требует явных настроек analysis_settings.')
+    elif analysis_settings is not None:
+        raise ValueError('Настройки анализа требуют формат условий версии 4.')
 
 
 class ScenarioCreate(BaseModel):
@@ -32,6 +77,7 @@ class ScenarioCreate(BaseModel):
     geometry_version: str = Field(max_length=64)
     geometry_sha256: str | None = Field(pattern='^[0-9a-f]{64}$')
     conditions: SimulationRequest | MultipleSimulationRequest
+    analysis_settings: AnalysisSettings | None = None
 
     @field_validator('name', mode='before')
     @classmethod
@@ -45,7 +91,7 @@ class ScenarioCreate(BaseModel):
     @field_validator('format_version')
     @classmethod
     def supported_format(cls, value):
-        if value not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION):
+        if value not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION, ANALYSIS_FORMAT_VERSION):
             raise ValueError('Не поддерживается версия формата сценария.')
         return value
 
@@ -66,8 +112,9 @@ class ScenarioCreate(BaseModel):
     @model_validator(mode='after')
     def matching_model(self):
         multiple = isinstance(self.conditions, MultipleSimulationRequest)
-        if (multiple and (self.format_version != MULTIPLE_FORMAT_VERSION or self.model_id != MULTIPLE_MODEL_ID)
-                or not multiple and (self.format_version == MULTIPLE_FORMAT_VERSION or self.model_id != MODEL_ID)):
+        validate_analysis_format(self.format_version, self.conditions, self.analysis_settings)
+        if (multiple and (self.format_version not in (MULTIPLE_FORMAT_VERSION, ANALYSIS_FORMAT_VERSION) or self.model_id != MULTIPLE_MODEL_ID)
+                or not multiple and (self.format_version in (MULTIPLE_FORMAT_VERSION, ANALYSIS_FORMAT_VERSION) or self.model_id != MODEL_ID)):
             raise ValueError('Формат и модель должны соответствовать физической постановке условий.')
         return self
 
@@ -96,7 +143,15 @@ class ScenarioDetail(ScenarioSummary):
     reach_id: str | None
     geometry_source: dict
     conditions: dict
+    analysis_settings: AnalysisSettings | None = None
     compatibility: Compatibility
+
+    @model_serializer(mode='wrap')
+    def preserve_legacy_snapshot(self, handler):
+        value = handler(self)
+        if self.analysis_settings is None:
+            value.pop('analysis_settings', None)
+        return value
 
 
 class ScenarioPage(BaseModel):
@@ -137,14 +192,14 @@ def compatibility(row: SavedScenario) -> Compatibility:
                                     geometry_mode=row.geometry_mode, geometry_version=row.geometry_version,
                                     geometry_sha256=row.geometry_sha256,
                                     downstream_geometry_sha256=row.downstream_geometry_sha256,
-                                    reach_id=row.reach_id, conditions=row.conditions)
+                                    reach_id=row.reach_id, conditions=row.conditions, analysis_settings=row.analysis_settings)
 
 
 def conditions_compatibility(*, format_version, model_id, geometry_mode, geometry_version,
-                             geometry_sha256, downstream_geometry_sha256, reach_id, conditions) -> Compatibility:
+                             geometry_sha256, downstream_geometry_sha256, reach_id, conditions, analysis_settings=None) -> Compatibility:
     """One compatibility policy for saved records and untrusted portable files."""
     reasons = []
-    if format_version not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION):
+    if format_version not in (1, FORMAT_VERSION, MULTIPLE_FORMAT_VERSION, ANALYSIS_FORMAT_VERSION):
         reasons.append('Версия формата сценария не поддерживается; исходная запись сохранена.')
     expected_model = MULTIPLE_MODEL_ID if isinstance(conditions,dict) and 'sources' in conditions else MODEL_ID
     if model_id != expected_model:
@@ -152,6 +207,8 @@ def conditions_compatibility(*, format_version, model_id, geometry_mode, geometr
     try:
         validate_versioned_load(format_version, conditions)
         parameters = (MultipleSimulationRequest if isinstance(conditions,dict) and 'sources' in conditions else SimulationRequest).model_validate(conditions)
+        parsed_analysis = AnalysisSettings.model_validate(analysis_settings) if analysis_settings is not None else None
+        validate_analysis_format(format_version, parameters, parsed_analysis)
         if parameters.reach_id != reach_id or (parameters.reach_id is not None) != (geometry_mode == 'river'):
             raise ValueError('Сведения о геометрии и условия записи не согласованы.')
         reach = current_geometry(parameters, geometry_version, geometry_sha256)
@@ -172,8 +229,8 @@ def validate_versioned_load(format_version, conditions):
         raise ValueError('Условия должны быть объектом.')
     if 'sources' in conditions and format_version in (1, FORMAT_VERSION):
         raise ValueError('Несколько источников требуют формат условий версии 3 и новую модель.')
-    if format_version == MULTIPLE_FORMAT_VERSION and 'sources' not in conditions:
-        raise ValueError('Формат 3 требует полного списка источников новой модели.')
+    if format_version in (MULTIPLE_FORMAT_VERSION, ANALYSIS_FORMAT_VERSION) and 'sources' not in conditions:
+        raise ValueError(f'Формат {format_version} требует полного списка источников новой модели.')
     if format_version == 1:
         if conditions.get('load_mode') == 'profile':
             raise ValueError('График нагрузки требует формат условий версии 2.')
@@ -187,7 +244,7 @@ def detail(row: SavedScenario) -> ScenarioDetail:
                           geometry_version=row.geometry_version, geometry_sha256=row.geometry_sha256,
                           downstream_geometry_sha256=row.downstream_geometry_sha256,
                           reach_id=row.reach_id, geometry_source=row.geometry_source,
-                          conditions=row.conditions, compatibility=compatibility(row))
+                          conditions=row.conditions, analysis_settings=row.analysis_settings, compatibility=compatibility(row))
 
 
 def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
@@ -214,6 +271,7 @@ def persist(data: ScenarioCreate, session: Session) -> ScenarioDetail:
         downstream_geometry_sha256=metadata.get('downstream_geometry_sha256'),
         reach_id=data.conditions.reach_id, reach_name=reach['name'] if reach else 'Синтетический участок',
         load_mode='multiple' if isinstance(data.conditions, MultipleSimulationRequest) else data.conditions.load_mode, conditions=stored_conditions,
+        analysis_settings=data.analysis_settings.model_dump(mode='json') if data.analysis_settings is not None else None,
         geometry_source={key: metadata[key] for key in source_keys if key in metadata},
     )
     try:
