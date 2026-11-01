@@ -15,7 +15,7 @@ async function mock(page: Page, result: unknown) {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
   await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [reach] } }));
   await page.route('**/api/v1/simulations', route => route.fulfill({ json: result }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('1000');
@@ -104,7 +104,7 @@ test('resolution metadata explains the numerical reference and rejects exceeded 
 
 test('real five-second finite load exposes the preserved near-source peak and downstream transport', async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('500');
   await page.getByLabel('Длительность, ч').fill('1');

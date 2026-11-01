@@ -20,7 +20,7 @@ test('opens conditions without calculating and saves edited form as a new immuta
   let calculations = 0;
   page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; });
   await page.route('**/api/v1/scenarios', route => route.fulfill({ status: 201, json: { ...saved, ...route.request().postDataJSON(), id: '00000000-0000-4000-8000-000000000002' } }));
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
   await expect(page.getByLabel('Геометрия сценария')).toHaveValue('synthetic');
   await expect(page.getByLabel('Длительность, ч')).toHaveValue('0.1');
@@ -37,7 +37,7 @@ test('opens conditions without calculating and saves edited form as a new immuta
 
 test('database errors never report success and permit retry', async ({ page }) => {
   await page.route('**/api/v1/scenarios', route => route.fulfill({ status: 503, json: { detail: 'База данных временно недоступна.' } }));
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Открыть «Короткий период»' }).click();
   await page.getByLabel('Название сохраняемых условий').fill('Ошибка');
   await page.getByRole('button', { name: 'Сохранить как новый сценарий', exact: true }).click();
@@ -49,7 +49,7 @@ test('database errors never report success and permit retry', async ({ page }) =
 for (const reason of ['Геометрия участка изменилась.', 'Участок удалён.', 'Версия модели не поддерживается.', 'Версия формата не поддерживается.']) {
   test(`incompatible record remains accessible without restoring form: ${reason}`, async ({ page }) => {
     await page.route(`**/api/v1/scenarios/${id}`, route => route.fulfill({ json: { ...saved, compatibility: { compatible: false, reasons: [reason] } } }));
-    await page.goto('/#model'); await library(page);
+    await page.goto('/#model/legacy'); await library(page);
     await page.getByRole('button', { name: 'Открыть «Короткий период»' }).click();
     await expect(page.getByTestId('library-error')).toContainText(reason);
     await expect(page.getByLabel('Геометрия сценария')).toHaveValue('river');
@@ -61,7 +61,7 @@ test('late open cannot replace edits made while waiting', async ({ page }) => {
   await page.addInitScript(() => { const fetch = window.fetch; window.fetch = (input, options) => fetch(input, typeof input === 'string' && input.includes('/scenarios/') ? { ...options, signal: undefined } : options); });
   let release!: () => void;
   await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Открыть «Короткий период»' }).click();
   await expect.poll(() => !!release).toBeTruthy();
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('123');
@@ -74,7 +74,7 @@ test('late open cannot replace edits made while waiting', async ({ page }) => {
 test('empty or incomplete form is rejected without posting a record', async ({ page }) => {
   let writes = 0;
   page.on('request', r => { if (r.url().endsWith('/scenarios') && r.method() === 'POST') writes++; });
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByLabel('Название сохраняемых условий').fill('Незавершённый');
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('');
   await page.getByRole('button', { name: 'Сохранить как новый сценарий', exact: true }).click();
@@ -85,7 +85,7 @@ test('empty or incomplete form is rejected without posting a record', async ({ p
 test('list is paginated and supports retry without opening a large permanent table', async ({ page }) => {
   const urls: string[] = [];
   await page.route('**/api/v1/scenarios?*', route => { urls.push(route.request().url()); return route.fulfill({ json: { items: [saved], total: 21, limit: 20, offset: new URL(route.request().url()).searchParams.get('offset') === '20' ? 20 : 0 } }); });
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Следующие сохранённые условия' }).click();
   await expect.poll(() => urls.some(url => url.includes('offset=20'))).toBeTruthy();
   await expect(page.getByRole('table')).toHaveCount(0);
@@ -96,7 +96,7 @@ test('list is paginated and supports retry without opening a large permanent tab
 test('opening a delayed variant respects A pinned while the record was loading', async ({ page }) => {
   let release!: () => void;
   await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('500');
   await page.getByLabel('Длительность, ч').fill('.1');
@@ -118,7 +118,7 @@ test('a cancelled open ignores a late response and can be retried', async ({ pag
   await page.addInitScript(() => { const fetch = window.fetch; window.fetch = (input, options) => fetch(input, typeof input === 'string' && input.includes('/scenarios/') ? { ...options, signal: undefined } : options); });
   let release!: () => void;
   await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
   await expect.poll(() => !!release).toBeTruthy();
   await page.getByRole('button', { name: 'Отменить ожидание библиотеки', exact: true }).click();
@@ -134,7 +134,7 @@ test('Enter in the saved name saves conditions instead of submitting a calculati
   let calculations = 0, saves = 0;
   page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; });
   await page.route('**/api/v1/scenarios', route => { saves++; return route.fulfill({ status: 201, json: { ...saved, ...route.request().postDataJSON() } }); });
-  await page.goto('/#model'); await library(page);
+  await page.goto('/#model/legacy'); await library(page);
   await page.getByRole('button', { name: 'Открыть «Короткий период»', exact: true }).click();
   await expect(page.getByTestId('library-status')).toContainText('Открыты условия');
   await expect(page.getByRole('button', { name: 'Сохранить как новый сценарий', exact: true })).toBeEnabled();

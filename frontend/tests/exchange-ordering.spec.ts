@@ -9,7 +9,7 @@ test('creating B with unchanged A conditions supersedes an older library open wi
   await page.route('**/api/v1/scenarios?*', route => route.fulfill({ json: { items: [saved], total: 1, limit: 20, offset: 0 } }));
   let release!: () => void;
   await page.route(`**/api/v1/scenarios/${id}`, async route => { await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: saved }); });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   const response = page.waitForResponse(reply => reply.url().endsWith('/api/v1/simulations'));
   await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
   const baseline = await (await response).json();
@@ -48,7 +48,7 @@ test('an explicitly applied same-form import supersedes an older library open', 
   await page.route('**/api/v1/scenario-files/validate', route => route.fulfill({ json: { document: route.request().postDataJSON(), compatibility: { compatible: true, reasons: [] } } }));
   let calculations = 0, writes = 0;
   page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; if (request.url().endsWith('/scenarios') && request.method() === 'POST') writes++; });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.getByLabel('Подготовленный участок')).toHaveValue(reach.id);
   await page.locator('.saved-scenarios summary').click();
   await page.getByLabel('Название сохраняемых условий').fill('Текущие условия для переноса');

@@ -1,85 +1,362 @@
-import { memo, useEffect, useMemo, useState } from 'react';
-import { valuesAtHour } from './scenarioComparison';
+import { memo, useEffect, useMemo, useState } from "react";
+import { valuesAtHour } from "./scenarioComparison";
+import type { ExceedanceInterval } from "./controlPointAnalysis";
 
 type Series = { times_hours: number[]; concentrations_mg_l: number[][] };
 type Props = {
-  result: Series; a: Series | null; b: Series | null;
-  distances: number[]; selected: number; onSelect: (index: number) => void;
-  hour: number; duration: number; scale: [number, number]; background: number; onSeek: (hour: number) => void;
+  result: Series;
+  a: Series | null;
+  b: Series | null;
+  distances: number[];
+  selected: number;
+  onSelect: (index: number) => void;
+  hour: number;
+  duration: number;
+  scale: [number, number];
+  background: number;
+  onSeek: (hour: number) => void;
+  thresholdMgL?: number | null;
+  exceedanceIntervals?: ExceedanceInterval[];
+  comparisonExceedanceIntervals?: ExceedanceInterval[];
 };
-const number = (value: number, digits = 4) => value.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const number = (value: number, digits = 4) =>
+  value.toLocaleString("ru-RU", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 
 const TABLE_PAGE_SIZE = 100;
-const TemporalTable = memo(function TemporalTable({ primary, secondary, selected }: { primary: Series; secondary: Series | null; selected: number }) {
+const TemporalTable = memo(function TemporalTable({
+  primary,
+  secondary,
+  selected,
+}: {
+  primary: Series;
+  secondary: Series | null;
+  selected: number;
+}) {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
   // Keep every saved event, even when two timestamps are extremely close.
-  const times = useMemo(() => secondary
-    ? [...new Set([...primary.times_hours, ...secondary.times_hours])].sort((a, b) => a - b)
-    : primary.times_hours, [primary, secondary]);
+  const times = useMemo(
+    () =>
+      secondary
+        ? [...new Set([...primary.times_hours, ...secondary.times_hours])].sort(
+            (a, b) => a - b,
+          )
+        : primary.times_hours,
+    [primary, secondary],
+  );
   useEffect(() => setPage(0), [times]);
   const pages = Math.ceil(times.length / TABLE_PAGE_SIZE);
   const currentPage = Math.min(page, pages - 1);
   const first = currentPage * TABLE_PAGE_SIZE;
-  const rows = useMemo(() => open ? times.slice(first, first + TABLE_PAGE_SIZE).map(time => ({
-    time,
-    primary: valuesAtHour(primary, time)[selected],
-    secondary: secondary ? valuesAtHour(secondary, time)[selected] : null,
-  })) : [], [open, times, first, primary, secondary, selected]);
+  const rows = useMemo(
+    () =>
+      open
+        ? times.slice(first, first + TABLE_PAGE_SIZE).map((time) => ({
+            time,
+            primary: valuesAtHour(primary, time)[selected],
+            secondary: secondary
+              ? valuesAtHour(secondary, time)[selected]
+              : null,
+          }))
+        : [],
+    [open, times, first, primary, secondary, selected],
+  );
 
-  return <details onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>Таблица C(t)</summary>
-    {open && <>
-      {secondary && <p className="temporal-table-note">Все сохранённые моменты А и Б. Между ними значения каждого сценария интерполированы.</p>}
-      <nav className="temporal-table-pagination" aria-label="Страницы таблицы C(t)">
-        <p role="status" data-testid="temporal-table-status">Строки {first + 1}–{Math.min(first + TABLE_PAGE_SIZE, times.length)} из {times.length} · Страница {currentPage + 1} / {pages}</p>
-        <button type="button" aria-label="Предыдущая страница C(t)" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Назад</button>
-        <button type="button" aria-label="Следующая страница C(t)" disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>Далее</button>
-      </nav>
-      <div className="simulation-table temporal-table"><table aria-label="Концентрация сегмента во времени">
-        <thead><tr><th scope="col">Время</th>{secondary ? <><th scope="col">А, мг/л</th><th scope="col">Б, мг/л</th></> : <th scope="col">Концентрация, мг/л</th>}</tr></thead>
-        <tbody>{rows.map(row => <tr key={row.time}>
-          <td><span>{(row.time * 3600).toLocaleString('ru-RU', { maximumFractionDigits: 3 })} с</span><small><span className="temporal-table-hour">{String(row.time).replace('.', ',')}</span> ч</small></td><td>{number(row.primary)}</td>{row.secondary !== null && <td>{number(row.secondary)}</td>}
-        </tr>)}</tbody>
-      </table></div>
-    </>}
-  </details>;
+  return (
+    <details onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>Таблица C(t)</summary>
+      {open && (
+        <>
+          {secondary && (
+            <p className="temporal-table-note">
+              Все сохранённые моменты А и Б. Между ними значения каждого
+              сценария интерполированы.
+            </p>
+          )}
+          <nav
+            className="temporal-table-pagination"
+            aria-label="Страницы таблицы C(t)"
+          >
+            <p role="status" data-testid="temporal-table-status">
+              Строки {first + 1}–
+              {Math.min(first + TABLE_PAGE_SIZE, times.length)} из{" "}
+              {times.length} · Страница {currentPage + 1} / {pages}
+            </p>
+            <button
+              type="button"
+              aria-label="Предыдущая страница C(t)"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Назад
+            </button>
+            <button
+              type="button"
+              aria-label="Следующая страница C(t)"
+              disabled={currentPage === pages - 1}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Далее
+            </button>
+          </nav>
+          <div className="simulation-table temporal-table">
+            <table aria-label="Концентрация сегмента во времени">
+              <thead>
+                <tr>
+                  <th scope="col">Время</th>
+                  {secondary ? (
+                    <>
+                      <th scope="col">А, мг/л</th>
+                      <th scope="col">Б, мг/л</th>
+                    </>
+                  ) : (
+                    <th scope="col">Концентрация, мг/л</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.time}>
+                    <td>
+                      <span>
+                        {(row.time * 3600).toLocaleString("ru-RU", {
+                          maximumFractionDigits: 3,
+                        })}{" "}
+                        с
+                      </span>
+                      <small>
+                        <span className="temporal-table-hour">
+                          {String(row.time).replace(".", ",")}
+                        </span>{" "}
+                        ч
+                      </small>
+                    </td>
+                    <td>{number(row.primary)}</td>
+                    {row.secondary !== null && <td>{number(row.secondary)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </details>
+  );
 });
 
-export default function TemporalProfile({ result, a, b, distances, selected, onSelect, hour, duration, scale, background, onSeek }: Props) {
-  const x = (time: number) => 85 + 645 * time / duration;
-  const y = (value: number) => scale[1] === scale[0] ? 110 : 190 - 160 * (value - scale[0]) / (scale[1] - scale[0]);
-  const points = (series: Series) => series.times_hours.map((time, index) => `${x(time)},${y(series.concentrations_mg_l[index][selected])}`).join(' ');
+export default function TemporalProfile({
+  result,
+  a,
+  b,
+  distances,
+  selected,
+  onSelect,
+  hour,
+  duration,
+  scale,
+  background,
+  onSeek,
+  thresholdMgL = null,
+  exceedanceIntervals = [],
+  comparisonExceedanceIntervals = [],
+}: Props) {
+  const x = (time: number) => 85 + (645 * time) / duration;
+  const plotMinimum =
+    thresholdMgL === null ? scale[0] : Math.min(scale[0], thresholdMgL);
+  const plotMaximum =
+    thresholdMgL === null ? scale[1] : Math.max(scale[1], thresholdMgL);
+  const y = (value: number) =>
+    plotMaximum === plotMinimum
+      ? 110
+      : 190 - 160 * ((value - plotMinimum) / (plotMaximum - plotMinimum));
+  const points = (series: Series) =>
+    series.times_hours
+      .map(
+        (time, index) =>
+          `${x(time)},${y(series.concentrations_mg_l[index][selected])}`,
+      )
+      .join(" ");
   const current = valuesAtHour(result, hour)[selected];
-  const series = result.concentrations_mg_l.map(row => row[selected]);
-  const minimum = Math.min(...series), maximum = Math.max(...series);
+  const series = result.concentrations_mg_l.map((row) => row[selected]);
+  const minimum = Math.min(...series),
+    maximum = Math.max(...series);
   const flat = maximum === minimum;
   const isMinimum = background - minimum > maximum - background;
   const extremum = isMinimum ? minimum : maximum;
   const extremumHour = result.times_hours[series.indexOf(extremum)];
-  return <section className="simulation-profile temporal-profile" aria-labelledby="temporal-title">
-    <h3 id="temporal-title">Концентрация во времени C(t)</h3>
-    <label htmlFor="temporal-segment">Сегмент для графика времени</label>
-    <select id="temporal-segment" value={selected} onChange={event => onSelect(Number(event.target.value))}>
-      {distances.map((distance, index) => <option key={index} value={index}>{index + 1} · {number(distance, 0)} м</option>)}
-    </select>
-    <p className="temporal-reading"><strong data-testid="temporal-current">{number(current)} мг/л</strong><span>{number(hour, 6)} ч · {number(distances[selected], 0)} м</span></p>
-    <div className="temporal-extremum" data-testid="temporal-extremum">
-      {flat ? <p>{maximum === background ? 'Отклонения от фона нет. Выраженного экстремума нет.' : 'Концентрация постоянна. Выраженного экстремума нет.'}</p> : <>
-        <p>Расчётная оценка · {isMinimum ? 'минимум' : 'максимум'}<br /><strong>{number(extremum, 6)} мг/л</strong> · {number(extremumHour * 3600, 3)} с</p>
-        <button type="button" onClick={() => onSeek(extremumHour)}>{isMinimum ? 'Перейти к минимуму' : 'Перейти к максимуму'}</button>
-      </>}
-    </div>
-    <svg viewBox="0 0 760 235" role="img" aria-label="Концентрация выбранного сегмента во времени; вертикальная линия показывает текущий момент.">
-      <path d="M85 25V195H735" fill="none" stroke="currentColor" />
-      {a && b ? <><polyline data-testid="temporal-a" points={points(a)} fill="none" stroke="#2367a1" strokeWidth="3" /><polyline data-testid="temporal-b" points={points(b)} fill="none" stroke="#b54b35" strokeWidth="3" strokeDasharray="8 4" /></> : <polyline data-testid="temporal-curve" points={points(result)} fill="none" stroke="var(--accent)" strokeWidth="3" />}
-      <line data-testid="temporal-cursor" data-hour={hour} x1={x(hour)} x2={x(hour)} y1="25" y2="195" stroke="var(--ink)" strokeWidth="2" strokeDasharray="4 4" />
-      <circle cx={x(hour)} cy={y(current)} r="5" fill="var(--ink)" />
-      <text x="85" y="17">мг/л</text>
-      {scale[1] === scale[0] ? <text x="75" y="114" textAnchor="end">{number(scale[0], 1)}</text> : <><text x="75" y="34" textAnchor="end">{number(scale[1], 1)}</text><text x="75" y="194" textAnchor="end">{number(scale[0], 1)}</text></>}
-      <text x="85" y="220">0</text><text x="730" y="220" textAnchor="end">{number(duration, 2)} ч</text>
-    </svg>
-    {a && b && <p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}
-    <TemporalTable primary={a && b ? a : result} secondary={a && b ? b : null} selected={selected} />
-  </section>;
+  return (
+    <section
+      className="simulation-profile temporal-profile"
+      aria-labelledby="temporal-title"
+    >
+      <h3 id="temporal-title">Концентрация во времени C(t)</h3>
+      <label htmlFor="temporal-segment">Сегмент для графика времени</label>
+      <select
+        id="temporal-segment"
+        value={selected}
+        onChange={(event) => onSelect(Number(event.target.value))}
+      >
+        {distances.map((distance, index) => (
+          <option key={index} value={index}>
+            {index + 1} · {number(distance, 0)} м
+          </option>
+        ))}
+      </select>
+      <p className="temporal-reading">
+        <strong data-testid="temporal-current">{number(current)} мг/л</strong>
+        <span>
+          {number(hour, 6)} ч · {number(distances[selected], 0)} м
+        </span>
+      </p>
+      <div className="temporal-extremum" data-testid="temporal-extremum">
+        {flat ? (
+          <p>
+            {maximum === background
+              ? "Отклонения от фона нет. Выраженного экстремума нет."
+              : "Концентрация постоянна. Выраженного экстремума нет."}
+          </p>
+        ) : (
+          <>
+            <p>
+              Расчётная оценка · {isMinimum ? "минимум" : "максимум"}
+              <br />
+              <strong>{number(extremum, 6)} мг/л</strong> ·{" "}
+              {number(extremumHour * 3600, 3)} с
+            </p>
+            <button type="button" onClick={() => onSeek(extremumHour)}>
+              {isMinimum ? "Перейти к минимуму" : "Перейти к максимуму"}
+            </button>
+          </>
+        )}
+      </div>
+      <svg
+        viewBox="0 0 760 235"
+        role="img"
+        aria-label="Концентрация выбранного сегмента во времени; вертикальная линия показывает текущий момент."
+      >
+        {exceedanceIntervals.map((interval, index) => (
+          <rect
+            key={`primary-${index}`}
+            data-testid="temporal-exceedance-primary"
+            x={x(interval.start_hours)}
+            width={x(interval.end_hours) - x(interval.start_hours)}
+            y="25"
+            height={a && b ? 82 : 170}
+            fill={a && b ? "#2367a1" : "#ad7448"}
+            fillOpacity=".13"
+          />
+        ))}
+        {a &&
+          b &&
+          comparisonExceedanceIntervals.map((interval, index) => (
+            <rect
+              key={`comparison-${index}`}
+              data-testid="temporal-exceedance-comparison"
+              x={x(interval.start_hours)}
+              width={x(interval.end_hours) - x(interval.start_hours)}
+              y="110"
+              height="85"
+              fill="#b54b35"
+              fillOpacity=".15"
+            />
+          ))}
+        <path d="M85 25V195H735" fill="none" stroke="currentColor" />
+        {thresholdMgL !== null && (
+          <line
+            data-testid="temporal-threshold"
+            data-threshold={thresholdMgL}
+            x1="85"
+            x2="735"
+            y1={y(thresholdMgL)}
+            y2={y(thresholdMgL)}
+            stroke="#805120"
+            strokeWidth="2"
+            strokeDasharray="6 5"
+          />
+        )}
+        {a && b ? (
+          <>
+            <polyline
+              data-testid="temporal-a"
+              points={points(a)}
+              fill="none"
+              stroke="#2367a1"
+              strokeWidth="3"
+            />
+            <polyline
+              data-testid="temporal-b"
+              points={points(b)}
+              fill="none"
+              stroke="#b54b35"
+              strokeWidth="3"
+              strokeDasharray="8 4"
+            />
+          </>
+        ) : (
+          <polyline
+            data-testid="temporal-curve"
+            points={points(result)}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="3"
+          />
+        )}
+        <line
+          data-testid="temporal-cursor"
+          data-hour={hour}
+          x1={x(hour)}
+          x2={x(hour)}
+          y1="25"
+          y2="195"
+          stroke="var(--ink)"
+          strokeWidth="2"
+          strokeDasharray="4 4"
+        />
+        <circle cx={x(hour)} cy={y(current)} r="5" fill="var(--ink)" />
+        <text x="85" y="17">
+          мг/л
+        </text>
+        {plotMaximum === plotMinimum ? (
+          <text x="75" y="114" textAnchor="end">
+            {number(plotMinimum, 1)}
+          </text>
+        ) : (
+          <>
+            <text x="75" y="34" textAnchor="end">
+              {number(plotMaximum, 1)}
+            </text>
+            <text x="75" y="194" textAnchor="end">
+              {number(plotMinimum, 1)}
+            </text>
+          </>
+        )}
+        <text x="85" y="220">
+          0
+        </text>
+        <text x="730" y="220" textAnchor="end">
+          {number(duration, 2)} ч
+        </text>
+      </svg>
+      {a && b && (
+        <p className="profile-comparison-key">
+          <span>А — сплошная синяя</span>
+          <span>Б — пунктирная терракотовая</span>
+        </p>
+      )}
+      {thresholdMgL !== null && (
+        <p className="temporal-table-note">
+          Пунктир — пользовательский порог {number(thresholdMgL)} мг/л. Заливка
+          — периоды C(t) &gt; порога{a && b ? ": А сверху, Б снизу" : ""}.
+        </p>
+      )}
+      <TemporalTable
+        primary={a && b ? a : result}
+        secondary={a && b ? b : null}
+        selected={selected}
+      />
+    </section>
+  );
 }

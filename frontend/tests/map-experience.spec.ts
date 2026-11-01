@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 
 test('opens a map-first Don workspace with the timeline in the laptop viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.getByLabel('Геометрия сценария')).toHaveValue('river');
   await expect(page.getByLabel('Подготовленный участок')).toContainText('Дон');
   await expect(page.locator('.scenario-source-marker')).toBeVisible();
@@ -20,7 +20,7 @@ test('opens a map-first Don workspace with the timeline in the laptop viewport',
 
 test('explicit demonstration runs a four-hour preset and preserves the map view during playback', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByLabel('Концентрация стоков ce, мг/л').fill('321');
   const response = page.waitForResponse(r => r.url().endsWith('/api/v1/simulations'));
   await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
@@ -53,7 +53,7 @@ test('explicit demonstration runs a four-hour preset and preserves the map view 
 
 test('mobile panels collapse without losing access to the map and timeline', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.locator('.scenario-source-marker')).toBeVisible();
   await expect(page.getByLabel('Время от начала сценария')).toBeInViewport();
   const toggle = page.getByRole('button', { name: 'Параметры', exact: true });
@@ -69,7 +69,7 @@ test('mobile panels collapse without losing access to the map and timeline', asy
 
 test('mobile profile moves keyboard focus into the panel and leaves timeline accessible', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.locator('.scenario-badge')).toBeVisible();
   await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
   const open = page.getByRole('button', { name: 'Профиль и показатели', exact: true });
@@ -83,7 +83,7 @@ test('mobile profile moves keyboard focus into the panel and leaves timeline acc
 
 test('short mobile viewport keeps the river legible above its inspector', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
   await expect(page.locator('.simulation-segment')).toHaveCount(100);
   const bounds = await page.locator('.simulation-segment').evaluateAll(elements => {

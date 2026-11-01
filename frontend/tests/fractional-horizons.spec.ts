@@ -4,7 +4,7 @@ import { concentrationsAt, openParameters, openProfile } from './model-helpers';
 for (const geometry of ['river', 'synthetic']) for (const duration of [.1, .2, .4, .7, 6.1]) {
   test(`actual API accepts ${duration} hours in ${geometry}, continuous and finite A/B`, async ({ page }) => {
     await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-    await page.goto('/#model'); await openParameters(page);
+    await page.goto('/#model/legacy'); await openParameters(page);
     await page.getByLabel('Геометрия сценария').selectOption(geometry);
     if (geometry === 'synthetic') await page.getByLabel('Длина участка L, м').fill('1000');
     await page.getByLabel('Длительность, ч', { exact: true }).fill(String(duration));
@@ -45,7 +45,7 @@ for (const geometry of ['river', 'synthetic']) for (const duration of [.1, .2, .
 
 test('finite pulse distinguishes numerical accuracy from saved trajectory accuracy', async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('1000');
   await page.getByLabel('Длительность, ч', { exact: true }).fill('1');

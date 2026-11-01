@@ -1,133 +1,1726 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import './simulation.css';
-import './multipleSources.css';
-import MultipleSourceMap from './MultipleSourceMap';
-import TemporalProfile from './TemporalProfile';
-import ResultExports from './ResultExports';
-import SavedScenarios from './SavedScenarios';
-import LoadProfileEditor from './LoadProfileEditor';
-import LoadProfileChart from './LoadProfileChart';
-import { intervalDrafts } from './loadProfileDraft';
-import { sourceConcentrationAt, sourceEvents, validLoadProfile } from './loadProfile';
-import { valuesAtHour, sharedScale } from './scenarioComparison';
-import { MULTIPLE_FORMAT, MULTIPLE_MODEL_ID, RIVER_VERSION, isMultipleConditions, type SavePayload, type MultipleConditions } from './scenarioStorage';
-import type { ConditionsDocument } from './scenarioExchange';
-import { buildMultipleConditions, draftsFromSources, multipleComparisonReason, newSourceDraft, sharedInitial, validMultipleResult, validReach, validCoordinate, type MultipleInputs, type MultipleResult, type Reach, type RestorableConditions, type ScenarioSource, type SharedDraft, type SharedKey, type SourceDraft } from './multipleSources';
-const commonFields:{key:SharedKey;label:string;min:number;max:number}[]=[
- {key:'river_flow_m3_s',label:'Расход реки выше всех источников Qr, м³/с',min:.1,max:1000},
- {key:'background_mg_l',label:'Фоновая концентрация cb, мг/л',min:0,max:10000},
- {key:'velocity_m_s',label:'Скорость течения u, м/с',min:.02,max:2},
- {key:'dispersion_m2_s',label:'Продольная дисперсия D, м²/с',min:.1,max:100},
- {key:'duration_hours',label:'Длительность, ч',min:.1,max:48},
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import "./simulation.css";
+import "./multipleSources.css";
+import MultipleSourceMap from "./MultipleSourceMap";
+import ControlPointsPanel from "./ControlPointsPanel";
+import ControlPointDownload from "./ControlPointDownload";
+import { useControlPointSettings } from "./useControlPointSettings";
+import { emptyAnalysisSettings, type ControlPoint } from "./analysisSettings";
+import { geometryScope } from "./controlPointSettings";
+import { analyzeSeries } from "./controlPointAnalysis";
+import TemporalProfile from "./TemporalProfile";
+import ResultExports from "./ResultExports";
+import SavedScenarios from "./SavedScenarios";
+import LoadProfileEditor from "./LoadProfileEditor";
+import LoadProfileChart from "./LoadProfileChart";
+import { intervalDrafts } from "./loadProfileDraft";
+import {
+  sourceConcentrationAt,
+  sourceEvents,
+  validLoadProfile,
+} from "./loadProfile";
+import { valuesAtHour, sharedScale } from "./scenarioComparison";
+import {
+  ANALYSIS_FORMAT,
+  MULTIPLE_MODEL_ID,
+  RIVER_VERSION,
+  isMultipleConditions,
+  type SavePayload,
+  type MultipleConditions,
+} from "./scenarioStorage";
+import type { ConditionsDocument } from "./scenarioExchange";
+import {
+  buildMultipleConditions,
+  draftsFromSources,
+  multipleComparisonReason,
+  newSourceDraft,
+  sharedInitial,
+  validMultipleResult,
+  validReach,
+  validCoordinate,
+  type MultipleInputs,
+  type MultipleResult,
+  type Reach,
+  type RestorableConditions,
+  type ScenarioSource,
+  type SharedDraft,
+  type SharedKey,
+  type SourceDraft,
+} from "./multipleSources";
+const commonFields: {
+  key: SharedKey;
+  label: string;
+  min: number;
+  max: number;
+}[] = [
+  {
+    key: "river_flow_m3_s",
+    label: "Расход реки выше всех источников Qr, м³/с",
+    min: 0.1,
+    max: 1000,
+  },
+  {
+    key: "background_mg_l",
+    label: "Фоновая концентрация cb, мг/л",
+    min: 0,
+    max: 10000,
+  },
+  { key: "velocity_m_s", label: "Скорость течения u, м/с", min: 0.02, max: 2 },
+  {
+    key: "dispersion_m2_s",
+    label: "Продольная дисперсия D, м²/с",
+    min: 0.1,
+    max: 100,
+  },
+  { key: "duration_hours", label: "Длительность, ч", min: 0.1, max: 48 },
 ];
-const number=(value:number,digits=4)=>value.toLocaleString('ru-RU',{minimumFractionDigits:digits,maximumFractionDigits:digits});
-const sourceLoad=(source:ScenarioSource,input:MultipleInputs)=>({...source,background_mg_l:input.background_mg_l,duration_hours:input.duration_hours});
-const sourceMetadata=(reach:Reach)=>Object.fromEntries(['name','source','source_url','attribution','license','license_url','crs','snapshot_date','osm_way_id','osm_way_version','osm_way_timestamp','raw_sha256'].filter(key=>key in reach.metadata).map(key=>[key,reach.metadata[key]]));
-function responseMessage(data:unknown){if(data&&typeof data==='object'&&'detail'in data){const detail=(data as {detail:unknown}).detail;if(typeof detail==='string')return detail;if(Array.isArray(detail))return detail.map(v=>typeof v?.msg==='string'?`${(v.loc??[]).slice(1).join(' · ')}: ${v.msg}`:'Некорректные условия.').join(' ');}return 'Сервер не смог выполнить расчёт. Повторите запрос.';}
-function sameInputs(a:MultipleInputs,b:MultipleInputs){return commonFields.every(f=>a[f.key]===b[f.key])&&a.reach_id===b.reach_id&&a.sources.length===b.sources.length&&a.sources.every((source,i)=>{const other=b.sources[i];return source.id===other.id&&source.name===other.name&&source.source_distance_m===other.source_distance_m&&source.effluent_flow_m3_s===other.effluent_flow_m3_s&&source.effluent_mg_l===other.effluent_mg_l&&source.load_mode===other.load_mode&&source.load_duration_hours===other.load_duration_hours&&(source.load_intervals===null?other.load_intervals===null:Array.isArray(other.load_intervals)&&source.load_intervals.length===other.load_intervals.length&&source.load_intervals.every((row,j)=>row.start_hours===other.load_intervals![j].start_hours&&row.end_hours===other.load_intervals![j].end_hours&&row.effluent_mg_l===other.load_intervals![j].effluent_mg_l));});}
-function inputOf(result:MultipleResult):MultipleInputs{const {length_m:_,...input}=result.inputs;return structuredClone(input);}
-function SpatialProfile({result,a,b,hour,selected,onSelect,scale}:{result:MultipleResult;a:MultipleResult|null;b:MultipleResult|null;hour:number;selected:number;onSelect:(i:number)=>void;scale:[number,number]}){
- const values=valuesAtHour(result,hour),av=a?valuesAtHour(a,hour):null,bv=b?valuesAtHour(b,hour):null;
- const x=(distance:number)=>70+660*distance/result.inputs.length_m,y=(value:number)=>scale[1]===scale[0]?110:190-160*(value-scale[0])/(scale[1]-scale[0]);
- const points=(row:number[])=>result.distances_m.map((d,i)=>`${x(d)},${y(row[i])}`).join(' ');
- return <section className="simulation-profile"><h3>Концентрация по расстоянию C(x)</h3><label htmlFor="multiple-segment">Расчётный сегмент</label><select id="multiple-segment" value={selected} onChange={e=>onSelect(Number(e.target.value))}>{result.distances_m.map((d,i)=><option key={i} value={i}>{i+1} · {number(d,0)} м от начала участка</option>)}</select><p className="temporal-reading"><strong>{number(values[selected])} мг/л</strong><span>{number(hour)} ч</span></p>
- <svg viewBox="0 0 760 230" role="img" aria-label="Профиль концентрации по полной длине участка"><path d="M70 25V195H735" fill="none" stroke="currentColor"/>{av&&bv?<><polyline points={points(av)} fill="none" stroke="#2367a1" strokeWidth="3"/><polyline points={points(bv)} fill="none" stroke="#b54b35" strokeWidth="3" strokeDasharray="8 4"/></>:<polyline points={points(values)} fill="none" stroke="var(--accent)" strokeWidth="3"/>}<circle cx={x(result.distances_m[selected])} cy={y(values[selected])} r="5" fill="var(--ink)"/><text x="60" y="35" textAnchor="end">{number(scale[1],2)}</text><text x="60" y="195" textAnchor="end">{number(scale[0],2)}</text><text x="70" y="218">0 м</text><text x="735" y="218" textAnchor="end">{number(result.inputs.length_m,0)} м</text></svg>{av&&bv&&<p className="profile-comparison-key"><span>А — сплошная синяя</span><span>Б — пунктирная терракотовая</span></p>}</section>;
+const number = (value: number, digits = 4) =>
+  value.toLocaleString("ru-RU", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+const sourceLoad = (source: ScenarioSource, input: MultipleInputs) => ({
+  ...source,
+  background_mg_l: input.background_mg_l,
+  duration_hours: input.duration_hours,
+});
+const sourceMetadata = (reach: Reach) =>
+  Object.fromEntries(
+    [
+      "name",
+      "source",
+      "source_url",
+      "attribution",
+      "license",
+      "license_url",
+      "crs",
+      "snapshot_date",
+      "osm_way_id",
+      "osm_way_version",
+      "osm_way_timestamp",
+      "raw_sha256",
+    ]
+      .filter((key) => key in reach.metadata)
+      .map((key) => [key, reach.metadata[key]]),
+  );
+function responseMessage(data: unknown) {
+  if (data && typeof data === "object" && "detail" in data) {
+    const detail = (data as { detail: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail))
+      return detail
+        .map((v) =>
+          typeof v?.msg === "string"
+            ? `${(v.loc ?? []).slice(1).join(" · ")}: ${v.msg}`
+            : "Некорректные условия.",
+        )
+        .join(" ");
+  }
+  return "Сервер не смог выполнить расчёт. Повторите запрос.";
 }
-type Props={initialScenario?:RestorableConditions;onOpenLegacy?:(scenario:RestorableConditions)=>void;onApplyLegacy?:(scenario:RestorableConditions)=>void};
-export default function MultipleSimulation({initialScenario,onOpenLegacy,onApplyLegacy}:Props){
- const [reaches,setReaches]=useState<Reach[]>([]),[reachId,setReachId]=useState('don-olkhovets'),[reachError,setReachError]=useState(''),[reachRevision,setReachRevision]=useState(0);
- const [shared,setShared]=useState<SharedDraft>({...sharedInitial}),[sources,setSources]=useState<SourceDraft[]>(()=>[newSourceDraft(1)]),[chosen,setChosen]=useState('');
- const [parametersOpen,setParametersOpen]=useState(false),[profileOpen,setProfileOpen]=useState(false),[profileView,setProfileView]=useState<'space'|'time'>('time'),[mobile,setMobile]=useState(()=>matchMedia('(max-width:760px)').matches);
- const [latest,setLatest]=useState<MultipleResult|null>(null),[baseline,setBaseline]=useState<MultipleResult|null>(null),[variant,setVariant]=useState(false),[active,setActive]=useState<'А'|'Б'>('Б');
- const [status,setStatus]=useState<'idle'|'loading'|'error'|'cancelled'|'ready'>('idle'),[message,setMessage]=useState(''),[notice,setNotice]=useState(''),[interaction,setInteraction]=useState(0);
- const [hour,setHour]=useState(0),[speed,setSpeed]=useState(1),[playing,setPlaying]=useState(false),[segment,setSegment]=useState(0),[preview,setPreview]=useState(false),[picking,setPicking]=useState(false),[pickMessage,setPickMessage]=useState('');
- const request=useRef(0),controller=useRef<AbortController|null>(null),snapRequest=useRef(0),snapController=useRef<AbortController|null>(null),form=useRef<HTMLFormElement>(null),parameterButton=useRef<HTMLButtonElement>(null),closeButton=useRef<HTMLButtonElement>(null),profileButton=useRef<HTMLButtonElement>(null),previousParameters=useRef(false),previousProfile=useRef(false),lastInitial=useRef<RestorableConditions|undefined>(undefined);
- const geometryRevision=useRef(0);
- const pendingSourceFocus=useRef(false);
- useLayoutEffect(()=>{if(pendingSourceFocus.current){pendingSourceFocus.current=false;document.getElementById('multiple-source-name')?.focus();}},[chosen]);
- const [completedKey,setCompletedKey]=useState('');const reach=reaches.find(r=>r.id===reachId)??null;const selectedSource=sources.find(s=>s.id===chosen)??sources[0];
- const draftKey=JSON.stringify([shared,reachId,sources]);
- const build=()=>buildMultipleConditions(shared,reachId,reach?.length_m??NaN,sources);
- function stopPending(){request.current++;controller.current?.abort();setPlaying(false);setStatus('idle');setInteraction(i=>i+1);}
- function stopPicking(){snapRequest.current++;snapController.current?.abort();setPicking(false);setPickMessage('');}
- function editSource(patch:Partial<SourceDraft>,geometry=false){setSources(list=>list.map(s=>s.id===selectedSource.id?{...s,...patch}:s));setPlaying(false);if(geometry){geometryRevision.current++;stopPicking();setPreview(true);}}
- function selectSource(id:string){stopPicking();setChosen(id);}
- useEffect(()=>{const abort=new AbortController();setReachError('');fetch('/api/v1/river-reaches',{signal:abort.signal}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();if(!Array.isArray(data.items)||!data.items.length||!data.items.every(validReach))throw new Error();setReaches(data.items);}).catch(()=>{if(!abort.signal.aborted)setReachError('Не удалось загрузить подготовленные участки. Повторите запрос.');});return()=>abort.abort();},[reachRevision]);
- useEffect(()=>{const media=matchMedia('(max-width:760px)');const update=()=>{setMobile(media.matches);if(!media.matches)setParametersOpen(false);};media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
- useEffect(()=>{if(parametersOpen)closeButton.current?.focus({preventScroll:true});else if(previousParameters.current)parameterButton.current?.focus({preventScroll:true});previousParameters.current=parametersOpen;},[parametersOpen]);
- useEffect(()=>{if(profileOpen)document.querySelector<HTMLButtonElement>('.multiple-profile .profile-close')?.focus({preventScroll:true});else if(previousProfile.current)profileButton.current?.focus({preventScroll:true});previousProfile.current=profileOpen;},[profileOpen]);
- useEffect(()=>{if(!parametersOpen&&!picking&&!profileOpen)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();if(parametersOpen)setParametersOpen(false);else if(picking){stopPicking();parameterButton.current?.focus();}else setProfileOpen(false);}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[parametersOpen,picking,profileOpen]);
- useEffect(()=>()=>{request.current++;controller.current?.abort();snapRequest.current++;snapController.current?.abort();},[]);
- function applyConditions(scenario:RestorableConditions,fromFile=false){
-  if(!isMultipleConditions(scenario.conditions)){stopPending();stopPicking();(fromFile?onApplyLegacy:onOpenLegacy)?.(scenario);return;}
-  const conditions=scenario.conditions;const target=reaches.find(r=>r.id===conditions.reach_id);
-  if(!target||scenario.geometry_sha256!==target.metadata.geometry_sha256||scenario.downstream_geometry_sha256!==target.metadata.downstream_geometry_sha256){setMessage('Геометрия сохранённых условий не совпадает с подготовленным участком. Условия не применены.');setStatus('error');return;}
-  geometryRevision.current++;stopPending();stopPicking();setShared(Object.fromEntries(commonFields.map(f=>[f.key,String(conditions[f.key])])) as SharedDraft);setReachId(conditions.reach_id);setSources(draftsFromSources(conditions.sources));setChosen(conditions.sources[0].id);setPreview(true);setNotice('Открыты сохранённые условия. Нажмите «Рассчитать» для нового результата; сохранённая запись не изменена.');
- }
- useEffect(()=>{if(initialScenario&&initialScenario!==lastInitial.current&&reaches.length){lastInitial.current=initialScenario;applyConditions(initialScenario);}},[initialScenario,reaches]);
- const draftReason=baseline&&variant&&(baseline.reach_id!==reachId?'Для сравнения нужен один и тот же подготовленный участок.':Number(shared.duration_hours)!==baseline.inputs.duration_hours?'Для сравнения нужен одинаковый горизонт расчёта.':'');
- const completedReason=baseline&&latest&&variant?multipleComparisonReason(baseline,latest):'';
- const comparing=!!(baseline&&latest&&variant&&!draftReason&&!completedReason);
- const result=comparing?(active==='А'?baseline:latest):latest??baseline;
- const comparisonA=comparing?baseline:null,comparisonB=comparing?latest:null;
- const scale=useMemo<[number,number]>(()=>comparisonA&&comparisonB?sharedScale(comparisonA,comparisonB):result?.scale_mg_l??[10,10],[comparisonA,comparisonB,result]);
- const values=useMemo(()=>result?valuesAtHour(result,hour):null,[result,hour]);
- const stale=!!(latest&&completedKey!==draftKey)||!!(variant&&baseline&&!latest);
- const displayReach=preview||!result?reach:reaches.find(r=>r.id===result.reach_id)??null;
- const mapSources=useMemo(()=>preview||!result?sources.map((s,index)=>({...s,number:index+1})).filter(s=>s.source_distance_m.trim()&&Number.isFinite(Number(s.source_distance_m))&&reach&&Number(s.source_distance_m)>=0&&Number(s.source_distance_m)<=reach.length_m-100).map(s=>({id:s.id,name:s.name,number:s.number,source_distance_m:Number(s.source_distance_m)})):result.inputs.sources,[preview,result,sources,reach]);
- useEffect(()=>{if(!playing||!result)return;let frame=0,previous=performance.now();const duration=result.inputs.duration_hours;const tick=(now:number)=>{const delta=(now-previous)/1000;previous=now;setHour(value=>{const next=Math.min(duration,value+delta*duration/24*speed);if(next===duration)setPlaying(false);return next;});frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);},[playing,speed,result]);
- async function calculate(override?:MultipleInputs,overrideKey?:string){
-  let input:MultipleInputs;try{input=override??build();}catch(error){setMessage(error instanceof Error?error.message:'Проверьте условия.');setStatus('error');return;}
-  setInteraction(value => value + 1);
-  const before=overrideKey??draftKey,beforeGeometry=geometryRevision.current,id=++request.current;controller.current?.abort();const abort=new AbortController();controller.current=abort;setStatus('loading');setMessage('');setPlaying(false);const timeout=window.setTimeout(()=>abort.abort(),30000);
-  try{const response=await fetch('/api/v1/simulations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input),signal:abort.signal});const data:unknown=await response.json();if(id!==request.current||abort.signal.aborted)return;if(!response.ok)throw new Error(responseMessage(data));if(!validMultipleResult(data)||!sameInputs(inputOf(data),input))throw new Error('Сервер вернул неполные или несогласованные результаты.');setLatest(data);setCompletedKey(before);setStatus('ready');if(beforeGeometry===geometryRevision.current)setPreview(false);setActive('Б');if(!variant||!baseline||multipleComparisonReason(baseline,data)){setHour(0);setSegment(0);}setParametersOpen(false);setNotice('');}
-  catch(error){if(id!==request.current)return;setStatus(abort.signal.aborted?'cancelled':'error');setMessage(error instanceof Error?error.message:'Ошибка подключения. Проверьте доступность сервера.');}finally{window.clearTimeout(timeout);}
- }
- function cancel(){setInteraction(value => value + 1);request.current++;controller.current?.abort();setStatus('cancelled');setPlaying(false);}
- function demo(){const a=newSourceDraft(1),b=newSourceDraft(2);Object.assign(a,{id:'demo-source-1',source_distance_m:'0',load_mode:'profile',rows:intervalDrafts([{start_hours:0,end_hours:.5,effluent_mg_l:100}])});Object.assign(b,{id:'demo-source-2',source_distance_m:'1200',effluent_flow_m3_s:'.05',load_mode:'profile',rows:intervalDrafts([{start_hours:2,end_hours:2.5,effluent_mg_l:60}])});const target=reaches.find(r=>r.id==='don-olkhovets');if(!target)return;stopPending();stopPicking();setShared({...sharedInitial});setSources([a,b]);setChosen(a.id);setReachId(target.id);setVariant(false);setBaseline(null);setLatest(null);setNotice('Синтетическая демонстрация: два условных источника, не фактические сбросы предприятий.');const key=JSON.stringify([sharedInitial,target.id,[a,b]]);void calculate(buildMultipleConditions(sharedInitial,target.id,target.length_m,[a,b]),key);}
- function pin(){if(!result)return;setInteraction(value => value + 1);setBaseline(structuredClone(result));setLatest(structuredClone(result));try{setCompletedKey(sameInputs(build(),inputOf(result))?draftKey:'');}catch{setCompletedKey('');}setVariant(false);setActive('А');setNotice('А закреплён отдельно от редактируемых условий.');}
- function createVariant(){if(!baseline)return;stopPending();stopPicking();const input=inputOf(baseline);setShared(Object.fromEntries(commonFields.map(f=>[f.key,String(input[f.key])])) as SharedDraft);setSources(draftsFromSources(input.sources));setChosen(input.sources[0].id);setReachId(input.reach_id);setLatest(null);setVariant(true);setActive('А');setPreview(false);setParametersOpen(true);setNotice('Вариант Б создан на основе А. Измените условия и отдельно запустите расчёт.');}
- function add(){if(sources.length>=3)return;geometryRevision.current++;stopPicking();const source=newSourceDraft(sources.length+1);setSources([...sources,source]);pendingSourceFocus.current=true;setChosen(source.id);setPreview(true);}
- function remove(){if(sources.length<=1)return;geometryRevision.current++;stopPicking();const index=sources.findIndex(s=>s.id===selectedSource.id),next=sources.filter(s=>s.id!==selectedSource.id);setSources(next);pendingSourceFocus.current=true;setChosen(next[Math.min(index,next.length-1)].id);setPreview(true);}
- async function pick(lon:number,lat:number){if(!picking||!reach)return;const id=++snapRequest.current,sourceId=selectedSource.id,target=reach;snapController.current?.abort();const abort=new AbortController();snapController.current=abort;setPickMessage('Привязываем точку к руслу…');const timeout=window.setTimeout(()=>abort.abort(),10000);try{const response=await fetch(`/api/v1/river-reaches/${encodeURIComponent(target.id)}/source-snap?${new URLSearchParams({longitude:String(lon),latitude:String(lat)})}`,{signal:abort.signal});const data=await response.json();if(id!==snapRequest.current||abort.signal.aborted)return;if(!response.ok)throw new Error('Точка должна находиться не дальше 75 м от русла; ниже источника нужны 100 м.');if(data.reach_id!==target.id||!Number.isFinite(data.source_distance_m)||data.source_distance_m<0||data.source_distance_m>target.length_m-100||!Number.isFinite(data.distance_to_river_m)||data.distance_to_river_m<0||data.distance_to_river_m>75||data.max_distance_m!==75||!validCoordinate(data.coordinate))throw new Error('Сервер вернул некорректную привязку. Источник не перемещён.');setSources(list=>list.map(s=>s.id===sourceId?{...s,source_distance_m:String(data.source_distance_m)}:s));setPicking(false);setPickMessage(`Выбран источник: ${number(data.source_distance_m,1)} м от начала участка. Нажмите «Рассчитать».`);}catch(error){if(id===snapRequest.current)setPickMessage(abort.signal.aborted?'Время привязки истекло. Источник не перемещён.':error instanceof Error?error.message:'Не удалось привязать точку.');}finally{window.clearTimeout(timeout);}}
- function savePayload():SavePayload{const conditions=build();if(!reach)throw new Error('Выберите участок.');return{format_version:MULTIPLE_FORMAT,model_id:MULTIPLE_MODEL_ID,geometry_version:RIVER_VERSION,geometry_sha256:String(reach.metadata.geometry_sha256),conditions:conditions as MultipleConditions};}
- function conditionsDocument(name:string):ConditionsDocument{const payload=savePayload();return{name,...payload,geometry_mode:'river',downstream_geometry_sha256:String(reach!.metadata.downstream_geometry_sha256),reach_id:reachId,reach_name:reach!.name,geometry_source:sourceMetadata(reach!),conditions:payload.conditions};}
- let previewLoad=null;try{const checked=build();const source=checked.sources.find(s=>s.id===selectedSource.id)!;if(validLoadProfile(sourceLoad(source,checked)))previewLoad=sourceLoad(source,checked);}catch{/* Incomplete drafts stay visible without invented numeric values. */}
+function sameInputs(a: MultipleInputs, b: MultipleInputs) {
+  return (
+    commonFields.every((f) => a[f.key] === b[f.key]) &&
+    a.reach_id === b.reach_id &&
+    a.sources.length === b.sources.length &&
+    a.sources.every((source, i) => {
+      const other = b.sources[i];
+      return (
+        source.id === other.id &&
+        source.name === other.name &&
+        source.source_distance_m === other.source_distance_m &&
+        source.effluent_flow_m3_s === other.effluent_flow_m3_s &&
+        source.effluent_mg_l === other.effluent_mg_l &&
+        source.load_mode === other.load_mode &&
+        source.load_duration_hours === other.load_duration_hours &&
+        (source.load_intervals === null
+          ? other.load_intervals === null
+          : Array.isArray(other.load_intervals) &&
+            source.load_intervals.length === other.load_intervals.length &&
+            source.load_intervals.every(
+              (row, j) =>
+                row.start_hours === other.load_intervals![j].start_hours &&
+                row.end_hours === other.load_intervals![j].end_hours &&
+                row.effluent_mg_l === other.load_intervals![j].effluent_mg_l,
+            ))
+      );
+    })
+  );
+}
+function inputOf(result: MultipleResult): MultipleInputs {
+  const { length_m: _, ...input } = result.inputs;
+  return structuredClone(input);
+}
+function SpatialProfile({
+  result,
+  a,
+  b,
+  hour,
+  selected,
+  onSelect,
+  scale,
+}: {
+  result: MultipleResult;
+  a: MultipleResult | null;
+  b: MultipleResult | null;
+  hour: number;
+  selected: number;
+  onSelect: (i: number) => void;
+  scale: [number, number];
+}) {
+  const values = valuesAtHour(result, hour),
+    av = a ? valuesAtHour(a, hour) : null,
+    bv = b ? valuesAtHour(b, hour) : null;
+  const x = (distance: number) =>
+      70 + (660 * distance) / result.inputs.length_m,
+    y = (value: number) =>
+      scale[1] === scale[0]
+        ? 110
+        : 190 - (160 * (value - scale[0])) / (scale[1] - scale[0]);
+  const points = (row: number[]) =>
+    result.distances_m.map((d, i) => `${x(d)},${y(row[i])}`).join(" ");
+  return (
+    <section className="simulation-profile">
+      <h3>Концентрация по расстоянию C(x)</h3>
+      <label htmlFor="multiple-segment">Расчётный сегмент</label>
+      <select
+        id="multiple-segment"
+        value={selected}
+        onChange={(e) => onSelect(Number(e.target.value))}
+      >
+        {result.distances_m.map((d, i) => (
+          <option key={i} value={i}>
+            {i + 1} · {number(d, 0)} м от начала участка
+          </option>
+        ))}
+      </select>
+      <p className="temporal-reading">
+        <strong>{number(values[selected])} мг/л</strong>
+        <span>{number(hour)} ч</span>
+      </p>
+      <svg
+        viewBox="0 0 760 230"
+        role="img"
+        aria-label="Профиль концентрации по полной длине участка"
+      >
+        <path d="M70 25V195H735" fill="none" stroke="currentColor" />
+        {av && bv ? (
+          <>
+            <polyline
+              points={points(av)}
+              fill="none"
+              stroke="#2367a1"
+              strokeWidth="3"
+            />
+            <polyline
+              points={points(bv)}
+              fill="none"
+              stroke="#b54b35"
+              strokeWidth="3"
+              strokeDasharray="8 4"
+            />
+          </>
+        ) : (
+          <polyline
+            points={points(values)}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="3"
+          />
+        )}
+        <circle
+          cx={x(result.distances_m[selected])}
+          cy={y(values[selected])}
+          r="5"
+          fill="var(--ink)"
+        />
+        <text x="60" y="35" textAnchor="end">
+          {number(scale[1], 2)}
+        </text>
+        <text x="60" y="195" textAnchor="end">
+          {number(scale[0], 2)}
+        </text>
+        <text x="70" y="218">
+          0 м
+        </text>
+        <text x="735" y="218" textAnchor="end">
+          {number(result.inputs.length_m, 0)} м
+        </text>
+      </svg>
+      {av && bv && (
+        <p className="profile-comparison-key">
+          <span>А — сплошная синяя</span>
+          <span>Б — пунктирная терракотовая</span>
+        </p>
+      )}
+    </section>
+  );
+}
+type Props = {
+  initialScenario?: RestorableConditions;
+  onOpenLegacy?: (scenario: RestorableConditions) => void;
+  onApplyLegacy?: (scenario: RestorableConditions) => void;
+};
+export default function MultipleSimulation({
+  initialScenario,
+  onOpenLegacy,
+  onApplyLegacy,
+}: Props) {
+  const [reaches, setReaches] = useState<Reach[]>([]),
+    [reachId, setReachId] = useState("don-olkhovets"),
+    [reachError, setReachError] = useState(""),
+    [reachRevision, setReachRevision] = useState(0);
+  const [shared, setShared] = useState<SharedDraft>({ ...sharedInitial }),
+    [sources, setSources] = useState<SourceDraft[]>(() => [newSourceDraft(1)]),
+    [chosen, setChosen] = useState("");
+  const [parametersOpen, setParametersOpen] = useState(false),
+    [profileOpen, setProfileOpen] = useState(false),
+    [profileView, setProfileView] = useState<"space" | "time" | "analysis">(
+      "time",
+    ),
+    [mobile, setMobile] = useState(
+      () => matchMedia("(max-width:760px)").matches,
+    );
+  const [latest, setLatest] = useState<MultipleResult | null>(null),
+    [baseline, setBaseline] = useState<MultipleResult | null>(null),
+    [variant, setVariant] = useState(false),
+    [active, setActive] = useState<"А" | "Б">("Б");
+  const [status, setStatus] = useState<
+      "idle" | "loading" | "error" | "cancelled" | "ready"
+    >("idle"),
+    [message, setMessage] = useState(""),
+    [notice, setNotice] = useState(""),
+    [interaction, setInteraction] = useState(0);
+  const [hour, setHour] = useState(0),
+    [speed, setSpeed] = useState(1),
+    [playing, setPlaying] = useState(false),
+    [segment, setSegment] = useState(0),
+    [preview, setPreview] = useState(false),
+    [picking, setPicking] = useState(false),
+    [pickMessage, setPickMessage] = useState("");
+  const request = useRef(0),
+    controller = useRef<AbortController | null>(null),
+    snapRequest = useRef(0),
+    snapController = useRef<AbortController | null>(null),
+    form = useRef<HTMLFormElement>(null),
+    parameterButton = useRef<HTMLButtonElement>(null),
+    closeButton = useRef<HTMLButtonElement>(null),
+    profileButton = useRef<HTMLButtonElement>(null),
+    profileOpener = useRef<HTMLElement | null>(null),
+    previousParameters = useRef(false),
+    previousProfile = useRef(false),
+    lastInitial = useRef<RestorableConditions | undefined>(undefined);
+  const geometryRevision = useRef(0);
+  const pendingSourceFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (pendingSourceFocus.current) {
+      pendingSourceFocus.current = false;
+      document.getElementById("multiple-source-name")?.focus();
+    }
+  }, [chosen]);
+  const [completedKey, setCompletedKey] = useState("");
+  const reach = reaches.find((r) => r.id === reachId) ?? null;
+  const selectedSource = sources.find((s) => s.id === chosen) ?? sources[0];
+  const draftKey = JSON.stringify([shared, reachId, sources]);
+  const build = () =>
+    buildMultipleConditions(shared, reachId, reach?.length_m ?? NaN, sources);
+  function stopPending() {
+    request.current++;
+    controller.current?.abort();
+    setPlaying(false);
+    setStatus("idle");
+    setInteraction((i) => i + 1);
+  }
+  function stopPicking() {
+    snapRequest.current++;
+    snapController.current?.abort();
+    setPicking(false);
+    setPickMessage("");
+  }
+  function editSource(patch: Partial<SourceDraft>, geometry = false) {
+    setSources((list) =>
+      list.map((s) => (s.id === selectedSource.id ? { ...s, ...patch } : s)),
+    );
+    setPlaying(false);
+    if (geometry) {
+      geometryRevision.current++;
+      stopPicking();
+      setPreview(true);
+    }
+  }
+  function selectSource(id: string) {
+    stopPicking();
+    setChosen(id);
+  }
+  useEffect(() => {
+    const abort = new AbortController();
+    setReachError("");
+    fetch("/api/v1/river-reaches", { signal: abort.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (
+          !Array.isArray(data.items) ||
+          !data.items.length ||
+          !data.items.every(validReach)
+        )
+          throw new Error();
+        setReaches(data.items);
+      })
+      .catch(() => {
+        if (!abort.signal.aborted)
+          setReachError(
+            "Не удалось загрузить подготовленные участки. Повторите запрос.",
+          );
+      });
+    return () => abort.abort();
+  }, [reachRevision]);
+  useEffect(() => {
+    const media = matchMedia("(max-width:760px)");
+    const update = () => {
+      setMobile(media.matches);
+      if (!media.matches) setParametersOpen(false);
+    };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (parametersOpen) closeButton.current?.focus({ preventScroll: true });
+    else if (previousParameters.current)
+      parameterButton.current?.focus({ preventScroll: true });
+    previousParameters.current = parametersOpen;
+  }, [parametersOpen]);
+  useEffect(() => {
+    if (profileOpen)
+      document
+        .querySelector<HTMLButtonElement>(".multiple-profile .profile-close")
+        ?.focus({ preventScroll: true });
+    else if (previousProfile.current)
+      (profileOpener.current ?? profileButton.current)?.focus({
+        preventScroll: true,
+      });
+    previousProfile.current = profileOpen;
+  }, [profileOpen]);
+  useEffect(() => {
+    if (!parametersOpen && !picking && !profileOpen) return;
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (parametersOpen) setParametersOpen(false);
+        else if (picking) {
+          stopPicking();
+          parameterButton.current?.focus();
+        } else setProfileOpen(false);
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [parametersOpen, picking, profileOpen]);
+  useEffect(
+    () => () => {
+      request.current++;
+      controller.current?.abort();
+      snapRequest.current++;
+      snapController.current?.abort();
+    },
+    [],
+  );
+  function applyConditions(scenario: RestorableConditions, fromFile = false) {
+    if (!isMultipleConditions(scenario.conditions)) {
+      stopPending();
+      stopPicking();
+      (fromFile ? onApplyLegacy : onOpenLegacy)?.(scenario);
+      return;
+    }
+    const conditions = scenario.conditions;
+    const target = reaches.find((r) => r.id === conditions.reach_id);
+    if (
+      !target ||
+      scenario.geometry_sha256 !== target.metadata.geometry_sha256 ||
+      scenario.downstream_geometry_sha256 !==
+        target.metadata.downstream_geometry_sha256
+    ) {
+      setMessage(
+        "Геометрия сохранённых условий не совпадает с подготовленным участком. Условия не применены.",
+      );
+      setStatus("error");
+      return;
+    }
+    analysis.restore(
+      scenario.analysis_settings ?? emptyAnalysisSettings(),
+      geometryScope(target),
+    );
+    geometryRevision.current++;
+    stopPending();
+    stopPicking();
+    setShared(
+      Object.fromEntries(
+        commonFields.map((f) => [f.key, String(conditions[f.key])]),
+      ) as SharedDraft,
+    );
+    setReachId(conditions.reach_id);
+    setSources(draftsFromSources(conditions.sources));
+    setChosen(conditions.sources[0].id);
+    setPreview(true);
+    setNotice(
+      "Открыты сохранённые условия. Нажмите «Рассчитать» для нового результата; сохранённая запись не изменена.",
+    );
+  }
+  useEffect(() => {
+    if (
+      initialScenario &&
+      initialScenario !== lastInitial.current &&
+      reaches.length
+    ) {
+      lastInitial.current = initialScenario;
+      applyConditions(initialScenario);
+    }
+  }, [initialScenario, reaches]);
+  const draftReason =
+    baseline &&
+    variant &&
+    (baseline.reach_id !== reachId
+      ? "Для сравнения нужен один и тот же подготовленный участок."
+      : Number(shared.duration_hours) !== baseline.inputs.duration_hours
+        ? "Для сравнения нужен одинаковый горизонт расчёта."
+        : "");
+  const completedReason =
+    baseline && latest && variant
+      ? multipleComparisonReason(baseline, latest)
+      : "";
+  const comparing = !!(
+    baseline &&
+    latest &&
+    variant &&
+    !draftReason &&
+    !completedReason
+  );
+  const result = comparing
+    ? active === "А"
+      ? baseline
+      : latest
+    : (latest ?? baseline);
+  const comparisonA = comparing ? baseline : null,
+    comparisonB = comparing ? latest : null;
+  const scale = useMemo<[number, number]>(
+    () =>
+      comparisonA && comparisonB
+        ? sharedScale(comparisonA, comparisonB)
+        : (result?.scale_mg_l ?? [10, 10]),
+    [comparisonA, comparisonB, result],
+  );
+  const values = useMemo(
+    () => (result ? valuesAtHour(result, hour) : null),
+    [result, hour],
+  );
+  const stale =
+    !!(latest && completedKey !== draftKey) ||
+    !!(variant && baseline && !latest);
+  const displayReach =
+    preview || !result
+      ? reach
+      : (reaches.find((r) => r.id === result.reach_id) ?? null);
+  const mapScope = geometryScope(displayReach);
+  const resultScope = result
+    ? JSON.stringify([
+        result.reach_id,
+        result.reach_metadata.geometry_sha256,
+        result.reach_metadata.downstream_geometry_sha256,
+        result.inputs.length_m,
+        100,
+      ])
+    : null;
+  const analysis = useControlPointSettings(mapScope, () =>
+    setInteraction((value) => value + 1),
+  );
+  const analysisAvailable = !!result && analysis.availableFor(resultScope);
+  const selectedAnalysis = useMemo(
+    () =>
+      analysisAvailable && result
+        ? analyzeSeries(
+            (comparisonA ?? result).times_hours,
+            (comparisonA ?? result).concentrations_mg_l.map(
+              (row) => row[segment],
+            ),
+            analysis.applied.threshold_mg_l,
+          )
+        : null,
+    [analysisAvailable, result, comparisonA, segment, analysis.applied],
+  );
+  const comparisonAnalysis = useMemo(
+    () =>
+      analysisAvailable && comparisonB
+        ? analyzeSeries(
+            comparisonB.times_hours,
+            comparisonB.concentrations_mg_l.map((row) => row[segment]),
+            analysis.applied.threshold_mg_l,
+          )
+        : null,
+    [analysisAvailable, comparisonB, segment, analysis.applied],
+  );
+  function selectControlPoint(point: ControlPoint) {
+    stopPicking();
+    analysis.setSelectedId(point.id);
+    setSegment(point.segment_index);
+    setProfileView("time");
+    setProfileOpen(true);
+    if (
+      analysisAvailable &&
+      analysis.applied.points.some((item) => item.id === point.id)
+    )
+      setPreview(false);
+  }
+  const mapSources = useMemo(
+    () =>
+      preview || !result
+        ? sources
+            .map((s, index) => ({ ...s, number: index + 1 }))
+            .filter(
+              (s) =>
+                s.source_distance_m.trim() &&
+                Number.isFinite(Number(s.source_distance_m)) &&
+                reach &&
+                Number(s.source_distance_m) >= 0 &&
+                Number(s.source_distance_m) <= reach.length_m - 100,
+            )
+            .map((s) => ({
+              id: s.id,
+              name: s.name,
+              number: s.number,
+              source_distance_m: Number(s.source_distance_m),
+            }))
+        : result.inputs.sources,
+    [preview, result, sources, reach],
+  );
+  useEffect(() => {
+    if (!playing || !result) return;
+    let frame = 0,
+      previous = performance.now();
+    const duration = result.inputs.duration_hours;
+    const tick = (now: number) => {
+      const delta = (now - previous) / 1000;
+      previous = now;
+      setHour((value) => {
+        const next = Math.min(
+          duration,
+          value + ((delta * duration) / 24) * speed,
+        );
+        if (next === duration) setPlaying(false);
+        return next;
+      });
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, speed, result]);
+  async function calculate(override?: MultipleInputs, overrideKey?: string) {
+    let input: MultipleInputs;
+    try {
+      input = override ?? build();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Проверьте условия.");
+      setStatus("error");
+      return;
+    }
+    setInteraction((value) => value + 1);
+    const before = overrideKey ?? draftKey,
+      beforeGeometry = geometryRevision.current,
+      id = ++request.current;
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setStatus("loading");
+    setMessage("");
+    setPlaying(false);
+    const timeout = window.setTimeout(() => abort.abort(), 30000);
+    try {
+      const response = await fetch("/api/v1/simulations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+        signal: abort.signal,
+      });
+      const data: unknown = await response.json();
+      if (id !== request.current || abort.signal.aborted) return;
+      if (!response.ok) throw new Error(responseMessage(data));
+      if (!validMultipleResult(data) || !sameInputs(inputOf(data), input))
+        throw new Error(
+          "Сервер вернул неполные или несогласованные результаты.",
+        );
+      setLatest(data);
+      setCompletedKey(before);
+      setStatus("ready");
+      if (beforeGeometry === geometryRevision.current) setPreview(false);
+      setActive("Б");
+      if (!variant || !baseline || multipleComparisonReason(baseline, data)) {
+        setHour(0);
+        setSegment(0);
+      }
+      setParametersOpen(false);
+      setNotice("");
+    } catch (error) {
+      if (id !== request.current) return;
+      setStatus(abort.signal.aborted ? "cancelled" : "error");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Ошибка подключения. Проверьте доступность сервера.",
+      );
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+  function cancel() {
+    setInteraction((value) => value + 1);
+    request.current++;
+    controller.current?.abort();
+    setStatus("cancelled");
+    setPlaying(false);
+  }
+  function demo() {
+    const a = newSourceDraft(1),
+      b = newSourceDraft(2);
+    Object.assign(a, {
+      id: "demo-source-1",
+      source_distance_m: "0",
+      load_mode: "profile",
+      rows: intervalDrafts([
+        { start_hours: 0, end_hours: 0.5, effluent_mg_l: 100 },
+      ]),
+    });
+    Object.assign(b, {
+      id: "demo-source-2",
+      source_distance_m: "1200",
+      effluent_flow_m3_s: ".05",
+      load_mode: "profile",
+      rows: intervalDrafts([
+        { start_hours: 2, end_hours: 2.5, effluent_mg_l: 60 },
+      ]),
+    });
+    const target = reaches.find((r) => r.id === "don-olkhovets");
+    if (!target) return;
+    stopPending();
+    stopPicking();
+    setShared({ ...sharedInitial });
+    setSources([a, b]);
+    setChosen(a.id);
+    setReachId(target.id);
+    setVariant(false);
+    setBaseline(null);
+    setLatest(null);
+    analysis.restore(
+      {
+        points: [35, 49, 99].map((segment_index, index) => ({
+          id: `demo-control-${index + 1}`,
+          name: [
+            "Выше второго источника",
+            "Ниже второго источника",
+            "Конец участка",
+          ][index],
+          segment_index,
+        })),
+        threshold_mg_l: 10.2,
+      },
+      geometryScope(target),
+    );
+    setNotice(
+      "Синтетическая демонстрация: два условных источника, не фактические сбросы предприятий.",
+    );
+    const key = JSON.stringify([sharedInitial, target.id, [a, b]]);
+    void calculate(
+      buildMultipleConditions(sharedInitial, target.id, target.length_m, [
+        a,
+        b,
+      ]),
+      key,
+    );
+  }
+  function pin() {
+    if (!result) return;
+    setInteraction((value) => value + 1);
+    setBaseline(structuredClone(result));
+    setLatest(structuredClone(result));
+    try {
+      setCompletedKey(sameInputs(build(), inputOf(result)) ? draftKey : "");
+    } catch {
+      setCompletedKey("");
+    }
+    setVariant(false);
+    setActive("А");
+    setNotice("А закреплён отдельно от редактируемых условий.");
+  }
+  function createVariant() {
+    if (!baseline) return;
+    stopPending();
+    stopPicking();
+    const input = inputOf(baseline);
+    setShared(
+      Object.fromEntries(
+        commonFields.map((f) => [f.key, String(input[f.key])]),
+      ) as SharedDraft,
+    );
+    setSources(draftsFromSources(input.sources));
+    setChosen(input.sources[0].id);
+    setReachId(input.reach_id);
+    setLatest(null);
+    setVariant(true);
+    setActive("А");
+    setPreview(false);
+    setParametersOpen(true);
+    setNotice(
+      "Вариант Б создан на основе А. Измените условия и отдельно запустите расчёт.",
+    );
+  }
+  function add() {
+    if (sources.length >= 3) return;
+    geometryRevision.current++;
+    stopPicking();
+    const source = newSourceDraft(sources.length + 1);
+    setSources([...sources, source]);
+    pendingSourceFocus.current = true;
+    setChosen(source.id);
+    setPreview(true);
+  }
+  function remove() {
+    if (sources.length <= 1) return;
+    geometryRevision.current++;
+    stopPicking();
+    const index = sources.findIndex((s) => s.id === selectedSource.id),
+      next = sources.filter((s) => s.id !== selectedSource.id);
+    setSources(next);
+    pendingSourceFocus.current = true;
+    setChosen(next[Math.min(index, next.length - 1)].id);
+    setPreview(true);
+  }
+  async function pick(lon: number, lat: number) {
+    if (!picking || !reach) return;
+    const id = ++snapRequest.current,
+      sourceId = selectedSource.id,
+      target = reach;
+    snapController.current?.abort();
+    const abort = new AbortController();
+    snapController.current = abort;
+    setPickMessage("Привязываем точку к руслу…");
+    const timeout = window.setTimeout(() => abort.abort(), 10000);
+    try {
+      const response = await fetch(
+        `/api/v1/river-reaches/${encodeURIComponent(target.id)}/source-snap?${new URLSearchParams({ longitude: String(lon), latitude: String(lat) })}`,
+        { signal: abort.signal },
+      );
+      const data = await response.json();
+      if (id !== snapRequest.current || abort.signal.aborted) return;
+      if (!response.ok)
+        throw new Error(
+          "Точка должна находиться не дальше 75 м от русла; ниже источника нужны 100 м.",
+        );
+      if (
+        data.reach_id !== target.id ||
+        !Number.isFinite(data.source_distance_m) ||
+        data.source_distance_m < 0 ||
+        data.source_distance_m > target.length_m - 100 ||
+        !Number.isFinite(data.distance_to_river_m) ||
+        data.distance_to_river_m < 0 ||
+        data.distance_to_river_m > 75 ||
+        data.max_distance_m !== 75 ||
+        !validCoordinate(data.coordinate)
+      )
+        throw new Error(
+          "Сервер вернул некорректную привязку. Источник не перемещён.",
+        );
+      setSources((list) =>
+        list.map((s) =>
+          s.id === sourceId
+            ? { ...s, source_distance_m: String(data.source_distance_m) }
+            : s,
+        ),
+      );
+      setPicking(false);
+      setPickMessage(
+        `Выбран источник: ${number(data.source_distance_m, 1)} м от начала участка. Нажмите «Рассчитать».`,
+      );
+    } catch (error) {
+      if (id === snapRequest.current)
+        setPickMessage(
+          abort.signal.aborted
+            ? "Время привязки истекло. Источник не перемещён."
+            : error instanceof Error
+              ? error.message
+              : "Не удалось привязать точку.",
+        );
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+  function savePayload(): SavePayload {
+    const conditions = build();
+    if (!reach) throw new Error("Выберите участок.");
+    return {
+      format_version: ANALYSIS_FORMAT,
+      analysis_settings: analysis.forSave(geometryScope(reach)),
+      model_id: MULTIPLE_MODEL_ID,
+      geometry_version: RIVER_VERSION,
+      geometry_sha256: String(reach.metadata.geometry_sha256),
+      conditions: conditions as MultipleConditions,
+    };
+  }
+  function conditionsDocument(name: string): ConditionsDocument {
+    const payload = savePayload();
+    return {
+      name,
+      ...payload,
+      geometry_mode: "river",
+      downstream_geometry_sha256: String(
+        reach!.metadata.downstream_geometry_sha256,
+      ),
+      reach_id: reachId,
+      reach_name: reach!.name,
+      geometry_source: sourceMetadata(reach!),
+      conditions: payload.conditions,
+    };
+  }
+  let previewLoad = null;
+  try {
+    const checked = build();
+    const source = checked.sources.find((s) => s.id === selectedSource.id)!;
+    if (validLoadProfile(sourceLoad(source, checked)))
+      previewLoad = sourceLoad(source, checked);
+  } catch {
+    /* Incomplete drafts stay visible without invented numeric values. */
+  }
 
- const savedEvents=result?result.inputs.sources.flatMap((source,index)=>sourceEvents(sourceLoad(source,result.inputs)).map(event=>({...event,id:source.id,index}))):[];
- const seek=(value:number)=>{setHour(value);setPlaying(false);};
- return <div className={`simulation multiple-simulation${comparing?' is-comparing':''}`}>
-  <header className="model-heading"><div><h1>Несколько сценарных источников</h1><span className="scenario-badge">Синтетические условия · хлориды</span></div><div className="workspace-tools"><button ref={parameterButton} className="mobile-parameters-toggle" aria-expanded={parametersOpen} aria-controls="multiple-parameters" onClick={()=>setParametersOpen(v=>!v)}>Параметры</button><button type="button" disabled={!reaches.some(r=>r.id==='don-olkhovets')||status==='loading'} onClick={demo}>Демонстрация двух источников</button></div></header>
-  <div className="map-status-stack">{(draftReason||completedReason)&&<p className="comparison-notice" role="status">Сравнение отключено: {draftReason||completedReason} А сохранён; можно выполнить одиночный расчёт.</p>}{stale&&<p className="simulation-stale" role="status">{variant?'Условия Б изменены. Показан прежний завершённый расчёт.':'Условия изменены. Результат относится к предыдущим условиям.'}</p>}{status==='loading'&&<p className="calculation-status" role="status">Выполняется расчёт… Прежние результаты сохраняются.</p>}{status==='cancelled'&&<p className="calculation-status" role="status">Ожидание отменено. Сервер может ещё завершать вычисление.</p>}{status==='error'&&<div className="simulation-error" role="alert"><strong>Не удалось выполнить расчёт</strong><p>{message}</p><button type="button" onClick={()=>void calculate()}>Повторить расчёт</button></div>}</div>
-  <div className="model-workspace">
-   <aside id="multiple-parameters" className={`simulation-parameters${parametersOpen?' is-open':''}`} aria-labelledby="multiple-parameters-title"><div className="parameters-heading"><div><p className="eyebrow">1–3 источника · одна река</p><h2 id="multiple-parameters-title">Условия расчёта</h2></div><button ref={closeButton} type="button" className="close-parameters" aria-label="Закрыть параметры" onClick={()=>setParametersOpen(false)}>×</button></div>
-    <form ref={form} onSubmit={e=>{e.preventDefault();void calculate();}}><div className="parameter-scroll">
-     <SavedScenarios initialName={initialScenario?.name} draftKey={draftKey} interactionKey={interaction} getConditions={savePayload} getDocument={conditionsDocument} onOpen={scenario=>applyConditions(scenario)} onApplyConditions={scenario=>applyConditions(scenario,true)}/>
-     {notice&&<p className="multiple-notice" role="status">{notice}</p>}
-     <section className="scenario-comparison-controls" aria-label="Сценарии текущего сеанса"><p className="comparison-step">{variant?'Б · редактируемые условия':baseline?'А · закреплённый расчёт':'Начните с расчёта'}</p>{!baseline?<button type="button" disabled={!result||status==='loading'} onClick={pin}>Закрепить как А</button>:<><button type="button" onClick={createVariant}>Создать вариант Б</button><button type="button" disabled={!result||status==='loading'} onClick={pin}>Заменить А показанным расчётом</button></>}<small>А/Б хранятся в памяти и сбрасываются после перезагрузки. Библиотека сохраняет условия.</small></section>
-     <label htmlFor="multiple-reach">Подготовленный участок</label><select id="multiple-reach" value={reachId} onChange={e=>{geometryRevision.current++;stopPicking();setReachId(e.target.value);setPreview(true);setPlaying(false);}}>{reaches.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select>{reach&&<p className="simulation-hint">Полная область: 0–{number(reach.length_m,1)} м. Источники не обрезают участок.</p>}{reachError&&<p role="alert">{reachError}<button type="button" onClick={()=>setReachRevision(v=>v+1)}>Повторить загрузку участков</button></p>}
-     <details className="multiple-common" open><summary>Общие условия</summary>{commonFields.map(field=><div className="simulation-field" key={field.key}><label htmlFor={`multiple-${field.key}`}>{field.label}</label><input id={`multiple-${field.key}`} type="number" step="any" required min={field.min} max={field.max} value={shared[field.key]} onChange={e=>{setShared({...shared,[field.key]:e.target.value});setPlaying(false);}}/></div>)}<p className="simulation-hint">Q(x)=Qr+Σq выше сечения; A(x)=Q(x)/u. Скорость и дисперсия общие. Это сценарное приближение, не расчёт реальной гидравлики.</p></details>
-     <section className="multiple-source-editor" aria-label="Список сценарных источников"><h3>Сценарные источники · {sources.length}/3</h3><div className="multiple-source-list">{sources.map((source,index)=><button key={source.id} type="button" className={`multiple-source-choice${source.id===selectedSource.id?' is-selected':''}`} aria-label={`Выбрать источник ${index+1}`} aria-pressed={source.id===selectedSource.id} onClick={()=>selectSource(source.id)}><span>{index+1}</span><strong>{source.name||'Без названия'}</strong><small>{source.source_distance_m||'—'} м</small></button>)}</div><button type="button" disabled={sources.length>=3} onClick={add}>Добавить источник</button>
-      <div className="multiple-selected-source" key={selectedSource.id}><p className="eyebrow">Редактируется источник {sources.findIndex(s=>s.id===selectedSource.id)+1}</p><label htmlFor="multiple-source-name">Название источника</label><input id="multiple-source-name" required maxLength={80} value={selectedSource.name} onChange={e=>editSource({name:e.target.value})}/><label htmlFor="multiple-source-distance">Положение выбранного источника, м от начала участка</label><input id="multiple-source-distance" type="number" required step="any" min={0} max={reach?reach.length_m-100:20000} value={selectedSource.source_distance_m} onChange={e=>editSource({source_distance_m:e.target.value},true)}/><small>Ниже каждого источника остаётся не менее 100 м.</small><button type="button" disabled={!reach} onClick={()=>{geometryRevision.current++;stopPicking();setPicking(true);setPreview(true);setParametersOpen(false);setProfileOpen(false);setPlaying(false);setPickMessage('Нажмите на русло не дальше 75 м от него. Выбор изменит только выбранный источник.');}}>Выбрать положение на карте</button>
-      <label htmlFor="multiple-source-flow">Расход стоков выбранного источника q, м³/с</label><input id="multiple-source-flow" type="number" step="any" min={0} max={100} required value={selectedSource.effluent_flow_m3_s} onChange={e=>editSource({effluent_flow_m3_s:e.target.value})}/>
-      <label htmlFor="multiple-load-mode">Режим нагрузки выбранного источника</label><select id="multiple-load-mode" value={selectedSource.load_mode} onChange={e=>editSource({load_mode:e.target.value as SourceDraft['load_mode']})}><option value="continuous">Постоянная нагрузка</option><option value="finite">Ограниченный период загрязнения</option><option value="profile">График концентрации стоков</option></select>
-      {selectedSource.load_mode!=='profile'&&<><label htmlFor="multiple-source-ce">Концентрация стоков выбранного источника ce, мг/л</label><input id="multiple-source-ce" type="number" step="any" required min={0} max={10000} value={selectedSource.effluent_mg_l} onChange={e=>editSource({effluent_mg_l:e.target.value})}/></>}
-      {selectedSource.load_mode==='finite'&&<><label htmlFor="multiple-source-duration">Период нагрузки выбранного источника, ч</label><input id="multiple-source-duration" type="number" step="any" required min={Number.MIN_VALUE} max={Number(shared.duration_hours)} value={selectedSource.load_duration_hours} onChange={e=>editSource({load_duration_hours:e.target.value})}/></>}
-      {selectedSource.load_mode==='profile'&&<LoadProfileEditor rows={selectedSource.rows} duration={Number(shared.duration_hours)} onChange={rows=>editSource({rows})}/>}
-      {previewLoad&&<LoadProfileChart conditions={previewLoad} label="Черновик: концентрация выбранного источника ce(t)"/>}<p className="simulation-hint">В пропусках и после периода ce=cb; расход q сохраняется. Источники условные, это не фактические водовыпуски предприятий. Совпадающие положения суммируются по воде и массе, записи сохраняются отдельно.</p><button type="button" disabled={sources.length<=1} onClick={remove}>Удалить выбранный источник</button></div>
-     </section>
-    </div><div className="simulation-actions"><button type="submit" disabled={status==='loading'||!reach}>Рассчитать</button>{status==='loading'&&<button type="button" onClick={cancel}>Отменить ожидание</button>}<small>Изменения применяются отдельным расчётом.</small></div></form>
-   </aside>
-   <section className="multiple-stage">
-    <div className="multiple-stage-top"><span>{displayReach?.name??'Подготовленный участок'} · {preview?'черновик положений':'полная расчётная область'}</span>{result&&preview&&<button type="button" onClick={()=>{setPreview(false);stopPicking();}}>Показать завершённый расчёт</button>}{result&&<button ref={profileButton} type="button" className="profile-toggle" aria-expanded={profileOpen} onClick={()=>setProfileOpen(v=>!v)}>Профиль и показатели</button>}</div>
-    {pickMessage&&<div className="multiple-pick-notice" role="status">{pickMessage}{picking&&<button type="button" onClick={()=>{stopPicking();parameterButton.current?.focus();}}>Отменить выбор положения</button>}</div>}
-    <div className="multiple-map-area"><MultipleSourceMap reach={displayReach} result={preview?null:result} values={preview?null:values} scale={scale} sources={mapSources} selectedSource={selectedSource.id} selectedSegment={segment} picking={picking} profileOpen={profileOpen} suspended={mobile&&parametersOpen} onSource={id=>{if(sources.some(s=>s.id===id))selectSource(id);}} onSegment={setSegment} onPick={(lon,lat)=>void pick(lon,lat)}/>
-     {result&&<aside className={`multiple-profile profile-drawer${profileOpen?' is-open':''}`} aria-label="Профиль и показатели" hidden={!profileOpen} inert={mobile&&parametersOpen}><div className="multiple-profile-heading"><h2>Профиль и показатели</h2><button type="button" className="profile-close" aria-label="Закрыть профиль" onClick={()=>setProfileOpen(false)}>×</button></div><div className="profile-tabs"><button type="button" aria-pressed={profileView==='space'} onClick={()=>setProfileView('space')}>По расстоянию C(x)</button><button type="button" aria-pressed={profileView==='time'} onClick={()=>setProfileView('time')}>Во времени C(t)</button></div>{profileView==='time'?<TemporalProfile result={result} a={comparisonA} b={comparisonB} distances={result.distances_m} selected={segment} onSelect={setSegment} hour={hour} duration={result.inputs.duration_hours} scale={scale} background={result.inputs.background_mg_l} onSeek={seek}/>:<SpatialProfile result={result} a={comparisonA} b={comparisonB} hour={hour} selected={segment} onSelect={setSegment} scale={scale}/>}
-      {comparisonA&&comparisonB&&<dl className="multiple-comparison-values" data-testid="comparison-values"><div><dt>А</dt><dd>{number(valuesAtHour(comparisonA,hour)[segment])} мг/л</dd></div><div><dt>Б</dt><dd>{number(valuesAtHour(comparisonB,hour)[segment])} мг/л</dd></div><div><dt>Б − А</dt><dd>{number(valuesAtHour(comparisonB,hour)[segment]-valuesAtHour(comparisonA,hour)[segment])} мг/л</dd></div></dl>}
-      <details className="completed-source-profile"><summary>Сохранённые условия источников</summary>{result.inputs.sources.map((source,index)=><div key={source.id}><h3>Сценарный источник {index+1}: {source.name}</h3><p>{number(source.source_distance_m,1)} м · q={number(source.effluent_flow_m3_s)} м³/с</p><LoadProfileChart conditions={sourceLoad(source,result.inputs)} hour={hour} label={`Сохранённый график источника ${index+1} ce(t)`}/></div>)}</details><p className="simulation-hint" data-testid="temporal-resolution">Сохранено {result.temporal_resolution.saved_states} моментов из {result.temporal_resolution.reference_states}. Интерполяционный допуск: {number(result.temporal_resolution.interpolation_relative_tolerance*100,0)}% отклонения от фона относительно внутренних состояний; это не физическая точность.</p><ResultExports result={result} a={comparisonA} b={comparisonB} hour={hour} selected={segment}/><p className="simulation-hint">Концентрации рассчитаны, параметры заданы пользователем. Проверка по реальным наблюдениям не выполнена. Толщина линии не является рассчитанной шириной пятна.</p></aside>}
+  const savedEvents = result
+    ? result.inputs.sources.flatMap((source, index) =>
+        sourceEvents(sourceLoad(source, result.inputs)).map((event) => ({
+          ...event,
+          id: source.id,
+          index,
+        })),
+      )
+    : [];
+  const seek = (value: number) => {
+    setHour(value);
+    setPlaying(false);
+  };
+  return (
+    <div
+      className={`simulation multiple-simulation${comparing ? " is-comparing" : ""}`}
+    >
+      <header className="model-heading">
+        <div>
+          <h1>Несколько сценарных источников</h1>
+          <span className="scenario-badge">
+            Синтетические условия · хлориды
+          </span>
+        </div>
+        <div className="workspace-tools">
+          <button
+            ref={parameterButton}
+            className="mobile-parameters-toggle"
+            aria-expanded={parametersOpen}
+            aria-controls="multiple-parameters"
+            onClick={() => setParametersOpen((v) => !v)}
+          >
+            Параметры
+          </button>
+          <button
+            type="button"
+            disabled={
+              !reaches.some((r) => r.id === "don-olkhovets") ||
+              status === "loading"
+            }
+            onClick={demo}
+          >
+            Демонстрация двух источников
+          </button>
+        </div>
+      </header>
+      <div className="map-status-stack">
+        {(draftReason || completedReason) && (
+          <p className="comparison-notice" role="status">
+            Сравнение отключено: {draftReason || completedReason} А сохранён;
+            можно выполнить одиночный расчёт.
+          </p>
+        )}
+        {stale && (
+          <p className="simulation-stale" role="status">
+            {variant
+              ? "Условия Б изменены. Показан прежний завершённый расчёт."
+              : "Условия изменены. Результат относится к предыдущим условиям."}
+          </p>
+        )}
+        {status === "loading" && (
+          <p className="calculation-status" role="status">
+            Выполняется расчёт… Прежние результаты сохраняются.
+          </p>
+        )}
+        {status === "cancelled" && (
+          <p className="calculation-status" role="status">
+            Ожидание отменено. Сервер может ещё завершать вычисление.
+          </p>
+        )}
+        {status === "error" && (
+          <div className="simulation-error" role="alert">
+            <strong>Не удалось выполнить расчёт</strong>
+            <p>{message}</p>
+            <button type="button" onClick={() => void calculate()}>
+              Повторить расчёт
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="model-workspace">
+        <aside
+          id="multiple-parameters"
+          className={`simulation-parameters${parametersOpen ? " is-open" : ""}`}
+          aria-labelledby="multiple-parameters-title"
+        >
+          <div className="parameters-heading">
+            <div>
+              <p className="eyebrow">1–3 источника · одна река</p>
+              <h2 id="multiple-parameters-title">Условия расчёта</h2>
+            </div>
+            <button
+              ref={closeButton}
+              type="button"
+              className="close-parameters"
+              aria-label="Закрыть параметры"
+              onClick={() => setParametersOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+          <form
+            ref={form}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void calculate();
+            }}
+          >
+            <div className="parameter-scroll">
+              <SavedScenarios
+                initialName={initialScenario?.name}
+                draftKey={JSON.stringify([draftKey, analysis.draftKey])}
+                interactionKey={interaction}
+                getConditions={savePayload}
+                getDocument={conditionsDocument}
+                onOpen={(scenario) => applyConditions(scenario)}
+                onApplyConditions={(scenario) =>
+                  applyConditions(scenario, true)
+                }
+              />
+              {notice && (
+                <p className="multiple-notice" role="status">
+                  {notice}
+                </p>
+              )}
+              <section
+                className="scenario-comparison-controls"
+                aria-label="Сценарии текущего сеанса"
+              >
+                <p className="comparison-step">
+                  {variant
+                    ? "Б · редактируемые условия"
+                    : baseline
+                      ? "А · закреплённый расчёт"
+                      : "Начните с расчёта"}
+                </p>
+                {!baseline ? (
+                  <button
+                    type="button"
+                    disabled={!result || status === "loading"}
+                    onClick={pin}
+                  >
+                    Закрепить как А
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" onClick={createVariant}>
+                      Создать вариант Б
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!result || status === "loading"}
+                      onClick={pin}
+                    >
+                      Заменить А показанным расчётом
+                    </button>
+                  </>
+                )}
+                <small>
+                  А/Б хранятся в памяти и сбрасываются после перезагрузки.
+                  Библиотека сохраняет условия.
+                </small>
+              </section>
+              <label htmlFor="multiple-reach">Подготовленный участок</label>
+              <select
+                id="multiple-reach"
+                value={reachId}
+                onChange={(e) => {
+                  geometryRevision.current++;
+                  stopPicking();
+                  setReachId(e.target.value);
+                  setPreview(true);
+                  setPlaying(false);
+                }}
+              >
+                {reaches.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+              {reach && (
+                <p className="simulation-hint">
+                  Полная область: 0–{number(reach.length_m, 1)} м. Источники не
+                  обрезают участок.
+                </p>
+              )}
+              {reachError && (
+                <p role="alert">
+                  {reachError}
+                  <button
+                    type="button"
+                    onClick={() => setReachRevision((v) => v + 1)}
+                  >
+                    Повторить загрузку участков
+                  </button>
+                </p>
+              )}
+              <details className="multiple-common" open>
+                <summary>Общие условия</summary>
+                {commonFields.map((field) => (
+                  <div className="simulation-field" key={field.key}>
+                    <label htmlFor={`multiple-${field.key}`}>
+                      {field.label}
+                    </label>
+                    <input
+                      id={`multiple-${field.key}`}
+                      type="number"
+                      step="any"
+                      required
+                      min={field.min}
+                      max={field.max}
+                      value={shared[field.key]}
+                      onChange={(e) => {
+                        setShared({ ...shared, [field.key]: e.target.value });
+                        setPlaying(false);
+                      }}
+                    />
+                  </div>
+                ))}
+                <p className="simulation-hint">
+                  Q(x)=Qr+Σq выше сечения; A(x)=Q(x)/u. Скорость и дисперсия
+                  общие. Это сценарное приближение, не расчёт реальной
+                  гидравлики.
+                </p>
+              </details>
+              <section
+                className="multiple-source-editor"
+                aria-label="Список сценарных источников"
+              >
+                <h3>Сценарные источники · {sources.length}/3</h3>
+                <div className="multiple-source-list">
+                  {sources.map((source, index) => (
+                    <button
+                      key={source.id}
+                      type="button"
+                      className={`multiple-source-choice${source.id === selectedSource.id ? " is-selected" : ""}`}
+                      aria-label={`Выбрать источник ${index + 1}`}
+                      aria-pressed={source.id === selectedSource.id}
+                      onClick={() => selectSource(source.id)}
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{source.name || "Без названия"}</strong>
+                      <small>{source.source_distance_m || "—"} м</small>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={sources.length >= 3}
+                  onClick={add}
+                >
+                  Добавить источник
+                </button>
+                <div
+                  className="multiple-selected-source"
+                  key={selectedSource.id}
+                >
+                  <p className="eyebrow">
+                    Редактируется источник{" "}
+                    {sources.findIndex((s) => s.id === selectedSource.id) + 1}
+                  </p>
+                  <label htmlFor="multiple-source-name">
+                    Название источника
+                  </label>
+                  <input
+                    id="multiple-source-name"
+                    required
+                    maxLength={80}
+                    value={selectedSource.name}
+                    onChange={(e) => editSource({ name: e.target.value })}
+                  />
+                  <label htmlFor="multiple-source-distance">
+                    Положение выбранного источника, м от начала участка
+                  </label>
+                  <input
+                    id="multiple-source-distance"
+                    type="number"
+                    required
+                    step="any"
+                    min={0}
+                    max={reach ? reach.length_m - 100 : 20000}
+                    value={selectedSource.source_distance_m}
+                    onChange={(e) =>
+                      editSource({ source_distance_m: e.target.value }, true)
+                    }
+                  />
+                  <small>Ниже каждого источника остаётся не менее 100 м.</small>
+                  <button
+                    type="button"
+                    disabled={!reach}
+                    onClick={() => {
+                      geometryRevision.current++;
+                      stopPicking();
+                      setPicking(true);
+                      setPreview(true);
+                      setParametersOpen(false);
+                      setProfileOpen(false);
+                      setPlaying(false);
+                      setPickMessage(
+                        "Нажмите на русло не дальше 75 м от него. Выбор изменит только выбранный источник.",
+                      );
+                    }}
+                  >
+                    Выбрать положение на карте
+                  </button>
+                  <label htmlFor="multiple-source-flow">
+                    Расход стоков выбранного источника q, м³/с
+                  </label>
+                  <input
+                    id="multiple-source-flow"
+                    type="number"
+                    step="any"
+                    min={0}
+                    max={100}
+                    required
+                    value={selectedSource.effluent_flow_m3_s}
+                    onChange={(e) =>
+                      editSource({ effluent_flow_m3_s: e.target.value })
+                    }
+                  />
+                  <label htmlFor="multiple-load-mode">
+                    Режим нагрузки выбранного источника
+                  </label>
+                  <select
+                    id="multiple-load-mode"
+                    value={selectedSource.load_mode}
+                    onChange={(e) =>
+                      editSource({
+                        load_mode: e.target.value as SourceDraft["load_mode"],
+                      })
+                    }
+                  >
+                    <option value="continuous">Постоянная нагрузка</option>
+                    <option value="finite">
+                      Ограниченный период загрязнения
+                    </option>
+                    <option value="profile">График концентрации стоков</option>
+                  </select>
+                  {selectedSource.load_mode !== "profile" && (
+                    <>
+                      <label htmlFor="multiple-source-ce">
+                        Концентрация стоков выбранного источника ce, мг/л
+                      </label>
+                      <input
+                        id="multiple-source-ce"
+                        type="number"
+                        step="any"
+                        required
+                        min={0}
+                        max={10000}
+                        value={selectedSource.effluent_mg_l}
+                        onChange={(e) =>
+                          editSource({ effluent_mg_l: e.target.value })
+                        }
+                      />
+                    </>
+                  )}
+                  {selectedSource.load_mode === "finite" && (
+                    <>
+                      <label htmlFor="multiple-source-duration">
+                        Период нагрузки выбранного источника, ч
+                      </label>
+                      <input
+                        id="multiple-source-duration"
+                        type="number"
+                        step="any"
+                        required
+                        min={Number.MIN_VALUE}
+                        max={Number(shared.duration_hours)}
+                        value={selectedSource.load_duration_hours}
+                        onChange={(e) =>
+                          editSource({ load_duration_hours: e.target.value })
+                        }
+                      />
+                    </>
+                  )}
+                  {selectedSource.load_mode === "profile" && (
+                    <LoadProfileEditor
+                      rows={selectedSource.rows}
+                      duration={Number(shared.duration_hours)}
+                      onChange={(rows) => editSource({ rows })}
+                    />
+                  )}
+                  {previewLoad && (
+                    <LoadProfileChart
+                      conditions={previewLoad}
+                      label="Черновик: концентрация выбранного источника ce(t)"
+                    />
+                  )}
+                  <p className="simulation-hint">
+                    В пропусках и после периода ce=cb; расход q сохраняется.
+                    Источники условные, это не фактические водовыпуски
+                    предприятий. Совпадающие положения суммируются по воде и
+                    массе, записи сохраняются отдельно.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={sources.length <= 1}
+                    onClick={remove}
+                  >
+                    Удалить выбранный источник
+                  </button>
+                </div>
+              </section>
+            </div>
+            <div className="simulation-actions">
+              <button type="submit" disabled={status === "loading" || !reach}>
+                Рассчитать
+              </button>
+              {status === "loading" && (
+                <button type="button" onClick={cancel}>
+                  Отменить ожидание
+                </button>
+              )}
+              <small>Изменения применяются отдельным расчётом.</small>
+            </div>
+          </form>
+        </aside>
+        <section className="multiple-stage">
+          <div className="multiple-stage-top" inert={mobile && parametersOpen}>
+            <span>
+              {displayReach?.name ?? "Подготовленный участок"} ·{" "}
+              {preview ? "черновик положений" : "полная расчётная область"}
+            </span>
+            {result && preview && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPreview(false);
+                  stopPicking();
+                }}
+              >
+                Показать завершённый расчёт
+              </button>
+            )}
+            <button
+              type="button"
+              aria-expanded={profileOpen && profileView === "analysis"}
+              onClick={(event) => {
+                profileOpener.current = event.currentTarget;
+                setProfileView("analysis");
+                setProfileOpen(true);
+              }}
+            >
+              Контрольные точки
+            </button>
+            {result && (
+              <button
+                ref={profileButton}
+                type="button"
+                className="profile-toggle"
+                aria-expanded={profileOpen}
+                onClick={(event) => {
+                  profileOpener.current = event.currentTarget;
+                  setProfileOpen((v) => !v);
+                }}
+              >
+                Профиль и показатели
+              </button>
+            )}
+          </div>
+          {pickMessage && (
+            <div className="multiple-pick-notice" role="status">
+              {pickMessage}
+              {picking && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopPicking();
+                    parameterButton.current?.focus();
+                  }}
+                >
+                  Отменить выбор положения
+                </button>
+              )}
+            </div>
+          )}
+          <div className="multiple-map-area">
+            <MultipleSourceMap
+              reach={displayReach}
+              result={preview ? null : result}
+              values={preview ? null : values}
+              scale={scale}
+              sources={mapSources}
+              selectedSource={selectedSource.id}
+              selectedSegment={segment}
+              picking={picking}
+              profileOpen={profileOpen}
+              suspended={mobile && parametersOpen}
+              onSource={(id) => {
+                if (sources.some((s) => s.id === id)) selectSource(id);
+              }}
+              controlPoints={
+                analysis.availableFor(mapScope) ? analysis.applied.points : []
+              }
+              selectedControlPointId={analysis.selectedId}
+              onControlPointSelect={selectControlPoint}
+              onSegment={setSegment}
+              onPick={(lon, lat) => void pick(lon, lat)}
+            />
+            <aside
+              className={`multiple-profile profile-drawer${profileOpen ? " is-open" : ""}`}
+              aria-label="Профиль и показатели"
+              hidden={!profileOpen}
+              inert={mobile && parametersOpen}
+            >
+              <div className="multiple-profile-heading">
+                <h2>Профиль и показатели</h2>
+                <button
+                  type="button"
+                  className="profile-close"
+                  aria-label="Закрыть профиль"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="profile-tabs">
+                <button
+                  type="button"
+                  aria-pressed={profileView === "space"}
+                  onClick={() => setProfileView("space")}
+                >
+                  По расстоянию C(x)
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={profileView === "time"}
+                  onClick={() => setProfileView("time")}
+                >
+                  Во времени C(t)
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={profileView === "analysis"}
+                  onClick={() => setProfileView("analysis")}
+                >
+                  Контрольные точки
+                </button>
+              </div>
+              {profileView === "analysis" ? (
+                <>
+                  {analysis.notice && <p role="status">{analysis.notice}</p>}
+                  <ControlPointsPanel
+                    draftPoints={analysis.draftPoints}
+                    thresholdDraft={analysis.thresholdDraft}
+                    appliedSettings={analysis.applied}
+                    result={result}
+                    a={comparisonA}
+                    b={comparisonB}
+                    hour={hour}
+                    selectedSegment={segment}
+                    onSegmentSelect={setSegment}
+                    selectedPointId={analysis.selectedId}
+                    analysisAvailable={analysisAvailable}
+                    inactiveReason={
+                      analysis.incompatible
+                        ? "Настройки относятся к другой геометрии. Вернитесь к прежнему участку или явно сбросьте их."
+                        : result && !analysisAvailable
+                          ? "Настройки анализа не относятся к геометрии показанного результата."
+                          : null
+                    }
+                    draftError={analysis.error}
+                    lengthM={displayReach?.length_m}
+                    draftDirty={analysis.dirty}
+                    onAddSelected={() => analysis.add(segment)}
+                    onRename={analysis.rename}
+                    onRemove={analysis.remove}
+                    onSelect={selectControlPoint}
+                    onThresholdChange={analysis.editThreshold}
+                    onApply={analysis.apply}
+                    onResetForGeometry={analysis.reset}
+                    onSeek={seek}
+                  />
+                  <ControlPointDownload
+                    result={analysisAvailable ? result : null}
+                    a={comparisonA}
+                    b={comparisonB}
+                    settings={analysis.applied}
+                    hour={hour}
+                  />
+                </>
+              ) : (
+                result &&
+                (profileView === "time" ? (
+                  <TemporalProfile
+                    result={result}
+                    a={comparisonA}
+                    b={comparisonB}
+                    distances={result.distances_m}
+                    selected={segment}
+                    onSelect={setSegment}
+                    hour={hour}
+                    duration={result.inputs.duration_hours}
+                    scale={scale}
+                    background={result.inputs.background_mg_l}
+                    thresholdMgL={
+                      analysisAvailable ? analysis.applied.threshold_mg_l : null
+                    }
+                    exceedanceIntervals={selectedAnalysis?.exceedance_intervals}
+                    comparisonExceedanceIntervals={
+                      comparisonAnalysis?.exceedance_intervals
+                    }
+                    onSeek={seek}
+                  />
+                ) : (
+                  <SpatialProfile
+                    result={result}
+                    a={comparisonA}
+                    b={comparisonB}
+                    hour={hour}
+                    selected={segment}
+                    onSelect={setSegment}
+                    scale={scale}
+                  />
+                ))
+              )}
+              {result && (
+                <>
+                  {comparisonA && comparisonB && (
+                    <dl
+                      className="multiple-comparison-values"
+                      data-testid="comparison-values"
+                    >
+                      <div>
+                        <dt>А</dt>
+                        <dd>
+                          {number(valuesAtHour(comparisonA, hour)[segment])}{" "}
+                          мг/л
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Б</dt>
+                        <dd>
+                          {number(valuesAtHour(comparisonB, hour)[segment])}{" "}
+                          мг/л
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Б − А</dt>
+                        <dd>
+                          {number(
+                            valuesAtHour(comparisonB, hour)[segment] -
+                              valuesAtHour(comparisonA, hour)[segment],
+                          )}{" "}
+                          мг/л
+                        </dd>
+                      </div>
+                    </dl>
+                  )}
+                  <details className="completed-source-profile">
+                    <summary>Сохранённые условия источников</summary>
+                    {result.inputs.sources.map((source, index) => (
+                      <div key={source.id}>
+                        <h3>
+                          Сценарный источник {index + 1}: {source.name}
+                        </h3>
+                        <p>
+                          {number(source.source_distance_m, 1)} м · q=
+                          {number(source.effluent_flow_m3_s)} м³/с
+                        </p>
+                        <LoadProfileChart
+                          conditions={sourceLoad(source, result.inputs)}
+                          hour={hour}
+                          label={`Сохранённый график источника ${index + 1} ce(t)`}
+                        />
+                      </div>
+                    ))}
+                  </details>
+                  <p
+                    className="simulation-hint"
+                    data-testid="temporal-resolution"
+                  >
+                    Сохранено {result.temporal_resolution.saved_states} моментов
+                    из {result.temporal_resolution.reference_states}.
+                    Интерполяционный допуск:{" "}
+                    {number(
+                      result.temporal_resolution
+                        .interpolation_relative_tolerance * 100,
+                      0,
+                    )}
+                    % отклонения от фона относительно внутренних состояний; это
+                    не физическая точность.
+                  </p>
+                  <ResultExports
+                    result={result}
+                    a={comparisonA}
+                    b={comparisonB}
+                    hour={hour}
+                    selected={segment}
+                  />
+                  <p className="simulation-hint">
+                    Концентрации рассчитаны, параметры заданы пользователем.
+                    Проверка по реальным наблюдениям не выполнена. Толщина линии
+                    не является рассчитанной шириной пятна.
+                  </p>
+                  <details>
+                    <summary>Сведения о расчёте</summary>
+                    <p>
+                      Модель: {result.model_id}. Формат результата:{" "}
+                      {result.format_version}.
+                    </p>
+                  </details>
+                </>
+              )}
+            </aside>
+          </div>
+          {result && (
+            <div
+              className="multiple-time-panel"
+              inert={mobile && parametersOpen}
+            >
+              <div className="multiple-time-top">
+                {comparing && (
+                  <div className="multiple-ab">
+                    <button
+                      type="button"
+                      aria-pressed={active === "А"}
+                      onClick={() => {
+                        setActive("А");
+                        setPreview(false);
+                      }}
+                    >
+                      Показать А
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={active === "Б"}
+                      onClick={() => {
+                        setActive("Б");
+                        setPreview(false);
+                      }}
+                    >
+                      Показать Б
+                    </button>
+                  </div>
+                )}
+                <div
+                  className="multiple-scale"
+                  data-testid="concentration-scale"
+                >
+                  <span>Концентрация · мг/л</span>
+                  <div />
+                  <small>
+                    {number(scale[0])}
+                    <span>{number(scale[1])}</span>
+                  </small>
+                </div>
+              </div>
+              <div className="multiple-play-row">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hour >= result.inputs.duration_hours) setHour(0);
+                    setPlaying((v) => !v);
+                  }}
+                >
+                  {playing ? "Пауза" : "Воспроизвести"}
+                </button>
+                <label>
+                  Скорость
+                  <select
+                    aria-label="Скорость воспроизведения"
+                    value={speed}
+                    onChange={(e) => setSpeed(Number(e.target.value))}
+                  >
+                    {[0.25, 0.5, 1, 2, 4].map((v) => (
+                      <option key={v} value={v}>
+                        {v}×
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <strong data-testid="model-time">{number(hour)} ч</strong>
+              </div>
+              <label htmlFor="multiple-clock">Время от начала сценария</label>
+              <div className="multiple-timeline">
+                <input
+                  id="multiple-clock"
+                  aria-label="Время от начала сценария"
+                  type="range"
+                  min={0}
+                  max={result.inputs.duration_hours}
+                  step="any"
+                  value={hour}
+                  onChange={(e) => seek(Number(e.target.value))}
+                />
+                {savedEvents.map((event, i) => (
+                  <span
+                    key={`${event.id}-${event.hour}-${i}`}
+                    data-testid="load-end-marker"
+                    data-hour={event.hour}
+                    style={{
+                      left: `${(event.hour / result.inputs.duration_hours) * 100}%`,
+                    }}
+                    title={`Источник ${event.index + 1}: ${number(event.hour)} ч`}
+                  />
+                ))}
+              </div>
+              <div
+                className="multiple-source-states"
+                data-testid="source-status"
+              >
+                {(comparing
+                  ? [
+                      { label: "А", value: baseline! },
+                      { label: "Б", value: latest! },
+                    ]
+                  : [{ label: "", value: result }]
+                ).map(({ label, value }) => (
+                  <div key={label}>
+                    {label && <strong>{label}: </strong>}
+                    {value.inputs.sources.map((source, index) => (
+                      <span key={source.id}>
+                        {index + 1} · ce=
+                        {number(
+                          sourceConcentrationAt(
+                            sourceLoad(source, value.inputs),
+                            hour,
+                          ),
+                        )}{" "}
+                        мг/л · q={number(source.effluent_flow_m3_s)} м³/с
+                        {index < value.inputs.sources.length - 1 ? " / " : ""}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
-    {result&&<div className="multiple-time-panel" inert={mobile&&parametersOpen}><div className="multiple-time-top">{comparing&&<div className="multiple-ab"><button type="button" aria-pressed={active==='А'} onClick={()=>{setActive('А');setPreview(false);}}>Показать А</button><button type="button" aria-pressed={active==='Б'} onClick={()=>{setActive('Б');setPreview(false);}}>Показать Б</button></div>}<div className="multiple-scale" data-testid="concentration-scale"><span>Концентрация · мг/л</span><div/><small>{number(scale[0])}<span>{number(scale[1])}</span></small></div></div><div className="multiple-play-row"><button type="button" onClick={()=>{if(hour>=result.inputs.duration_hours)setHour(0);setPlaying(v=>!v);}}>{playing?'Пауза':'Воспроизвести'}</button><label>Скорость<select aria-label="Скорость воспроизведения" value={speed} onChange={e=>setSpeed(Number(e.target.value))}>{[.25,.5,1,2,4].map(v=><option key={v} value={v}>{v}×</option>)}</select></label><strong data-testid="model-time">{number(hour)} ч</strong></div><label htmlFor="multiple-clock">Время от начала сценария</label><div className="multiple-timeline"><input id="multiple-clock" aria-label="Время от начала сценария" type="range" min={0} max={result.inputs.duration_hours} step="any" value={hour} onChange={e=>seek(Number(e.target.value))}/>{savedEvents.map((event,i)=><span key={`${event.id}-${event.hour}-${i}`} data-testid="load-end-marker" data-hour={event.hour} style={{left:`${event.hour/result.inputs.duration_hours*100}%`}} title={`Источник ${event.index+1}: ${number(event.hour)} ч`}/>)}</div><div className="multiple-source-states" data-testid="source-status">{(comparing?[{label:'А',value:baseline!},{label:'Б',value:latest!}]:[{label:'',value:result}]).map(({label,value})=><div key={label}>{label&&<strong>{label}: </strong>}{value.inputs.sources.map((source,index)=><span key={source.id}>{index+1} · ce={number(sourceConcentrationAt(sourceLoad(source,value.inputs),hour))} мг/л · q={number(source.effluent_flow_m3_s)} м³/с{index<value.inputs.sources.length-1?' / ':''}</span>)}</div>)}</div></div>}
-   </section>
-  </div>
- </div>;
+  );
 }

@@ -3,7 +3,7 @@ import { concentrationsAt } from './model-helpers';
 
 const numberText = (n: number) => `${n.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`;
 async function demo(page: Page) {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   const response = page.waitForResponse(r => r.url().endsWith('/api/v1/simulations'));
   await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
   const data = await (await response).json();

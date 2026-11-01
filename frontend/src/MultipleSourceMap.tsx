@@ -1,21 +1,366 @@
-import { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { riverCoordinate } from './riverCoordinate';
-import type { MultipleResult, Reach } from './multipleSources';
-export type MapSource={id:string;name:string;source_distance_m:number;number?:number};
-export function concentrationColor(value:number,scale:[number,number]){const f=scale[1]===scale[0]?.5:Math.min(1,Math.max(0,(value-scale[0])/(scale[1]-scale[0])));const p=[[36,101,180],[22,166,176],[225,212,90],[239,138,52],[185,31,82]];const x=f*4,i=Math.min(3,Math.floor(x));return `rgb(${p[i].map((v,j)=>Math.round(v+(p[i+1][j]-v)*(x-i))).join(', ')})`;}
-type Props={reach:Reach|null;result:MultipleResult|null;values:number[]|null;scale:[number,number];sources:MapSource[];selectedSource:string;selectedSegment:number;picking:boolean;profileOpen:boolean;suspended:boolean;onSource:(id:string)=>void;onSegment:(index:number)=>void;onPick:(lon:number,lat:number)=>void};
-export default function MultipleSourceMap({reach,result,values,scale,sources,selectedSource,selectedSegment,picking,profileOpen,suspended,onSource,onSegment,onPick}:Props){
- const host=useRef<HTMLDivElement>(null),map=useRef<L.Map|null>(null),segments=useRef<L.Polyline[]>([]),pins=useRef<L.Marker[]>([]);const [tileError,setTileError]=useState(false);const calls=useRef({onSource,onSegment,onPick,picking});calls.current={onSource,onSegment,onPick,picking};
- const key=reach?JSON.stringify([reach.id,reach.geometry]):'';
- useEffect(()=>{if(!host.current||!reach)return;setTileError(false);const m=L.map(host.current,{zoomControl:false,scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false});map.current=m;m.attributionControl.setPrefix(false);m.attributionControl.setPosition('bottomleft');L.control.zoom({zoomInTitle:'Увеличить масштаб',zoomOutTitle:'Уменьшить масштаб'}).addTo(m);const points=reach.geometry.coordinates.map(([lon,lat])=>[lat,lon] as L.LatLngTuple);m.fitBounds(points,{padding:[35,45],animate:false});const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(m);tiles.on('tileerror',()=>setTileError(true));L.polyline(points,{color:'#fff',weight:16,interactive:false,smoothFactor:0}).addTo(m);L.polyline(points,{color:'#416b7b',weight:11,interactive:false,smoothFactor:0}).addTo(m);L.control.scale({imperial:false,position:'bottomleft'}).addTo(m);m.on('click',e=>{if(calls.current.picking)calls.current.onPick(e.latlng.lng,e.latlng.lat);});const observer=new ResizeObserver(()=>m.invalidateSize({pan:false}));observer.observe(host.current);return()=>{observer.disconnect();segments.current=[];pins.current=[];m.remove();map.current=null;};},[key]);
- useEffect(()=>{if(!reach||!map.current||!matchMedia('(max-width:760px)').matches)return;const frame=requestAnimationFrame(()=>{const m=map.current,h=host.current;if(!m||!h)return;const panel=h.closest('.multiple-map-area')?.querySelector('.multiple-profile');const covered=profileOpen&&panel?panel.getBoundingClientRect().height:0;m.invalidateSize({pan:false});m.fitBounds(reach.geometry.coordinates.map(([lon,lat])=>[lat,lon] as L.LatLngTuple),{paddingTopLeft:[35,35],paddingBottomRight:[35,covered+15],animate:false});});return()=>cancelAnimationFrame(frame);},[key,profileOpen]);
- const segmentKey=result?JSON.stringify(result.segment_geometries):'';
- useEffect(()=>{const m=map.current;if(!m)return;segments.current.forEach(s=>s.remove());segments.current=result?.segment_geometries.map((line,index)=>L.polyline(line.coordinates.map(([lon,lat])=>[lat,lon] as L.LatLngTuple),{weight:9,color:'#2465b4',smoothFactor:0,className:'simulation-segment'}).addTo(m).on('click',e=>{if(calls.current.picking)calls.current.onPick(e.latlng.lng,e.latlng.lat);else calls.current.onSegment(index);L.DomEvent.stopPropagation(e);}))??[];return()=>{segments.current.forEach(s=>s.remove());segments.current=[];};},[key,segmentKey]);
- useEffect(()=>{segments.current.forEach((line,index)=>line.setStyle({color:values?concentrationColor(values[index],scale):'#416b7b',opacity:values?1:0,weight:index===selectedSegment?12:9}));},[values,scale,selectedSegment,key,segmentKey]);
- const sourceKey=JSON.stringify(sources);
- useEffect(()=>{const m=map.current;if(!m||!reach)return;pins.current.forEach(pin=>pin.remove());pins.current=sources.map((source,index)=>{const [lon,lat]=riverCoordinate(reach.geometry.coordinates,reach.distances_m,source.source_distance_m);const sourceNumber=source.number??index+1;const coincident=sources.slice(0,index).filter(s=>Math.abs(s.source_distance_m-source.source_distance_m)<.01).length;const pin=L.marker([lat,lon],{keyboard:true,title:`Сценарный источник ${sourceNumber}: ${source.name}`,alt:`Выбрать источник ${sourceNumber}`,zIndexOffset:source.id===selectedSource?1000:0,icon:L.divIcon({className:`multiple-map-source${source.id===selectedSource?' is-selected':''}`,html:`<span class="multiple-source-dot" style="left:${11-coincident*32}px"></span><span class="multiple-source-number">${sourceNumber}</span>`,iconSize:[30,35],iconAnchor:[15-coincident*32,30]})}).addTo(m).on('click',e=>{calls.current.onSource(source.id);L.DomEvent.stopPropagation(e);});return pin;});return()=>{pins.current.forEach(pin=>pin.remove());pins.current=[];};},[key,sourceKey,selectedSource]);
- useEffect(()=>{if(picking)host.current?.focus({preventScroll:true});},[picking]);
- return <div className={`multiple-map${picking?' is-picking':''}`} inert={suspended}><div ref={host} className="point-map" tabIndex={-1} aria-label="Полный участок реки и сценарные источники"/>{tileError&&<p className="map-caption">Подложка недоступна. Русло и источники показаны независимо от неё.</p>}{!reach&&<p className="multiple-map-empty">Загружаем подготовленное русло…</p>}</div>;
+import { useEffect, useMemo, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "./controlPoints.css";
+import { riverCoordinate } from "./riverCoordinate";
+import type { ControlPoint } from "./analysisSettings";
+import type { Line, MultipleResult, Reach } from "./multipleSources";
+
+export type MapSource = {
+  id: string;
+  name: string;
+  source_distance_m: number;
+  number?: number;
+};
+
+export function concentrationColor(value: number, scale: [number, number]) {
+  const fraction =
+    scale[1] === scale[0]
+      ? 0.5
+      : Math.min(1, Math.max(0, (value - scale[0]) / (scale[1] - scale[0])));
+  const palette = [
+    [36, 101, 180],
+    [22, 166, 176],
+    [225, 212, 90],
+    [239, 138, 52],
+    [185, 31, 82],
+  ];
+  const position = fraction * 4;
+  const index = Math.min(3, Math.floor(position));
+  return `rgb(${palette[index].map((value, channel) => Math.round(value + (palette[index + 1][channel] - value) * (position - index))).join(", ")})`;
+}
+
+/** Cut by ellipsoidal chainage, retaining every original bend within a segment. */
+export function previewSegmentGeometries(reach: Reach): Line[] {
+  return Array.from({ length: 100 }, (_, index) => {
+    const start = (reach.length_m * index) / 100;
+    const end = (reach.length_m * (index + 1)) / 100;
+    const interior = reach.geometry.coordinates.filter(
+      (_, vertex) =>
+        reach.distances_m[vertex] > start && reach.distances_m[vertex] < end,
+    );
+    return {
+      type: "LineString",
+      coordinates: [
+        riverCoordinate(reach.geometry.coordinates, reach.distances_m, start),
+        ...interior,
+        riverCoordinate(reach.geometry.coordinates, reach.distances_m, end),
+      ],
+    };
+  });
+}
+
+/** Fit only after an explicit layout change, never on time or A/B switching. */
+function fitVisibleReach(instance: L.Map, reach: Reach, element: HTMLElement) {
+  const panel = element
+    .closest(".multiple-map-area")
+    ?.querySelector<HTMLElement>(".multiple-profile");
+  const visible = panel && !panel.hidden;
+  const phone = matchMedia("(max-width:760px)").matches;
+  const right = visible && !phone ? panel.getBoundingClientRect().width : 0;
+  const bottom = visible && phone ? panel.getBoundingClientRect().height : 0;
+  instance.invalidateSize({ pan: false });
+  instance.fitBounds(
+    reach.geometry.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
+    {
+      paddingTopLeft: [45, 45],
+      paddingBottomRight: [right + 45, bottom + 45],
+      animate: false,
+    },
+  );
+}
+
+type Props = {
+  reach: Reach | null;
+  result: MultipleResult | null;
+  values: number[] | null;
+  scale: [number, number];
+  sources: MapSource[];
+  selectedSource: string;
+  selectedSegment: number;
+  picking: boolean;
+  profileOpen: boolean;
+  suspended: boolean;
+  onSource: (id: string) => void;
+  onSegment: (index: number) => void;
+  onPick: (lon: number, lat: number) => void;
+  controlPoints?: ControlPoint[];
+  selectedControlPointId?: string | null;
+  onControlPointSelect?: (point: ControlPoint) => void;
+};
+
+export default function MultipleSourceMap({
+  reach,
+  result,
+  values,
+  scale,
+  sources,
+  selectedSource,
+  selectedSegment,
+  picking,
+  profileOpen,
+  suspended,
+  onSource,
+  onSegment,
+  onPick,
+  controlPoints = [],
+  selectedControlPointId = null,
+  onControlPointSelect,
+}: Props) {
+  const host = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const segments = useRef<L.Polyline[]>([]);
+  const pins = useRef<L.Marker[]>([]);
+  const pointPins = useRef<L.Marker[]>([]);
+  const [tileError, setTileError] = useState(false);
+  const calls = useRef({
+    onSource,
+    onSegment,
+    onPick,
+    picking,
+    onControlPointSelect,
+  });
+  calls.current = {
+    onSource,
+    onSegment,
+    onPick,
+    picking,
+    onControlPointSelect,
+  };
+  const key = reach
+    ? JSON.stringify([
+        reach.id,
+        reach.geometry,
+        reach.length_m,
+        reach.distances_m,
+      ])
+    : "";
+  const preview = useMemo(
+    () => (reach ? previewSegmentGeometries(reach) : []),
+    [key],
+  );
+  const geometries = result?.segment_geometries ?? preview;
+  const segmentKey = JSON.stringify(geometries);
+
+  useEffect(() => {
+    if (!host.current || !reach) return;
+    setTileError(false);
+    const instance = L.map(host.current, {
+      zoomControl: false,
+      scrollWheelZoom: false,
+      zoomAnimation: false,
+      fadeAnimation: false,
+    });
+    map.current = instance;
+    instance.attributionControl.setPrefix(false);
+    instance.attributionControl.setPosition("bottomleft");
+    L.control
+      .zoom({
+        zoomInTitle: "Увеличить масштаб",
+        zoomOutTitle: "Уменьшить масштаб",
+      })
+      .addTo(instance);
+    const points = reach.geometry.coordinates.map(
+      ([lon, lat]) => [lat, lon] as L.LatLngTuple,
+    );
+    instance.fitBounds(points, { padding: [35, 45], animate: false });
+    const tiles = L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      },
+    ).addTo(instance);
+    tiles.on("tileerror", () => setTileError(true));
+    L.polyline(points, {
+      color: "#fff",
+      weight: 16,
+      interactive: false,
+      smoothFactor: 0,
+    }).addTo(instance);
+    L.polyline(points, {
+      color: "#416b7b",
+      weight: 11,
+      interactive: false,
+      smoothFactor: 0,
+    }).addTo(instance);
+    L.control
+      .scale({ imperial: false, position: "bottomleft" })
+      .addTo(instance);
+    instance.on("click", (event) => {
+      if (calls.current.picking)
+        calls.current.onPick(event.latlng.lng, event.latlng.lat);
+    });
+    const element = host.current;
+    const observer = new ResizeObserver(() =>
+      fitVisibleReach(instance, reach, element),
+    );
+    observer.observe(host.current);
+    return () => {
+      observer.disconnect();
+      segments.current = [];
+      pins.current = [];
+      pointPins.current = [];
+      instance.remove();
+      map.current = null;
+    };
+  }, [key]);
+
+  useEffect(() => {
+    if (!reach || !map.current || !host.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (map.current && host.current)
+        fitVisibleReach(map.current, reach, host.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [key, profileOpen]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    segments.current.forEach((segment) => segment.remove());
+    segments.current = geometries.map((line, index) =>
+      L.polyline(
+        line.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
+        {
+          weight: 9,
+          color: "#416b7b",
+          smoothFactor: 0,
+          className: result
+            ? "simulation-segment"
+            : "simulation-preview-segment",
+        },
+      )
+        .addTo(instance)
+        .on("click", (event) => {
+          if (calls.current.picking)
+            calls.current.onPick(event.latlng.lng, event.latlng.lat);
+          else calls.current.onSegment(index);
+          L.DomEvent.stopPropagation(event);
+        }),
+    );
+    return () => {
+      segments.current.forEach((segment) => segment.remove());
+      segments.current = [];
+    };
+  }, [key, segmentKey, !!result]);
+
+  useEffect(() => {
+    segments.current.forEach((line, index) =>
+      line.setStyle({
+        color: values
+          ? concentrationColor(values[index], scale)
+          : index === selectedSegment
+            ? "#174c45"
+            : "#416b7b",
+        opacity: values || index === selectedSegment ? 1 : 0.65,
+        weight: index === selectedSegment ? 13 : 9,
+      }),
+    );
+  }, [values, scale, selectedSegment, key, segmentKey, !!result]);
+
+  const sourceKey = JSON.stringify(sources);
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !reach) return;
+    pins.current.forEach((pin) => pin.remove());
+    pins.current = sources.map((source, index) => {
+      const [lon, lat] = riverCoordinate(
+        reach.geometry.coordinates,
+        reach.distances_m,
+        source.source_distance_m,
+      );
+      const sourceNumber = source.number ?? index + 1;
+      const coincident = sources
+        .slice(0, index)
+        .filter(
+          (other) =>
+            Math.abs(other.source_distance_m - source.source_distance_m) < 0.01,
+        ).length;
+      return L.marker([lat, lon], {
+        keyboard: true,
+        title: `Сценарный источник ${sourceNumber}: ${source.name}`,
+        alt: `Выбрать источник ${sourceNumber}`,
+        zIndexOffset: source.id === selectedSource ? 1000 : 0,
+        icon: L.divIcon({
+          className: `multiple-map-source${source.id === selectedSource ? " is-selected" : ""}`,
+          html: `<span class="multiple-source-dot" style="left:${11 - coincident * 32}px"></span><span class="multiple-source-number">${sourceNumber}</span>`,
+          iconSize: [30, 35],
+          iconAnchor: [15 - coincident * 32, 30],
+        }),
+      })
+        .addTo(instance)
+        .on("click", (event) => {
+          calls.current.onSource(source.id);
+          L.DomEvent.stopPropagation(event);
+        });
+    });
+    return () => {
+      pins.current.forEach((pin) => pin.remove());
+      pins.current = [];
+    };
+  }, [key, sourceKey, selectedSource]);
+
+  const pointsKey = JSON.stringify(controlPoints);
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !reach) return;
+    pointPins.current.forEach((pin) => pin.remove());
+    pointPins.current = controlPoints.map((point, index) => {
+      const [lon, lat] = riverCoordinate(
+        reach.geometry.coordinates,
+        reach.distances_m,
+        (reach.length_m * (point.segment_index + 0.5)) / 100,
+      );
+      return L.marker([lat, lon], {
+        keyboard: true,
+        title: `Контрольная точка К${index + 1}: ${point.name}`,
+        alt: `Выбрать контрольную точку К${index + 1}`,
+        zIndexOffset: point.id === selectedControlPointId ? 1200 : 200,
+        icon: L.divIcon({
+          className: `multiple-map-control-point${point.id === selectedControlPointId ? " is-selected" : ""}`,
+          html: `<span class="control-point-pin">К${index + 1}</span>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, -5],
+        }),
+      })
+        .addTo(instance)
+        .on("click", (event) => {
+          if (calls.current.onControlPointSelect)
+            calls.current.onControlPointSelect(point);
+          else calls.current.onSegment(point.segment_index);
+          L.DomEvent.stopPropagation(event);
+        });
+    });
+    return () => {
+      pointPins.current.forEach((pin) => pin.remove());
+      pointPins.current = [];
+    };
+  }, [key, pointsKey, selectedControlPointId]);
+
+  useEffect(() => {
+    if (picking) host.current?.focus({ preventScroll: true });
+  }, [picking]);
+  return (
+    <div
+      className={`multiple-map${picking ? " is-picking" : ""}`}
+      inert={suspended}
+    >
+      <div
+        ref={host}
+        className="point-map"
+        tabIndex={-1}
+        aria-label="Полный участок реки, сценарные источники и контрольные точки"
+      />
+      {tileError && (
+        <p className="map-caption">
+          Подложка недоступна. Русло и метки показаны независимо от неё.
+        </p>
+      )}
+      {!reach && (
+        <p className="multiple-map-empty">Загружаем подготовленное русло…</p>
+      )}
+    </div>
+  );
 }

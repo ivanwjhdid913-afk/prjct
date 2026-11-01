@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('runs the actual conservative model and uses its profile on the map', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длительность, ч').fill('24');
@@ -53,7 +53,7 @@ test('preserves catalog filters when visiting the model', async ({ page }) => {
   await page.getByRole('button', { name: 'Применить', exact: true }).click();
   await expect(page.locator('.water-row')).toHaveCount(1);
   await page.getByRole('link', { name: 'Моделирование', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Моделирование', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Несколько сценарных источников', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Каталог', exact: true }).click();
   await expect(page.getByLabel('Название объекта')).toHaveValue('озеро');
   await expect(page.locator('.water-row')).toHaveCount(1);
@@ -62,7 +62,7 @@ test('preserves catalog filters when visiting the model', async ({ page }) => {
 test('shows a failed calculation and allows retry', async ({ page }) => {
   let attempt = 0;
   await page.route('**/api/v1/simulations', route => ++attempt === 1 ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } }) : route.continue());
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длительность, ч').fill('24');
@@ -80,7 +80,7 @@ test('marks an in-flight result stale after inputs change', async ({ page }) => 
     await gate;
     await route.fulfill({ response });
   });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длительность, ч').fill('24');
@@ -118,7 +118,7 @@ for (const cancel of [false, true]) {
       if (first) { firstCalculated(); await gate; }
       await route.fulfill({ response });
     });
-    await page.goto('/#model');
+    await page.goto('/#model/legacy');
     await openParameters(page);
     await page.getByLabel('Геометрия сценария').selectOption('synthetic');
     await page.getByLabel('Длительность, ч').fill('24');
@@ -150,7 +150,7 @@ test('shows field errors returned by API and rejects malformed results', async (
   await page.route('**/api/v1/simulations', route => ++attempts === 1
     ? route.fulfill({ status: 422, json: { detail: [{ loc: ['body', 'velocity_m_s'], msg: 'Invalid value' }] } })
     : route.fulfill({ json: { inputs: {}, concentrations_mg_l: [] } }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длительность, ч').fill('24');
@@ -164,7 +164,7 @@ test('shows field errors returned by API and rejects malformed results', async (
 });
 
 test('zero-source calculation shows a uniform legend matching every segment', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длительность, ч').fill('24');
@@ -184,7 +184,7 @@ test('zero-source calculation shows a uniform legend matching every segment', as
 for (const width of [375, 768, 1024, 1440]) {
   test(`model fits ${width}px and exposes keyboard controls`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/#model');
+    await page.goto('/#model/legacy');
     await openParameters(page);
     await page.getByLabel('Геометрия сценария').selectOption('synthetic');
     await page.getByLabel('Длительность, ч').fill('24');

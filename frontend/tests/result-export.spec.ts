@@ -19,12 +19,12 @@ async function exportPanel(page: Page) {
 test.beforeEach(async ({ page }) => { await page.setViewportSize({ width: 1280, height: 720 }); await page.route('https://tile.openstreetmap.org/**', route => route.abort()); });
 
 test('CSV is disabled without a completed result and explains why', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.getByText('Выгрузка CSV доступна после завершения расчёта.', { exact: true })).toBeVisible();
 });
 
 test('actual five-second history exports every saved time and peak; changed form cannot change result metadata', async ({ page }) => {
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   for (const [label,value] of [['Длина участка L, м','500'],['Длительность, ч','1'],['Скорость течения u, м/с','1']] as const) await page.getByLabel(label).fill(value);
   await page.getByLabel('Режим нагрузки', { exact: true }).selectOption('finite'); await page.getByLabel('Период загрязнения, ч').fill(String(5 / 3600));
@@ -58,7 +58,7 @@ test('comparison exports full union independent of active result and pagination,
   const times = [0,...Array.from({length:2046},(_,i)=>(2*i+2)/4093),1];
   const b = {...base,inputs:{...base.inputs,effluent_flow_m3_s:.1,load_mode:'finite',load_duration_hours:5/3600},times_hours:times,concentrations_mg_l:times.map((_,i)=>[i===1?10.505969:10,i===100?10.2:10]),scale_mg_l:[10,10.505969]};
   await page.route('**/api/v1/simulations',route=>route.fulfill({json:primary}));
-  await page.goto('/#model'); await openParameters(page); await page.getByLabel('Геометрия сценария').selectOption('synthetic'); await page.getByLabel('Длина участка L, м').fill('500'); await page.getByLabel('Длительность, ч').fill('1');
+  await page.goto('/#model/legacy'); await openParameters(page); await page.getByLabel('Геометрия сценария').selectOption('synthetic'); await page.getByLabel('Длина участка L, м').fill('500'); await page.getByLabel('Длительность, ч').fill('1');
   await page.getByRole('button',{name:'Рассчитать',exact:true}).click(); await expect(page.locator('.simulation-segment')).toHaveCount(2);
   await page.getByRole('button',{name:'Закрепить как А',exact:true}).click(); await page.getByRole('button',{name:'Создать вариант Б',exact:true}).click();
   await page.route('**/api/v1/simulations',route=>route.fulfill({json:b})); await page.getByRole('button',{name:'Рассчитать Б',exact:true}).click(); await expect(page.getByRole('button',{name:'Показать А',exact:true})).toBeVisible();

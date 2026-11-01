@@ -14,7 +14,7 @@ const table = (page: Page) => page.getByRole('table', { name: 'Концентр�
 
 async function setup(page: Page) {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('500');

@@ -41,7 +41,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 375, height: 667 
     await page.setViewportSize(viewport);
     let calculations = 0;
     page.on('request', r => { if (r.url().endsWith('/simulations')) calculations++; });
-    await page.goto('/#model'); await openParameters(page);
+    await page.goto('/#model/legacy'); await openParameters(page);
     await page.getByLabel('Подготовленный участок').selectOption('voronezh-zheltye-peski');
     await page.getByLabel('Положение сценарного источника, м').fill('40.125');
     await page.getByLabel('Длительность, ч').fill('0.1');
@@ -84,7 +84,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 375, height: 667 
 for (const geometry of ['don-olkhovets', 'voronezh-zheltye-peski', 'synthetic']) {
   for (const load of ['continuous', 'finite']) {
     test(`server roundtrip through form: ${geometry}/${load}, fractional inputs and boundary source`, async ({ page }) => {
-      await page.goto('/#model'); await openParameters(page);
+      await page.goto('/#model/legacy'); await openParameters(page);
       if (geometry === 'synthetic') {
         await page.getByLabel('Геометрия сценария').selectOption('synthetic');
         await page.getByLabel('Длина участка L, м').fill('500.125');

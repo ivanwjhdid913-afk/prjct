@@ -34,7 +34,7 @@ test('loading and unavailable catalog can retry without breaking ordinary scenar
   await page.getByRole('button', { name: 'Повторить загрузку' }).click();
   await expect(page.getByTestId('discharge-card')).toHaveCount(1);
   await page.getByRole('link', { name: 'Моделирование', exact: true }).click();
-  await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
+  await page.getByRole('button', { name: 'Демонстрация двух источников', exact: true }).click();
   await expect(page.locator('.simulation-segment')).toHaveCount(100);
 });
 
@@ -54,8 +54,8 @@ test('enterprise coordinates are explicitly distinct from an outfall and never p
   await page.getByRole('button', { name: 'Территория предприятия: Исследованный объект', exact: true }).click();
   await expect(page.getByTestId('discharge-card').first()).toContainText('не водовыпуск');
   await page.getByRole('link', { name: 'Моделирование', exact: true }).click();
-  await expect(page.getByLabel('Положение сценарного источника, м')).toHaveValue('0');
-  await expect(page.getByLabel('Концентрация стоков ce, мг/л')).toHaveValue('100');
+  await expect(page.getByLabel('Положение выбранного источника, м от начала участка')).toHaveValue('0');
+  await expect(page.getByLabel('Концентрация стоков выбранного источника ce, мг/л')).toHaveValue('100');
 });
 
 test('document text is literal and malicious source links are rejected', async ({ page }) => {

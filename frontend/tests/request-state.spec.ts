@@ -26,7 +26,7 @@ async function deferCalculations(page: Page) {
 }
 
 async function begin(page: Page) {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await expect(page.getByLabel('Подготовленный участок')).toHaveValue(don.id);
   await page.getByLabel('Скорость течения u, м/с').fill('1');
@@ -111,7 +111,7 @@ test('source-snap timeout retains the source, rejects a late reply and permits a
     await new Promise<void>(resolve => releases.push(resolve));
     await route.fulfill({ json: { ...snap, source_distance_m: index ? 300 : 432.125 } }).catch(() => {});
   });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByLabel('Положение сценарного источника, м').fill('125.5');
   await arm(page); await clickMap(page);
   await expect.poll(() => releases.length).toBe(1);
@@ -135,7 +135,7 @@ test('a failed snap keeps the previous source and a new calculation cancels pend
     await new Promise<void>(resolve => { release = resolve; });
     await route.fulfill({ json: snap }).catch(() => {});
   });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByLabel('Положение сценарного источника, м').fill('125.5');
   await arm(page); await clickMap(page);
   await expect(page.getByTestId('source-pick-status')).toContainText('Не удалось привязать');

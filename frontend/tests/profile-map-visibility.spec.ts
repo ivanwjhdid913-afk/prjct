@@ -22,7 +22,7 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 375, height: 812 }
   test(`profile preserves exposed source, last segment, time and map instance at ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-    await page.goto('/#model');
+    await page.goto('/#model/legacy');
     await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
     await expect(page.locator('.simulation-segment')).toHaveCount(100);
     await page.getByLabel('Расчётный сегмент', { exact: true }).selectOption('99');

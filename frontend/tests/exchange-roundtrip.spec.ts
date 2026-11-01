@@ -8,7 +8,7 @@ for (const geometry of ['don-olkhovets', 'voronezh-zheltye-peski', 'synthetic'])
     await page.route('https://tile.openstreetmap.org/**', route => route.abort());
     let calculations = 0, writes = 0;
     page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; if (request.url().endsWith('/scenarios') && request.method() === 'POST') writes++; });
-    await page.goto('/#model'); await openParameters(page);
+    await page.goto('/#model/legacy'); await openParameters(page);
     if (geometry === 'synthetic') {
       await page.getByLabel('Геометрия сценария').selectOption('synthetic');
       await page.getByLabel('Длина участка L, м').fill('500.125');

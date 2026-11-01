@@ -1,3 +1,97 @@
-import { riverCoordinate } from '../src/riverCoordinate';
-export function multipleResultFixture(input:any,reach:any){const coordinates=Array.from({length:101},(_,i)=>riverCoordinate(reach.geometry.coordinates,reach.distances_m,reach.length_m*i/100));const times=[0,input.duration_hours/4,input.duration_hours/2,input.duration_hours];const amplitude=input.sources.reduce((sum:number,s:any)=>sum+s.effluent_flow_m3_s*((s.effluent_mg_l??s.load_intervals?.[0]?.effluent_mg_l??input.background_mg_l)-input.background_mg_l)/10,0);
- return {format_version:3,model_id:'conservative-1d-lateral-inflow-v2',inputs:{...input,length_m:reach.length_m},reach_id:reach.id,source_distance_m:0,source_coordinate:coordinates[0],source_coordinates:input.sources.map((s:any)=>({id:s.id,source_distance_m:s.source_distance_m,coordinate:riverCoordinate(reach.geometry.coordinates,reach.distances_m,s.source_distance_m)})),geometry:reach.geometry,reach_metadata:reach.metadata,segment_geometries:coordinates.slice(0,-1).map((point:any,i:number)=>({type:'LineString',coordinates:[point,coordinates[i+1]]})),distances_m:Array.from({length:100},(_,i)=>reach.length_m*(i+.5)/100),times_hours:times,concentrations_mg_l:times.map((_:number,t:number)=>Array.from({length:100},(_,j)=>input.background_mg_l+amplitude*(t===1?1:t===2?.5:0)*(1-j/150))),scale_mg_l:[input.background_mg_l,input.background_mg_l+Math.max(amplitude,0)],derived:{total_flow_m3_s:input.river_flow_m3_s+input.sources.reduce((n:number,s:any)=>n+s.effluent_flow_m3_s,0),area_m2:40,travel_hours:4,load_kg_s:null,excess_load_kg_s:null,steady_mg_l:null},diagnostics:{},temporal_resolution:{method:'adaptive-step-states',saved_states:4,reference_states:49,max_states:2048,interpolation_relative_tolerance:.01,interpolation_absolute_tolerance_mg_l:1e-9,max_relative_interpolation_error:.009,reference_max_step_seconds:10,max_gap_seconds:1000,memory_limit_bytes:16777216,reference_memory_bytes:50000,max_response_bytes:5242880}};}
+import { riverCoordinate } from "../src/riverCoordinate";
+export function multipleResultFixture(input: any, reach: any) {
+  const coordinates = Array.from({ length: 101 }, (_, i) =>
+    riverCoordinate(
+      reach.geometry.coordinates,
+      reach.distances_m,
+      (reach.length_m * i) / 100,
+    ),
+  );
+  const times = [
+    0,
+    input.duration_hours / 4,
+    input.duration_hours / 2,
+    input.duration_hours,
+  ];
+  const amplitude = input.sources.reduce(
+    (sum: number, s: any) =>
+      sum +
+      (s.effluent_flow_m3_s *
+        ((s.effluent_mg_l ??
+          s.load_intervals?.[0]?.effluent_mg_l ??
+          input.background_mg_l) -
+          input.background_mg_l)) /
+        10,
+    0,
+  );
+  return {
+    format_version: 3,
+    model_id: "conservative-1d-lateral-inflow-v2",
+    inputs: { ...input, length_m: reach.length_m },
+    reach_id: reach.id,
+    source_distance_m: 0,
+    source_coordinate: coordinates[0],
+    source_coordinates: input.sources.map((s: any) => ({
+      id: s.id,
+      source_distance_m: s.source_distance_m,
+      coordinate: riverCoordinate(
+        reach.geometry.coordinates,
+        reach.distances_m,
+        s.source_distance_m,
+      ),
+    })),
+    geometry: reach.geometry,
+    reach_metadata: reach.metadata,
+    segment_geometries: coordinates
+      .slice(0, -1)
+      .map((point: any, i: number) => ({
+        type: "LineString",
+        coordinates: [point, coordinates[i + 1]],
+      })),
+    distances_m: Array.from(
+      { length: 100 },
+      (_, i) => (reach.length_m * (i + 0.5)) / 100,
+    ),
+    times_hours: times,
+    concentrations_mg_l: times.map((_: number, t: number) =>
+      Array.from(
+        { length: 100 },
+        (_, j) =>
+          input.background_mg_l +
+          amplitude * (t === 1 ? 1 : t === 2 ? 0.5 : 0) * (1 - j / 150),
+      ),
+    ),
+    scale_mg_l: [
+      input.background_mg_l,
+      input.background_mg_l + Math.max(amplitude, 0),
+    ],
+    derived: {
+      total_flow_m3_s:
+        input.river_flow_m3_s +
+        input.sources.reduce(
+          (n: number, s: any) => n + s.effluent_flow_m3_s,
+          0,
+        ),
+      area_m2: 40,
+      travel_hours: 4,
+      load_kg_s: null,
+      excess_load_kg_s: null,
+      steady_mg_l: null,
+    },
+    diagnostics: {},
+    temporal_resolution: {
+      method: "adaptive-step-states",
+      saved_states: 4,
+      reference_states: 49,
+      max_states: 2048,
+      interpolation_relative_tolerance: 0.01,
+      interpolation_absolute_tolerance_mg_l: 1e-9,
+      max_relative_interpolation_error: 0.009,
+      reference_max_step_seconds: 10,
+      max_gap_seconds: 1000,
+      memory_limit_bytes: 16777216,
+      reference_memory_bytes: 50000,
+      max_response_bytes: 5242880,
+    },
+  };
+}

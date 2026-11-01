@@ -11,7 +11,7 @@ async function expectUncovered(locator: Locator) {
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
 });
 
 test('mobile parameters receive focus and shield preview, result and profile controls', async ({ page }) => {

@@ -1,3 +1,4 @@
+import type { AnalysisSettings } from './analysisSettings';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -213,7 +214,7 @@ function ReachPreview({ reach, distance, point, suspended, picking, onPick }: { 
   return <div className={`reach-preview${picking ? ' is-picking' : ''}`} data-reach-id={reach.id} data-source-coordinate={JSON.stringify(shownPoint)} inert={suspended}><div ref={host} tabIndex={-1} className="point-map" aria-label="Выбранный участок и сценарный источник" />{tileError && <p className="map-caption">Подложка недоступна. Геометрия участка и источник показаны независимо от неё.</p>}</div>;
 }
 
-type Restorable = { name?: string; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
+type Restorable = { name?: string; analysis_settings?: AnalysisSettings | null; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
 export default function Simulation({initialScenario,onOpenMultiple}:{initialScenario?:Restorable;onOpenMultiple?:(scenario:Restorable)=>void}={}) {
   const [mode, setMode] = useState('river');
   const [parametersOpen, setParametersOpen] = useState(false);

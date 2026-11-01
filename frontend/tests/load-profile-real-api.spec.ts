@@ -8,7 +8,7 @@ for(const width of [1280,375])test(`real profile lifecycle, reload, preview and 
  await page.setViewportSize({width,height:width===375?667:720});
  await page.route('https://tile.openstreetmap.org/**',r=>r.abort());
  await page.route('**/api/v1/**',async route=>{const u=new URL(route.request().url());const response=await route.fetch({url:api+u.pathname+u.search});await route.fulfill({response});});
- await page.goto('/#model');await openParameters(page);
+ await page.goto('/#model/legacy');await openParameters(page);
  await page.getByLabel('Режим нагрузки',{exact:true}).selectOption('profile');await page.getByLabel('Длительность, ч').fill('6');
  const rows=[{start_hours:0,end_hours:.5,effluent_mg_l:100},{start_hours:2,end_hours:2.5,effluent_mg_l:60}];
  for(let i=0;i<rows.length;i++){await page.getByRole('button',{name:'Добавить период',exact:true}).click();for(const [label,key] of [['Начало','start_hours'],['Конец','end_hours'],['Концентрация','effluent_mg_l']] as const)await page.getByLabel(`${label} периода ${i+1}, ${key==='effluent_mg_l'?'мг/л':'ч'}`,{exact:true}).fill(String(rows[i][key]));}

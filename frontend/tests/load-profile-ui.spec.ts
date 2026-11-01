@@ -10,7 +10,7 @@ async function add(page: Page, start: string, end: string, ce: string, index: nu
   await page.getByLabel(`Концентрация периода ${index}, мг/л`, { exact: true }).fill(ce);
 }
 async function prepare(page: Page) {
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await expect(page.getByRole('option', { name: 'График концентрации стоков', exact: true })).toHaveCount(1);
   await page.getByLabel('Режим нагрузки', { exact: true }).selectOption('profile');
   await page.getByLabel('Длительность, ч').fill('6');
@@ -122,7 +122,7 @@ for (const hiddenScalar of ['-1', '']) test(`profile calculation/save/export ign
       geometry_mode: 'synthetic', reach_name: 'Синтетический участок', load_mode: 'profile',
       created_at: '2026-10-31T00:00:00Z', compatibility: { compatible: true, reasons: [] } } });
   });
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByLabel('Длина участка L, м').fill('500'); await page.getByLabel('Длительность, ч').fill('6');
   await page.getByLabel('Концентрация стоков ce, мг/л', { exact: true }).fill(hiddenScalar);

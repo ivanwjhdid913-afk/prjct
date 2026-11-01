@@ -3,7 +3,7 @@ import { concentrationsAt, openParameters, openProfile } from './model-helpers';
 
 const text = (v: number) => `${v.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`;
 async function finiteDemo(page: Page) {
-  await page.goto('/#model'); await openParameters(page);
+  await page.goto('/#model/legacy'); await openParameters(page);
   const response = page.waitForResponse(r => r.url().endsWith('/api/v1/simulations'));
   await page.getByRole('button', { name: 'Демонстрация периода', exact: true }).click();
   const r = await response; expect(r.ok()).toBeTruthy();
@@ -59,7 +59,7 @@ test('C(t) follows selected map segment and shares physical cursor and current c
 });
 
 test('constant A and finite B keep independent settings, scale and time', async ({ page }) => {
-  await page.goto('/#model'); await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
+  await page.goto('/#model/legacy'); await page.getByRole('button', { name: 'Запустить демонстрацию', exact: true }).click();
   await expect(page.locator('.simulation-segment')).toHaveCount(100);
   await page.getByRole('button', { name: 'Закрепить как А', exact: true }).click();
   await page.getByRole('button', { name: 'Создать вариант Б', exact: true }).click();

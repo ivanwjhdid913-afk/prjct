@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('default and both demonstrations identify Don even with a reordered catalog', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.getByLabel('Подготовленный участок')).toHaveValue(don.id);
   for (const label of ['Запустить демонстрацию', 'Демонстрация периода']) {
     await openParameters(page);
@@ -35,7 +35,7 @@ test('default and both demonstrations identify Don even with a reordered catalog
 
 test('a missing demo reach is explained without substituting another river', async ({ page }) => {
   await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [other] } }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.getByText(/Участок Дона.*недоступен/).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Запустить демонстрацию' })).toBeDisabled();
   await expect(page.getByLabel('Подготовленный участок')).toHaveValue(other.id);
@@ -50,7 +50,7 @@ test('source toggle cancels the active mode, and newer clicks win out of order',
     await new Promise<void>(resolve => { releases.push(resolve); });
     await route.fulfill({ json: { ...snap, source_distance_m: index ? 500 : 100 } }).catch(() => {});
   });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await arm(page);
   await page.getByRole('button', { name: 'Указать источник на карте', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Отменить выбор источника' })).toHaveCount(0);
@@ -67,7 +67,7 @@ test('only explicit source mode snaps, keeps exact API coordinate, and never cal
   let snaps = 0, calculations = 0;
   await page.route('**/source-snap?*', route => { snaps++; return route.fulfill({ json: snap }); });
   page.on('request', request => { if (request.url().endsWith('/simulations')) calculations++; });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await expect(page.locator('.reach-preview')).toBeVisible();
   await clickMap(page);
   expect(snaps).toBe(0);
@@ -86,7 +86,7 @@ test('only explicit source mode snaps, keeps exact API coordinate, and never cal
 test('far clicks, final 100m and malformed replies keep the previous source', async ({ page }) => {
   let reply: unknown = snap;
   await page.route('**/source-snap?*', route => route.fulfill({ json: reply }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByLabel('Положение сценарного источника, м').fill('100');
   for (const invalid of [{ ...snap, distance_to_river_m: 76 }, { ...snap, source_distance_m: 901 }, { ...snap, reach_id: other.id }, { ...snap, coordinate: [400, 52] }, { ...snap, max_distance_m: 100 }]) {
     reply = invalid;
@@ -101,7 +101,7 @@ test('cancel, Escape, numeric edits and reach changes invalidate delayed snap re
   let release!: () => void;
   let requested = 0;
   await page.route('**/source-snap?*', async route => { requested++; await new Promise<void>(resolve => { release = resolve; }); await route.fulfill({ json: snap }).catch(() => {}); });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   for (const action of ['cancel', 'escape', 'numeric', 'reach']) {
     await arm(page); await clickMap(page);
     await expect.poll(() => requested).toBeGreaterThan(0);
@@ -118,7 +118,7 @@ test('cancel, Escape, numeric edits and reach changes invalidate delayed snap re
 });
 
 test('numeric source and keyboard range reach both allowed extremes', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   const input = page.getByLabel('Положение сценарного источника, м');
   const slider = page.getByRole('slider', { name: 'Переместить сценарный источник вдоль русла' });
   await slider.focus(); await page.keyboard.press('End');
@@ -130,7 +130,7 @@ test('numeric source and keyboard range reach both allowed extremes', async ({ p
 
 test('draft river preview keeps the completed result and A/B geometry immutable', async ({ page }) => {
   await page.route('**/source-snap?*', route => route.fulfill({ json: { ...snap, reach_id: other.id } }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByRole('button', { name: 'Запустить демонстрацию' }).click();
   const path = await page.locator('.simulation-segment').first().getAttribute('d');
   await page.getByRole('button', { name: 'Закрепить как А', exact: true }).click();
@@ -154,7 +154,7 @@ test('numeric preview follows the same WGS84 distance as the real Don API', asyn
   const catalog = await (await request.get('/api/v1/river-reaches')).json();
   const actual = catalog.items.find((item: { id: string }) => item.id === don.id);
   const distance = actual.length_m * .4321;
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await page.getByLabel('Положение сценарного источника, м').fill(String(distance));
   const [longitude, latitude] = JSON.parse((await page.locator('.reach-preview').getAttribute('data-source-coordinate'))!);
   const answer = await request.post('/api/v1/simulations', { data: { river_flow_m3_s: 10, effluent_flow_m3_s: .1, background_mg_l: 10, effluent_mg_l: 100, velocity_m_s: .25, dispersion_m2_s: 5, duration_hours: .1, reach_id: don.id, source_distance_m: distance } });
@@ -166,7 +166,7 @@ test('numeric preview follows the same WGS84 distance as the real Don API', asyn
 
 test('mobile source mode exposes the map, supports Escape and keeps the timeline', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await arm(page);
   await expect(page.locator('#model-parameters')).not.toBeVisible();
   await expect(page.locator('.reach-preview')).not.toHaveAttribute('inert', '');
@@ -188,7 +188,7 @@ for (const width of [1280, 375]) for (const load of ['continuous', 'finite']) {
     expect(pilot).toBeTruthy();
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto('/#model');
+    await page.goto('/#model/legacy');
     await openParameters(page);
     await page.getByLabel('Подготовленный участок').selectOption(pilot.id);
     await page.getByLabel('Положение сценарного источника, м').fill(String(pilot.length_m - 100));

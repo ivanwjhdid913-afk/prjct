@@ -23,7 +23,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 375, height: 667 
     const catalog = (await catalogResponse.json()).items;
     const reach = catalog.find((item: { id: string }) => item.id === PILOT);
     expect(reach).toBeTruthy();
-    await page.goto('/#model'); await openParameters(page);
+    await page.goto('/#model/legacy'); await openParameters(page);
     await page.getByLabel('Подготовленный участок', { exact: true }).selectOption(PILOT);
     await expect(page.locator('.reach-preview')).toHaveAttribute('data-reach-id', PILOT);
     await page.getByRole('button', { name: 'Указать источник на карте', exact: true }).click();

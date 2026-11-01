@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 
 test('malformed reach data gives a recoverable error instead of a broken map', async ({ page }) => {
   await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [{ ...reach, metadata: null }] } }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('river');
   await expect(page.getByRole('alert')).toContainText('Не удалось загрузить подготовленный участок');
@@ -21,7 +21,7 @@ test('rejects malformed synthetic and river result geometries', async ({ page })
   const actual = await (await page.request.post('/api/v1/simulations', { data: { river_flow_m3_s: 10, effluent_flow_m3_s: .1, background_mg_l: 10, effluent_mg_l: 100, velocity_m_s: .25, dispersion_m2_s: 5, length_m: 10000, duration_hours: 1 } })).json();
   let attempt = 0;
   await page.route('**/api/v1/simulations', route => route.fulfill({ json: ++attempt === 1 ? { ...actual, geometry: { type: 'LineString', coordinates: [[39, 52], [39.1, 52.1]] } } : { ...actual, reach_id: 'bad', segment_geometries: Array(100).fill(null) } }));
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Сервер вернул неполные результаты');
@@ -36,7 +36,7 @@ test('selects a river source, sends geometry identity and marks changed source s
     request = route.request().postDataJSON();
     await route.fulfill({ json: { inputs: { ...request, length_m: 500 }, derived: { total_flow_m3_s: 10.1, area_m2: 40.4, load_kg_s: .01, excess_load_kg_s: .009, steady_mg_l: 11, travel_hours: 1 }, distances_m: [125, 375], times_hours: [0, 2, 4], concentrations_mg_l: [[10, 10], [12, 10], [14, 12]], scale_mg_l: [10, 14], geometry: reach.geometry, provenance: 'river_scenario', reach_id: reach.id, source_distance_m: 500, source_coordinate: [39.202, 52.5015], reach_metadata: { ...reach.metadata, name: reach.name }, segment_geometries: [reach.geometry, reach.geometry] } });
   });
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('river');
   await page.getByLabel('Положение сценарного источника, м').fill('500');
@@ -57,7 +57,7 @@ test('selects a river source, sends geometry identity and marks changed source s
 });
 
 test('plays, pauses, changes speed and seeks consistently without automatic playback', async ({ page }) => {
-  await page.goto('/#model');
+  await page.goto('/#model/legacy');
   await openParameters(page);
   await page.getByLabel('Геометрия сценария').selectOption('synthetic');
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
@@ -85,7 +85,7 @@ for (const width of [375, 1440]) {
     const reaches = await (await request.get('/api/v1/river-reaches')).json();
     const actual = reaches.items[0];
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto('/#model');
+    await page.goto('/#model/legacy');
     await openParameters(page);
     await page.getByLabel('Геометрия сценария').selectOption('river');
     await page.getByLabel('Положение сценарного источника, м').fill(String(actual.length_m / 2));
