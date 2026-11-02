@@ -19,6 +19,8 @@ test('analysis CSV preserves all strict intervals, completed metadata and A/B nu
   expect(csv).toContain('0.5,1.5');
   expect(csv).toContain('3.5,4.5');
   expect(csv).toContain('C(t) > threshold_mg_l');
+  expect(csv).toContain('from_C_le_threshold_to_C_gt_threshold');
+  expect(csv).toContain('initial_exceedance_end_is_a_downcrossing');
   expect(csv).toContain('B');
   expect(csv).toContain('not_observation');
   expect(settings.points[0].name).toBe('=FORMULA()');

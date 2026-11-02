@@ -119,7 +119,7 @@ function MetricsRow({
           {hours(metrics.first_maximum_hours)}
         </button>
       </td>
-      <td data-label="Первое пересечение" data-metric="crossing">
+      <td data-label="Первый вход в превышение" data-metric="crossing">
         {hours(crossing)}
         {metrics.initially_exceeding && (
           <small>Уже выше порога в начале расчёта</small>
@@ -164,7 +164,7 @@ function DeltaRow({
       <td data-label="Первый максимум">
         {hours(second.first_maximum_hours - first.first_maximum_hours)}
       </td>
-      <td data-label="Первое пересечение" data-metric="crossing">
+      <td data-label="Первый вход в превышение" data-metric="crossing">
         {hours(
           difference(first.first_crossing_hours, second.first_crossing_hours),
         )}
@@ -461,6 +461,7 @@ export default function ControlPointsPanel({
       {first.length > 0 && (
         <>
           <h4>Итоги применённых настроек</h4>
+          <p className="control-points-note">Переход от C ≤ порога к C &gt; порога. Если концентрация выше порога уже в начале, завершение начального периода — пересечение вниз; первый последующий вход может наступить позже.</p>
           <p className="control-points-note">
             {format(hour, 6)} ч ·{" "}
             {appliedSettings.threshold_mg_l === null
@@ -478,7 +479,7 @@ export default function ControlPointsPanel({
                   <th scope="col">Мин., мг/л</th>
                   <th scope="col">Макс., мг/л</th>
                   <th scope="col">Первый максимум</th>
-                  <th scope="col">Первое пересечение</th>
+                  <th scope="col">Первый вход в превышение</th>
                   <th scope="col">Всего выше порога</th>
                 </tr>
               </thead>

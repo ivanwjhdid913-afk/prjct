@@ -30,6 +30,7 @@ test('initial exceedance differs from a later actual upcrossing and remains open
   const actual = analyzeSeries([0, .5, 2, 3], [2, 0, 0, 2], 1);
   expect(actual.first_exceedance_hours).toBe(0);
   expect(actual.first_crossing_hours).toBe(2.5);
+  expect(actual.exceedance_intervals[0].end_hours).toBe(.25);
   expect(actual.initially_exceeding).toBe(true);
   expect(actual.exceedance_intervals[0].start_inclusive).toBe(true);
   expect(actual.exceedance_intervals[1]).toEqual({ start_hours: 2.5, end_hours: 3, start_inclusive: false, end_inclusive: true, continues_at_end: true });

@@ -196,3 +196,10 @@ test("every selected-point period remains reachable across pages", async ({
     }),
   ).toBeVisible();
 });
+
+
+test('the first crossing label explicitly means entry from below, not any crossing', async ({page}) => {
+  await harness(page,'panel-zero');
+  await expect(page.getByRole('columnheader',{name:'Первый вход в превышение',exact:true})).toHaveCount(1);
+  await expect(page.getByText('Переход от C ≤ порога к C > порога.',{exact:false})).toBeVisible();
+});

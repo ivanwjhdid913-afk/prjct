@@ -84,6 +84,8 @@ export function buildControlPointCsv({
   const metadata = {
     analysis_csv_version: 1,
     threshold_rule: "C(t) > threshold_mg_l",
+    first_crossing_direction: "from_C_le_threshold_to_C_gt_threshold",
+    first_crossing_meaning: "first_upcrossing_after_start; initial_exceedance_end_is_a_downcrossing recorded_in_interval_end_hours",
     interpolation: "linear_between_actual_saved_states",
     concentration: "calculated_segment_mean_not_observation",
     time_unit: "hours",
