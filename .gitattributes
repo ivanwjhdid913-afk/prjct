@@ -2,3 +2,6 @@
 backend/data/raw/*.osm -text
 backend/data/*.geojson text eol=lf
 backend/data/reaches/*.geojson text eol=lf
+backend/data/regional/raw/* -text
+backend/data/regional/*.geojson text eol=lf
+backend/data/regional/*.sha256 text eol=lf
