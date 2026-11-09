@@ -1,0 +1,338 @@
+/* The profile is a sibling of the map. Keep result controls below the map,
+   while the desktop graph can use the full map + playback height. */
+.multiple-simulation .mobile-parameters-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.multiple-simulation .model-workspace {
+  min-width: 0;
+}
+
+.multiple-simulation.parameters-collapsed .model-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.multiple-simulation.parameters-collapsed .model-workspace > .simulation-parameters,
+.multiple-simulation .simulation-parameters[hidden] {
+  display: none;
+}
+
+.multiple-simulation .multiple-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.multiple-simulation .multiple-stage:has(> .multiple-profile:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 29vw, 370px);
+}
+
+.multiple-stage > .multiple-stage-top {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.multiple-stage-top > span {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.multiple-stage-top > button,
+.multiple-stage-top > .profile-toggle {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 42%;
+  justify-content: center;
+}
+
+.multiple-stage > .multiple-pick-notice {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  max-height: 100px;
+  overflow: auto;
+}
+
+.multiple-stage > .multiple-map-area {
+  grid-column: 1;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.multiple-stage > .multiple-profile.profile-drawer {
+  grid-column: 2;
+  grid-row: 3 / 5;
+  position: relative;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  overflow: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+.multiple-profile > .multiple-profile-heading {
+  min-height: 32px;
+}
+
+.multiple-profile-heading .profile-close {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 3px 8px;
+}
+
+.multiple-profile .profile-tabs {
+  margin: 8px 0;
+}
+
+.multiple-profile .temporal-profile h3 {
+  margin: 10px 0 5px;
+}
+
+.multiple-profile .temporal-reading {
+  margin: 8px 0 5px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.multiple-profile .temporal-extremum {
+  padding-block: 5px;
+  margin-block: 5px;
+}
+
+.multiple-profile .simulation-profile svg {
+  width: 100%;
+  height: auto;
+  margin: 6px 0;
+}
+
+.multiple-profile .temporal-profile svg {
+  min-height: 110px;
+}
+
+.multiple-stage > .multiple-time-panel {
+  grid-column: 1;
+  grid-row: 4;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  min-width: 0;
+  padding: 7px 12px 8px;
+  container: multiple-playback / inline-size;
+}
+
+.multiple-time-panel > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.multiple-time-panel .multiple-play-row {
+  gap: 8px;
+  margin: 4px 0;
+  min-height: 44px;
+}
+
+.multiple-time-panel .multiple-play-row > button {
+  min-width: 120px;
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.multiple-time-panel .multiple-play-row > label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: none;
+  margin: 0;
+}
+
+.multiple-time-panel .multiple-play-row select {
+  width: 60px;
+  min-height: 44px;
+  padding: 6px;
+  font-size: 12px;
+}
+
+.multiple-time-panel .multiple-play-row > strong {
+  font-size: 19px;
+  white-space: nowrap;
+}
+
+.multiple-time-panel .multiple-timeline {
+  min-height: 44px;
+  height: 44px;
+}
+
+.multiple-time-panel .multiple-timeline > span {
+  top: 13px;
+}
+
+.multiple-time-panel .multiple-source-states {
+  overflow-wrap: anywhere;
+}
+
+/* Query the available map column, rather than the browser: the same controls
+   also fit when the parameter sidebar is expanded or the profile is closed. */
+@container multiple-playback (min-width: 560px) {
+  .multiple-time-panel > .multiple-time-top {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .multiple-time-panel > .multiple-play-row {
+    grid-row: 2;
+    grid-column: 1;
+    margin: 2px 0;
+    min-height: 60px;
+  }
+
+  .multiple-time-panel .multiple-play-row > label {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    font-size: 9px !important;
+  }
+
+  .multiple-time-panel > label {
+    grid-row: 2;
+    grid-column: 2;
+    align-self: start;
+    padding-top: 2px;
+    pointer-events: none;
+  }
+
+  .multiple-time-panel > .multiple-timeline {
+    grid-row: 2;
+    grid-column: 2;
+    align-self: end;
+  }
+
+  .multiple-time-panel > .multiple-source-states {
+    grid-row: 3;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1000px) {
+  .multiple-simulation .multiple-stage:has(> .multiple-profile:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+
+  .multiple-stage-top {
+    flex-wrap: wrap;
+  }
+
+  .multiple-stage-top > span {
+    flex-basis: 100%;
+  }
+
+  .multiple-stage-top > button {
+    max-width: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .multiple-simulation .multiple-stage,
+  .multiple-simulation .multiple-stage:has(> .multiple-profile:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .multiple-stage > .multiple-stage-top {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .multiple-stage-top > span {
+    max-width: none;
+    font-size: 9px;
+  }
+
+  .multiple-stage-top > button {
+    min-height: 44px;
+    padding: 5px 7px;
+    font-size: 10px;
+    max-width: 35%;
+  }
+
+  .multiple-stage > .multiple-profile.profile-drawer {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: end;
+    z-index: 430;
+    height: 180px;
+    max-height: max(0px, calc(100% - 72px));
+    min-height: 0;
+    width: 100%;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 8px 12px;
+    box-shadow: 0 -3px 12px #214b3510;
+  }
+
+  .multiple-profile-heading .profile-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .multiple-profile .profile-tabs button {
+    min-height: 44px;
+  }
+
+  .multiple-stage > .multiple-time-panel {
+    padding: 5px 10px 7px;
+  }
+
+  .multiple-time-panel .multiple-time-top {
+    min-height: 25px;
+  }
+
+  .multiple-time-panel .multiple-play-row > button {
+    min-width: 116px;
+    font-size: 11px;
+    padding-inline: 8px;
+  }
+
+  .multiple-time-panel .multiple-play-row > strong {
+    font-size: 16px;
+  }
+
+  .multiple-time-panel .multiple-play-row > label {
+    font-size: 9px !important;
+    line-height: 1.2;
+  }
+
+  .multiple-time-panel .multiple-source-states {
+    font-size: 9px;
+    line-height: 1.4;
+  }
+
+  .multiple-time-panel .multiple-ab button {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multiple-simulation .multiple-stage,
+  .multiple-simulation .multiple-profile,
+  .multiple-simulation .simulation-parameters {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

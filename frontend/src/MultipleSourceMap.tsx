@@ -52,19 +52,21 @@ export function previewSegmentGeometries(reach: Reach): Line[] {
 
 /** Fit only after an explicit layout change, never on time or A/B switching. */
 function fitVisibleReach(instance: L.Map, reach: Reach, element: HTMLElement) {
+  const bounds = element.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
   const panel = element
-    .closest(".multiple-map-area")
+    .closest(".multiple-stage")
     ?.querySelector<HTMLElement>(".multiple-profile");
-  const visible = panel && !panel.hidden;
-  const phone = matchMedia("(max-width:760px)").matches;
-  const right = visible && !phone ? panel.getBoundingClientRect().width : 0;
-  const bottom = visible && phone ? panel.getBoundingClientRect().height : 0;
+  const cover = panel && !panel.hidden ? panel.getBoundingClientRect() : null;
+  const bottom = cover && cover.left < bounds.right && cover.right > bounds.left
+    ? Math.max(0, Math.min(bounds.bottom, cover.bottom) - Math.max(bounds.top, cover.top))
+    : 0;
   instance.invalidateSize({ pan: false });
   instance.fitBounds(
     reach.geometry.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
     {
       paddingTopLeft: [45, 45],
-      paddingBottomRight: [right + 45, bottom + 45],
+      paddingBottomRight: [45, bottom + 45],
       animate: false,
     },
   );
@@ -163,7 +165,7 @@ export default function MultipleSourceMap({
     const points = reach.geometry.coordinates.map(
       ([lon, lat]) => [lat, lon] as L.LatLngTuple,
     );
-    instance.fitBounds(points, { padding: [35, 45], animate: false });
+    instance.setView(points[0], 12);
     const tiles = L.tileLayer(
       "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
@@ -193,9 +195,14 @@ export default function MultipleSourceMap({
         calls.current.onPick(event.latlng.lng, event.latlng.lat);
     });
     const element = host.current;
-    const observer = new ResizeObserver(() =>
-      fitVisibleReach(instance, reach, element),
-    );
+    let lastSize = "";
+    const observer = new ResizeObserver(() => {
+      if (!element.clientWidth || !element.clientHeight) return;
+      const size = `${element.clientWidth}x${element.clientHeight}`;
+      if (size === lastSize) return;
+      lastSize = size;
+      fitVisibleReach(instance, reach, element);
+    });
     observer.observe(host.current);
     return () => {
       observer.disconnect();

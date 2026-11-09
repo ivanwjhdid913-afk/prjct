@@ -1,4 +1,5 @@
 import type { AnalysisSettings } from './analysisSettings';
+import type { ModelViewProps } from './ModelWorkspace';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -215,7 +216,7 @@ function ReachPreview({ reach, distance, point, suspended, picking, onPick }: { 
 }
 
 type Restorable = { name?: string; analysis_settings?: AnalysisSettings | null; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
-export default function Simulation({initialScenario,onOpenMultiple}:{initialScenario?:Restorable;onOpenMultiple?:(scenario:Restorable)=>void}={}) {
+export default function Simulation({initialScenario,onOpenMultiple,workspaceVisible=true,onViewState,requestedReach,returnResultVersion}:{initialScenario?:Restorable;onOpenMultiple?:(scenario:Restorable)=>void} & ModelViewProps={}) {
   const [mode, setMode] = useState('river');
   const [parametersOpen, setParametersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -279,6 +280,8 @@ export default function Simulation({initialScenario,onOpenMultiple}:{initialScen
   const controller = useRef<AbortController | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const form = useRef<HTMLFormElement>(null);
+  const appliedReach = useRef<Reach | undefined>(undefined);
+  const handledReturn = useRef(returnResultVersion);
   useEffect(() => { title.current?.focus({ preventScroll: true }); return () => { request.current++; controller.current?.abort(); }; }, []);
   const reach = reaches.find(item => item.id === reachId);
   const demoReach = reaches.find(item => item.id === DEMO_REACH_ID);
@@ -317,11 +320,11 @@ export default function Simulation({initialScenario,onOpenMultiple}:{initialScen
     setPickingSource(true); setDraftPreview(true); setPickMessage(''); setParametersOpen(false); setProfileOpen(false); setPlaying(false);
   }
   useEffect(() => {
-    if (!pickingSource) return;
+    if (!workspaceVisible || !pickingSource) return;
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); finishPicking(true); } };
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
-  }, [pickingSource, mobileLayout]);
+  }, [pickingSource, mobileLayout, workspaceVisible]);
   useEffect(() => () => { snapRequest.current++; snapController.current?.abort(); }, []);
   async function pickSource(longitude: number, latitude: number) {
     if (!pickingRef.current || !reach || mode !== 'river') return;
@@ -353,8 +356,32 @@ export default function Simulation({initialScenario,onOpenMultiple}:{initialScen
   const comparison = !!(baseline && variant && hasB && latestResult && !incompatibleDraft && !completedReason);
   const result = comparison && activeScenario === 'А' ? baseline : latestResult;
   const clockResult = comparison ? baseline : latestResult;
+  const displayReachId = (draftPreview || !result ? (mode === 'river' ? reachId : null) : result.reach_id) ?? null;
+  const hasResult = !!result;
+  useEffect(() => onViewState?.({ currentReachId: displayReachId, hasResult }), [displayReachId, hasResult, onViewState]);
   const scale = useMemo<[number, number]>(() => comparison && baseline && latestResult ? sharedScale(baseline, latestResult) : latestResult?.scale_mg_l ?? [0, 0], [comparison, baseline, latestResult]);
   function stopRequest() { request.current++; controller.current?.abort(); setStatus('idle'); setMessage(''); setFieldErrors({}); setComparisonExitReason(''); }
+  useEffect(() => {
+    if (!workspaceVisible) setPlaying(false);
+  }, [workspaceVisible]);
+  useEffect(() => {
+    if (!requestedReach || requestedReach === appliedReach.current) return;
+    appliedReach.current = requestedReach;
+    if (mode === 'river' && requestedReach.id === reachId) return;
+    geometryEditRevision.current++;
+    stopRequest(); invalidateSnap();
+    pickingRef.current = false; setPickingSource(false); setPlaying(false);
+    setReaches(items => items.some(item => item.id === requestedReach.id) ? items : [...items, requestedReach]);
+    setMode('river'); setReachId(requestedReach.id); setSource(''); setSourceCoordinate(null); setDraftPreview(true);
+    setPickMessage('Участок изменён. Задайте положение сценарного источника заново.');
+  }, [requestedReach, mode, reachId]);
+  useEffect(() => {
+    if (returnResultVersion === handledReturn.current) return;
+    handledReturn.current = returnResultVersion;
+    if (latestResult) {
+      invalidateSnap(); pickingRef.current = false; setPickingSource(false); setPickMessage(''); setDraftPreview(false);
+    }
+  }, [returnResultVersion, latestResult]);
   function pinBaseline() {
     if (!result) return;
     stopRequest(); setPlaying(false); setBaseline(result); setResult(result); setVariant(false); setHasB(false); setActiveScenario('А');
@@ -372,7 +399,7 @@ export default function Simulation({initialScenario,onOpenMultiple}:{initialScen
     setResult(baseline); setVariant(true); setHasB(false); setActiveScenario('Б'); setTime(0); setSelected(0);
   }
   useEffect(() => {
-    if (!playing || !clockResult) return;
+    if (!workspaceVisible || !playing || !clockResult) return;
     let frame = 0, previous: number | null = null;
     const duration = clockResult.inputs.duration_hours;
     const tick = (now: number) => {
@@ -384,7 +411,7 @@ export default function Simulation({initialScenario,onOpenMultiple}:{initialScen
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed, clockResult]);
+  }, [playing, speed, clockResult, workspaceVisible]);
   const stale = latestResult !== null && (loadMode !== (latestResult.inputs.load_mode ?? 'continuous') || (loadMode === 'finite' && Number(loadDuration) !== latestResult.inputs.load_duration_hours) || (loadMode === 'profile' && JSON.stringify(intervalCheck.intervals) !== JSON.stringify(latestResult.inputs.load_intervals)) || (mode === 'river' ? reachId !== latestResult.reach_id || Number(source) !== latestResult.source_distance_m || !sourceValid : !!latestResult.reach_id) || fields.some(field => (mode !== 'river' || field.key !== 'length_m') && (loadMode !== 'profile' || field.key !== 'effluent_mg_l') && (draft[field.key].trim() === '' || Number(draft[field.key]) !== latestResult.inputs[field.key])));
 
   function conditionsToSave(): SavePayload & {conditions:Conditions} {

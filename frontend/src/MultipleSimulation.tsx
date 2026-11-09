@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./simulation.css";
 import "./multipleSources.css";
+import "./multipleWorkspaceLayout.css";
+import type { ModelViewProps } from "./ModelWorkspace";
 import MultipleSourceMap from "./MultipleSourceMap";
 import ControlPointsPanel from "./ControlPointsPanel";
 import ControlPointDownload from "./ControlPointDownload";
@@ -260,11 +262,15 @@ type Props = {
   initialScenario?: RestorableConditions;
   onOpenLegacy?: (scenario: RestorableConditions) => void;
   onApplyLegacy?: (scenario: RestorableConditions) => void;
-};
+} & ModelViewProps;
 export default function MultipleSimulation({
   initialScenario,
   onOpenLegacy,
   onApplyLegacy,
+  workspaceVisible = true,
+  onViewState,
+  requestedReach,
+  returnResultVersion,
 }: Props) {
   const [reaches, setReaches] = useState<Reach[]>([]),
     [reachId, setReachId] = useState("don-olkhovets"),
@@ -274,6 +280,7 @@ export default function MultipleSimulation({
     [sources, setSources] = useState<SourceDraft[]>(() => [newSourceDraft(1)]),
     [chosen, setChosen] = useState("");
   const [parametersOpen, setParametersOpen] = useState(false),
+    [parametersCollapsed, setParametersCollapsed] = useState(false),
     [profileOpen, setProfileOpen] = useState(false),
     [profileView, setProfileView] = useState<"space" | "time" | "analysis">(
       "time",
@@ -311,6 +318,8 @@ export default function MultipleSimulation({
     previousProfile = useRef(false),
     lastInitial = useRef<RestorableConditions | undefined>(undefined);
   const geometryRevision = useRef(0);
+  const appliedReach = useRef<Reach | undefined>(undefined);
+  const handledReturn = useRef(returnResultVersion);
   const pendingSourceFocus = useRef(false);
   useLayoutEffect(() => {
     if (pendingSourceFocus.current) {
@@ -337,6 +346,31 @@ export default function MultipleSimulation({
     setPicking(false);
     setPickMessage("");
   }
+  useEffect(() => {
+    if (!workspaceVisible) setPlaying(false);
+  }, [workspaceVisible]);
+  useEffect(() => {
+    if (!requestedReach || appliedReach.current === requestedReach) return;
+    appliedReach.current = requestedReach;
+    if (requestedReach.id === reachId) return;
+    geometryRevision.current++;
+    stopPending();
+    stopPicking();
+    setReaches((items) => items.some((item) => item.id === requestedReach.id) ? items : [...items, requestedReach]);
+    setReachId(requestedReach.id);
+    setSources((items) => items.map((source) => ({ ...source, source_distance_m: "" })));
+    setPreview(true);
+    setParametersCollapsed(false);
+    setNotice("Участок изменён. Задайте положения источников заново. Контрольные точки остаются привязаны к прежней геометрии.");
+  }, [requestedReach, reachId]);
+  useEffect(() => {
+    if (handledReturn.current === returnResultVersion) return;
+    handledReturn.current = returnResultVersion;
+    if (latest || baseline) {
+      stopPicking();
+      setPreview(false);
+    }
+  }, [returnResultVersion, latest, baseline]);
   function editSource(patch: Partial<SourceDraft>, geometry = false) {
     setSources((list) =>
       list.map((s) => (s.id === selectedSource.id ? { ...s, ...patch } : s)),
@@ -402,7 +436,7 @@ export default function MultipleSimulation({
     previousProfile.current = profileOpen;
   }, [profileOpen]);
   useEffect(() => {
-    if (!parametersOpen && !picking && !profileOpen) return;
+    if (!workspaceVisible || (!parametersOpen && !picking && !profileOpen)) return;
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -415,7 +449,7 @@ export default function MultipleSimulation({
     };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, [parametersOpen, picking, profileOpen]);
+  }, [parametersOpen, picking, profileOpen, workspaceVisible]);
   useEffect(
     () => () => {
       request.current++;
@@ -480,7 +514,9 @@ export default function MultipleSimulation({
     baseline &&
     variant &&
     (baseline.reach_id !== reachId
-      ? "Для сравнения нужен один и тот же подготовленный участок."
+      ? !preview && latest?.reach_id === baseline.reach_id
+        ? ""
+        : "Для сравнения нужен один и тот же подготовленный участок."
       : Number(shared.duration_hours) !== baseline.inputs.duration_hours
         ? "Для сравнения нужен одинаковый горизонт расчёта."
         : "");
@@ -520,6 +556,9 @@ export default function MultipleSimulation({
     preview || !result
       ? reach
       : (reaches.find((r) => r.id === result.reach_id) ?? null);
+  const displayReachId = displayReach?.id ?? null;
+  const hasResult = !!result;
+  useEffect(() => onViewState?.({ currentReachId: displayReachId, hasResult }), [displayReachId, hasResult, onViewState]);
   const mapScope = geometryScope(displayReach);
   const resultScope = result
     ? JSON.stringify([
@@ -593,7 +632,7 @@ export default function MultipleSimulation({
     [preview, result, sources, reach],
   );
   useEffect(() => {
-    if (!playing || !result) return;
+    if (!workspaceVisible || !playing || !result) return;
     let frame = 0,
       previous = performance.now();
     const duration = result.inputs.duration_hours;
@@ -612,7 +651,7 @@ export default function MultipleSimulation({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, speed, result]);
+  }, [playing, speed, result, workspaceVisible]);
   async function calculate(override?: MultipleInputs, overrideKey?: string) {
     let input: MultipleInputs;
     try {
@@ -903,7 +942,7 @@ export default function MultipleSimulation({
   };
   return (
     <div
-      className={`simulation multiple-simulation${comparing ? " is-comparing" : ""}`}
+      className={`simulation multiple-simulation${comparing ? " is-comparing" : ""}${!mobile && parametersCollapsed ? " parameters-collapsed" : ""}`}
     >
       <header className="model-heading">
         <div>
@@ -916,9 +955,9 @@ export default function MultipleSimulation({
           <button
             ref={parameterButton}
             className="mobile-parameters-toggle"
-            aria-expanded={parametersOpen}
+            aria-expanded={mobile ? parametersOpen : !parametersCollapsed}
             aria-controls="multiple-parameters"
-            onClick={() => setParametersOpen((v) => !v)}
+            onClick={() => mobile ? setParametersOpen((v) => !v) : setParametersCollapsed((v) => !v)}
           >
             Параметры
           </button>
@@ -973,6 +1012,7 @@ export default function MultipleSimulation({
           id="multiple-parameters"
           className={`simulation-parameters${parametersOpen ? " is-open" : ""}`}
           aria-labelledby="multiple-parameters-title"
+          hidden={!mobile && parametersCollapsed}
         >
           <div className="parameters-heading">
             <div>
@@ -1377,7 +1417,7 @@ export default function MultipleSimulation({
               selectedSegment={segment}
               picking={picking}
               profileOpen={profileOpen}
-              suspended={mobile && parametersOpen}
+              suspended={!workspaceVisible || (mobile && parametersOpen)}
               onSource={(id) => {
                 if (sources.some((s) => s.id === id)) selectSource(id);
               }}
@@ -1389,6 +1429,7 @@ export default function MultipleSimulation({
               onSegment={setSegment}
               onPick={(lon, lat) => void pick(lon, lat)}
             />
+          </div>
             <aside
               className={`multiple-profile profile-drawer${profileOpen ? " is-open" : ""}`}
               aria-label="Профиль и показатели"
@@ -1595,7 +1636,6 @@ export default function MultipleSimulation({
                 </>
               )}
             </aside>
-          </div>
           {result && (
             <div
               className="multiple-time-panel"
