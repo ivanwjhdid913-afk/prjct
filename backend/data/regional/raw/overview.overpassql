@@ -1,0 +1,1 @@
+[out:json][timeout:180];rel(72169);out meta geom;map_to_area->.a;(way(area.a)[waterway=river][name~"^(Дон|Воронеж|Сосна|Быстрая Сосна|Красивая Меча|Матыра|Усмань|Битюг|Олым|Кшень|Байгора|Становая Ряса|Ранова|Семёнек|Семенек)$"];way(area.a)[natural=water][name][water~"^(lake|reservoir)$"];rel(area.a)[natural=water][name][water~"^(lake|reservoir)$"];);out meta geom;

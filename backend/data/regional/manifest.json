@@ -1,0 +1,104 @@
+{
+  "obtained_on": "2026-11-02",
+  "download_url": "https://overpass-api.de/api/interpreter",
+  "raw_sha256": "25f8a498aac59f5107076ab3a94159dc5990c4948780e833714ee66781523228",
+  "query_sha256": "e4654473c2a45b8e9c07ef67e07aeca013f615f2e1e28ed16f4fdfd228895645",
+  "coverage_note": "Картографическая подборка: граница Липецкой области OSM relation 72169, 11 именованных основных водотоков, 4 выбранных озера и 2 водохранилища. Это не полная инвентаризация поверхностных вод и не расчётная сеть. Для рек сохранены целиком исходные OSM ways, выбранные условием area Липецкой области; продолжения за границей показаны как картографический контекст. Разрывы и отдельные ways не соединены.",
+  "rivers": [
+    {
+      "id": "river-don",
+      "name": "Дон",
+      "prepared_reach_ids": [
+        "don-olkhovets"
+      ]
+    },
+    {
+      "id": "river-voronezh",
+      "name": "Воронеж",
+      "prepared_reach_ids": [
+        "voronezh-zheltye-peski",
+        "voronezh-below-kuzminka"
+      ]
+    },
+    {
+      "id": "river-bystraya-sosna",
+      "name": "Быстрая Сосна"
+    },
+    {
+      "id": "river-krasivaya-mecha",
+      "name": "Красивая Меча"
+    },
+    {
+      "id": "river-matyra",
+      "name": "Матыра"
+    },
+    {
+      "id": "river-bityug",
+      "name": "Битюг"
+    },
+    {
+      "id": "river-olym",
+      "name": "Олым"
+    },
+    {
+      "id": "river-baygora",
+      "name": "Байгора"
+    },
+    {
+      "id": "river-stanovaya-ryasa",
+      "name": "Становая Ряса"
+    },
+    {
+      "id": "river-ranova",
+      "name": "Ранова"
+    },
+    {
+      "id": "river-semenek",
+      "name": "Семенек"
+    }
+  ],
+  "waterbodies": [
+    {
+      "id": "lake-bogoroditskoe",
+      "type": "way",
+      "osm_id": 35164445,
+      "name": "озеро Богородицкое",
+      "kind": "lake"
+    },
+    {
+      "id": "lake-tolmachevo",
+      "type": "way",
+      "osm_id": 204466228,
+      "name": "озеро Толмачево",
+      "kind": "lake"
+    },
+    {
+      "id": "lake-bolshoe-ostabnoe",
+      "type": "way",
+      "osm_id": 204466235,
+      "name": "озеро Большое Остабное",
+      "kind": "lake"
+    },
+    {
+      "id": "lake-zalanskaya-luka",
+      "type": "way",
+      "osm_id": 475686623,
+      "name": "озеро Заланская Лука",
+      "kind": "lake"
+    },
+    {
+      "id": "reservoir-matyrskoe",
+      "type": "relation",
+      "osm_id": 149308,
+      "name": "Матырское водохранилище",
+      "kind": "reservoir"
+    },
+    {
+      "id": "reservoir-chamlykskoe",
+      "type": "relation",
+      "osm_id": 3880510,
+      "name": "Чамлыкское водохранилище",
+      "kind": "reservoir"
+    }
+  ]
+}
