@@ -352,7 +352,11 @@ export default function MultipleSimulation({
   useEffect(() => {
     if (!requestedReach || appliedReach.current === requestedReach) return;
     appliedReach.current = requestedReach;
-    if (requestedReach.id === reachId) return;
+    if (requestedReach.id === reachId) {
+      const completedReachId = (latest ?? baseline)?.reach_id;
+      if (completedReachId && completedReachId !== reachId) setPreview(true);
+      return;
+    }
     geometryRevision.current++;
     stopPending();
     stopPicking();
@@ -362,7 +366,7 @@ export default function MultipleSimulation({
     setPreview(true);
     setParametersCollapsed(false);
     setNotice("Участок изменён. Задайте положения источников заново. Контрольные точки остаются привязаны к прежней геометрии.");
-  }, [requestedReach, reachId]);
+  }, [requestedReach, reachId, latest, baseline]);
   useEffect(() => {
     if (handledReturn.current === returnResultVersion) return;
     handledReturn.current = returnResultVersion;

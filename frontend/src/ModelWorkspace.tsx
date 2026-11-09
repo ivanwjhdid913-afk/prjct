@@ -68,8 +68,12 @@ export default function ModelWorkspace() {
     restoreFocus.current = true;
     setOverview(false);
   }
+  function openOverview() {
+    setVisitedOverview(true);
+    setOverview(true);
+  }
   return (
-    <div className="model-choice-workspace">
+    <div className={`model-choice-workspace${multiple ? "" : " is-legacy"}`}>
       <nav className="model-choice" aria-label="Расчётная постановка" hidden={overview} inert={overview}>
         <button
           type="button"
@@ -92,17 +96,14 @@ export default function ModelWorkspace() {
             1–3 источника
           </span>
         </button>
-        <button
+        {multiple && <button
           ref={overviewButton}
           type="button"
           className="regional-open"
-          onClick={() => {
-            setVisitedOverview(true);
-            setOverview(true);
-          }}
+          onClick={openOverview}
         >
           Обзор области
-        </button>
+        </button>}
         <span>Сохраните условия перед сменой модели.</span>
       </nav>
       <div className="model-view" hidden={overview} inert={overview}>
@@ -117,6 +118,8 @@ export default function ModelWorkspace() {
           ) : (
             <Simulation
               {...viewProps}
+              onOpenOverview={openOverview}
+              overviewButtonRef={overviewButton}
               initialScenario={snapshot}
               onOpenMultiple={(value) => open(value, true)}
             />

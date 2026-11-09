@@ -277,7 +277,7 @@
     align-self: end;
     z-index: 430;
     height: 180px;
-    max-height: max(0px, calc(100% - 72px));
+    max-height: max(0px, calc(100% - 112px));
     min-height: 0;
     width: 100%;
     border-left: 0;
