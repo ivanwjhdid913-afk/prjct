@@ -61,12 +61,15 @@ function fitVisibleReach(instance: L.Map, reach: Reach, element: HTMLElement) {
   const bottom = cover && cover.left < bounds.right && cover.right > bounds.left
     ? Math.max(0, Math.min(bounds.bottom, cover.bottom) - Math.max(bounds.top, cover.top))
     : 0;
+  const exposedHeight = bounds.height - bottom;
+  const topPadding = bottom ? Math.min(36, Math.floor(exposedHeight / 3)) : 45;
+  const bottomPadding = bottom ? Math.min(16, Math.floor(exposedHeight / 6)) : 45;
   instance.invalidateSize({ pan: false });
   instance.fitBounds(
     reach.geometry.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
     {
-      paddingTopLeft: [45, 45],
-      paddingBottomRight: [45, bottom + 45],
+      paddingTopLeft: [45, topPadding],
+      paddingBottomRight: [45, bottom + bottomPadding],
       animate: false,
     },
   );
@@ -186,6 +189,7 @@ export default function MultipleSourceMap({
       weight: 11,
       interactive: false,
       smoothFactor: 0,
+      className: "multiple-river-centerline",
     }).addTo(instance);
     L.control
       .scale({ imperial: false, position: "bottomleft" })

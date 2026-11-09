@@ -43,7 +43,7 @@
 .regional-card-placeholder > span { font: 32px Georgia, serif; color: #91a28b; }
 .regional-card-placeholder h3 { color: #48614c; font-size: 15px; font-weight: 600; margin: 10px 0; }
 .regional-card-placeholder p { font-size: 12px; line-height: 1.7; margin: 0; }
-.regional-map-column { position: relative; min-width: 0; display: flex; flex-direction: column; background: #e9ede4; }
+.regional-map-column { position: relative; isolation: isolate; min-width: 0; display: flex; flex-direction: column; background: #e9ede4; }
 .regional-map { width: 100%; flex: 1; min-height: 450px; background: #e9ede4; isolation: isolate; }
 .regional-map-empty { display: grid; place-items: center; font-size: 14px; color: #647560; }
 .regional-map .leaflet-control-zoom a { width: 36px; height: 36px; line-height: 36px; color: #305645; }
@@ -68,6 +68,8 @@
   .regional-heading { padding: 12px; gap: 10px; }.regional-heading h2 { font-size: 22px; }.regional-kicker { font-size: 9px; letter-spacing: .7px; }.regional-heading button { padding: 8px 10px; font-size: 11px; max-width: 140px; }
   .regional-status { padding: 8px 12px; font-size: 10px; }.regional-workspace { display: flex; flex-direction: column; }.regional-sidebar { display: contents; }
   .regional-search { order: 0; padding: 12px; background: #fff; }.regional-map-column { order: 1; }.regional-object-list { order: 2; background: #fff; padding: 5px 10px 10px; }.regional-object-list ul { max-height: 150px; }
-  .regional-object-card,.regional-card-placeholder { order: 3; background: #fff; padding: 16px; }.regional-map { min-height: 370px; height: 44vh; flex: auto; }.regional-legend { right: 9px; bottom: 65px; padding: 7px 9px; }.regional-legend label { min-height: 26px; }.regional-data-note { padding: 10px 12px; }
+  .regional-object-card,.regional-card-placeholder { order: 3; background: #fff; padding: 16px; }.regional-map { min-height: 370px; height: 44vh; flex: auto; }
+  .regional-legend { position: static; display: flex; flex-wrap: wrap; gap: 0 12px; margin: 6px 9px; padding: 3px 8px 7px; box-shadow: none; }
+  .regional-legend label { min-height: 32px; }.regional-data-note { padding: 10px 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .regional-overview * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
