@@ -30,10 +30,14 @@ def test_valid_static_overview_retains_disconnected_parts_without_joining():
 
 
 @pytest.mark.parametrize('change', ['nan','coordinate_order','ring','duplicate','missing_source','sha','unsafe_url',
-    'bad_date','missing_boundary','two_boundaries','lake_reach','unknown_reach','bad_element','geometry_kind'])
+    'bad_date','missing_boundary','two_boundaries','lake_reach','unknown_reach','bad_element','geometry_kind',
+    'overflow_coordinate','malformed_source','boolean_version'])
 def test_invalid_static_data_is_rejected_before_serving(change):
     value=fixture_document()
     if change=='nan': value['features'][1]['geometry']['coordinates'][0][0][0]=float('nan')
+    if change=='overflow_coordinate': value['features'][1]['geometry']['coordinates'][0][0][0]=10**310
+    if change=='malformed_source': value['features'][1]['properties']['source_id']=[]
+    if change=='boolean_version': value['metadata']['format_version']=True
     if change=='coordinate_order': value['metadata']['coordinate_order']='latitude, longitude'
     if change=='ring': value['features'][0]['geometry']['coordinates'][0].pop()
     if change=='duplicate': value['features'].append(deepcopy(value['features'][1]))

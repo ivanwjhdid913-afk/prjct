@@ -3,7 +3,6 @@ from datetime import date
 from functools import lru_cache
 import hashlib
 import json
-import math
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -54,7 +53,8 @@ def validate_overview(document, reach_ids):
     require(isinstance(document, dict) and document.get('type') == 'FeatureCollection')
     metadata = document.get('metadata')
     require(isinstance(metadata, dict))
-    require(metadata.get('format_version') == 1 and metadata.get('crs') == 'EPSG:4326'
+    require(type(metadata.get('format_version')) is int and metadata['format_version'] == 1
+            and metadata.get('crs') == 'EPSG:4326'
             and metadata.get('coordinate_order') == 'longitude, latitude'
             and _text(metadata.get('name')) and _text(metadata.get('coverage_note'))
             and _date(metadata.get('obtained_on')) and isinstance(metadata.get('preparation'), dict))
@@ -75,7 +75,7 @@ def validate_overview(document, reach_ids):
         nonlocal vertices
         vertices += 1
         require(vertices <= 250000 and isinstance(point, list) and len(point) == 2)
-        require(all(not isinstance(v, bool) and isinstance(v, (int, float)) and math.isfinite(v) for v in point))
+        require(all(type(v) in (int, float) for v in point))
         require(-180 <= point[0] <= 180 and -90 <= point[1] <= 90)
 
     def line(points, ring=False):
@@ -95,7 +95,7 @@ def validate_overview(document, reach_ids):
         p, geometry = feature.get('properties'), feature.get('geometry')
         require(isinstance(p, dict) and isinstance(geometry, dict))
         require(_identifier(p.get('id')) and p['id'] not in ids and _text(p.get('name'), 300)
-                and p.get('source_id') in source_ids and _text(p.get('limitation')))
+                and _identifier(p.get('source_id')) and p['source_id'] in source_ids and _text(p.get('limitation')))
         ids.add(p['id'])
         kind = p.get('kind')
         require(kind in ('boundary', 'river', 'lake', 'reservoir'))
