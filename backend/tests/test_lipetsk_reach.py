@@ -13,7 +13,7 @@ PARAMS = dict(river_flow_m3_s=10., effluent_flow_m3_s=.1, background_mg_l=10.,
 @pytest.mark.anyio
 async def test_lipetsk_pilot_is_named_identified_and_measured_on_its_own_geometry(client, session):
     catalog = (await client.get('/api/v1/river-reaches')).json()['items']
-    assert {item['id'] for item in catalog} == {'don-olkhovets', PILOT}
+    assert {item['id'] for item in catalog} == {'don-olkhovets', PILOT, 'voronezh-below-kuzminka'}
     reach = next(item for item in catalog if item['id'] == PILOT)
     assert 'Воронеж' in reach['name']
     assert reach['metadata']['id'] == PILOT
