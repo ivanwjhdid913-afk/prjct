@@ -81,7 +81,8 @@ test('malformed provenance and unsupported prepared-waterbody mappings are rejec
     await expect(page.getByTestId('regional-load-status')).toContainText('Не удалось открыть сохранённый обзор');
     await page.route('**/api/v1/regional-overview', route => route.fulfill({ json: fixture }));
     await page.getByRole('button', { name: 'Повторить загрузку' }).click();
-    await expect(page.getByTestId('regional-load-status')).toContainText('3 водных объектов');
+    await expect(page.getByTestId('regional-load-status')).toContainText('Водные объекты — 3');
+    await expect(page.getByTestId('regional-map').locator('[data-regional-feature="boundary"]')).toBeVisible();
   }
 });
 
