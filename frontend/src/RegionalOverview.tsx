@@ -115,7 +115,7 @@ export default function RegionalOverview({ visible, currentReachId, hasResult, o
   return <section data-testid="regional-overview" className="regional-overview" hidden={!visible} inert={!visible} aria-label="Обзор области">
     <header className="regional-heading"><div><p className="regional-kicker">Липецкая область · поверхностные воды</p><h2 ref={heading} tabIndex={-1}>Обзор области</h2></div><button onClick={onReturnResult}>{hasResult ? 'Вернуться к результату' : 'К моделированию'}</button></header>
     <div data-testid="regional-load-status" className="regional-status" role="status" aria-live="polite">
-      {loading ? 'Загрузка сохранённой геометрии…' : error || (data ? `${features.length} водных объектов · ${reaches.length} подготовленных участков` : '')}
+      {loading ? 'Загрузка сохранённой геометрии…' : error || (data ? `Водные объекты — ${features.length} · Подготовленные участки — ${reaches.length}` : '')}
       {tileFailed && <span>Подложка недоступна. Сохранённые водные объекты и участки доступны.</span>}
       {reachError && <span>{reachError}</span>}
       {(error || reachError) && <button onClick={() => setAttempt(value => value + 1)} disabled={loading}>Повторить загрузку</button>}
