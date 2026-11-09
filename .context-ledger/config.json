@@ -1,0 +1,100 @@
+{
+  "schema_version": 8,
+  "docs": {
+    "ai": "docs/ai",
+    "specs": "docs/specs",
+    "changes": "docs/changes"
+  },
+  "modules": [
+    {
+      "path": "backend",
+      "readme": "backend/README.md",
+      "source": "auto"
+    },
+    {
+      "path": "frontend",
+      "readme": "frontend/README.md",
+      "source": "auto"
+    }
+  ],
+  "readme_managed_blocks": true,
+  "adapters": {
+    "agents": true,
+    "claude": true,
+    "cursor": true,
+    "copilot": true
+  },
+  "context": {
+    "max_required_files": 3,
+    "max_linked_specs": 2,
+    "max_change_summaries": 3,
+    "max_total_characters": 30000,
+    "show_close_candidates": 0
+  },
+  "coverage": {
+    "implementation_globs": [
+      "**"
+    ],
+    "test_globs": [
+      "tests/**",
+      "test/**",
+      "**/tests/**",
+      "**/test/**",
+      "**/test_*.py",
+      "**/*_test.*",
+      "**/*.test.*",
+      "**/*.spec.*"
+    ],
+    "ci_globs": [
+      ".github/**",
+      ".gitlab/**",
+      ".gitlab-ci.yml",
+      ".circleci/**",
+      "azure-pipelines*.yml",
+      "Jenkinsfile"
+    ],
+    "config_globs": [
+      "pyproject.toml",
+      "setup.cfg",
+      "tox.ini",
+      "package.json",
+      "package-lock.json",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "Cargo.lock",
+      "go.mod",
+      "go.sum",
+      "*.config.*",
+      ".env*",
+      ".gitattributes"
+    ],
+    "generated_globs": [
+      "dist/**",
+      "build/**",
+      "target/**",
+      "coverage/**",
+      "htmlcov/**",
+      "node_modules/**",
+      "vendor/**",
+      "**/__pycache__/**"
+    ],
+    "ignore_globs": []
+  },
+  "verification": {
+    "presets": {}
+  },
+  "runtime": {
+    "mode": "bundled"
+  },
+  "team": {
+    "enabled": true,
+    "default_branch": "main",
+    "derived_updates": "default-branch"
+  },
+  "quality": {
+    "profile": "evidence-v1",
+    "language": "auto",
+    "detail": "standard",
+    "max_context_pack_lines": 180
+  }
+}
