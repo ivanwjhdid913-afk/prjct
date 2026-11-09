@@ -63,7 +63,7 @@ function fitVisibleReach(instance: L.Map, reach: Reach, element: HTMLElement) {
     : 0;
   const exposedHeight = bounds.height - bottom;
   const topPadding = bottom ? Math.min(36, Math.floor(exposedHeight / 3)) : 45;
-  const bottomPadding = bottom ? Math.min(16, Math.floor(exposedHeight / 6)) : 45;
+  const bottomPadding = bottom ? Math.min(22, Math.floor(exposedHeight / 5)) : 45;
   instance.invalidateSize({ pan: false });
   instance.fitBounds(
     reach.geometry.coordinates.map(([lon, lat]) => [lat, lon] as L.LatLngTuple),
@@ -314,6 +314,7 @@ export default function MultipleSourceMap({
   }, [key, sourceKey, selectedSource]);
 
   const pointsKey = JSON.stringify(controlPoints);
+  const compactPointLabels = profileOpen && matchMedia("(max-width:760px)").matches;
   useEffect(() => {
     const instance = map.current;
     if (!instance || !reach) return;
@@ -333,7 +334,7 @@ export default function MultipleSourceMap({
           className: `multiple-map-control-point${point.id === selectedControlPointId ? " is-selected" : ""}`,
           html: `<span class="control-point-pin">К${index + 1}</span>`,
           iconSize: [32, 32],
-          iconAnchor: [16, -5],
+          iconAnchor: compactPointLabels ? [-12, 16] : [16, -5],
         }),
       })
         .addTo(instance)
@@ -348,7 +349,7 @@ export default function MultipleSourceMap({
       pointPins.current.forEach((pin) => pin.remove());
       pointPins.current = [];
     };
-  }, [key, pointsKey, selectedControlPointId]);
+  }, [key, pointsKey, selectedControlPointId, compactPointLabels]);
 
   useEffect(() => {
     if (picking) host.current?.focus({ preventScroll: true });

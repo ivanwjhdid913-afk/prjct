@@ -286,6 +286,10 @@
     box-shadow: 0 -3px 12px #214b3510;
   }
 
+  .multiple-stage:has(> .multiple-profile:not([hidden])) .multiple-source-number {
+    left: calc(var(--pin-offset, 0px) - 16px);
+  }
+
   .multiple-profile-heading .profile-close {
     min-width: 44px;
     min-height: 44px;
