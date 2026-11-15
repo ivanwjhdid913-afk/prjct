@@ -346,7 +346,10 @@ export default function Simulation({initialScenario,onOpenMultiple,onOpenOvervie
     }
     selectedDraftReach.current = target.id;
     geometryEditRevision.current++;
-    stopRequest(); invalidateSnap();
+    setInteractionKey(value => value + 1);
+    setStatus(current => current === 'loading' ? current : 'idle');
+    setMessage(''); setFieldErrors({}); setComparisonExitReason('');
+    invalidateSnap();
     pickingRef.current = false; setPickingSource(false); setPlaying(false);
     setReaches(items => items.some(item => item.id === target.id) ? items : [...items, target]);
     setMode('river'); setReachId(target.id); setSource(''); setSourceCoordinate(null); setDraftPreview(true);

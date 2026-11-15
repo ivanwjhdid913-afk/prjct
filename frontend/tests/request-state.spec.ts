@@ -74,7 +74,7 @@ for (const edit of ['numeric', 'reach'] as const) {
     await expect(page.getByText('Выполняется расчёт…', { exact: false })).toHaveCount(0);
     await expect(page.locator('.reach-preview')).toBeVisible();
     await expect(page.locator('.reach-preview')).toHaveAttribute('data-reach-id', edit === 'reach' ? other.id : don.id);
-    await expect(page.getByLabel('Положение сценарного источника, м')).toHaveValue(edit === 'numeric' ? '125.5' : '0');
+    await expect(page.getByLabel('Положение сценарного источника, м')).toHaveValue(edit === 'numeric' ? '125.5' : '');
     await expect(page.locator('.simulation-stale')).toBeVisible();
     await page.getByRole('button', { name: 'Показать рассчитанный результат', exact: true }).click();
     await expect(page.locator('.simulation-map-label')).toHaveText(don.name);
@@ -93,6 +93,8 @@ test('cancelled calculation and out-of-order repeated calculations never replace
   await page.getByRole('button', { name: 'Рассчитать', exact: true }).click();
   await expect.poll(() => pending.length).toBe(2);
   await page.getByLabel('Подготовленный участок').selectOption(other.id);
+  await expect(page.getByRole('button', { name: 'Запустить новый расчёт', exact: true })).toBeDisabled();
+  await page.getByLabel('Положение сценарного источника, м').fill('100');
   await page.getByRole('button', { name: 'Запустить новый расчёт', exact: true }).click();
   await expect.poll(() => pending.length).toBe(3);
   pending[2].release();

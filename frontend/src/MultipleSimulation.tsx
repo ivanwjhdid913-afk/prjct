@@ -356,7 +356,10 @@ export default function MultipleSimulation({
       return;
     }
     geometryRevision.current++;
-    stopPending();
+    setInteraction((value) => value + 1);
+    setStatus((current) => current === "loading" ? current : "idle");
+    setMessage("");
+    setPlaying(false);
     stopPicking();
     setReaches((items) => items.some((item) => item.id === target.id) ? items : [...items, target]);
     setReachId(target.id);
