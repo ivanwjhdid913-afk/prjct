@@ -7,6 +7,7 @@ import "./modelWorkspace.css";
 const Simulation = lazy(() => import("./Simulation"));
 const RegionalOverview = lazy(() => import("./RegionalOverview"));
 const MultipleSimulation = lazy(() => import("./MultipleSimulation"));
+const Confluence = lazy(() => import("./Confluence"));
 type Restore = {
   name?: string;
   analysis_settings?: AnalysisSettings | null;
@@ -27,15 +28,27 @@ export default function ModelWorkspace() {
   const [snapshot, setSnapshot] = useState<Restore>();
   const [overview, setOverview] = useState(false);
   const [visitedOverview, setVisitedOverview] = useState(false);
+  const [confluence, setConfluence] = useState(location.hash === "#model/confluence");
+  const [visitedConfluence, setVisitedConfluence] = useState(confluence);
   const [requestedReach, setRequestedReach] = useState<Reach>();
   const [returnResultVersion, setReturnResultVersion] = useState(0);
   const [viewState, setViewState] = useState<ModelViewState>({ currentReachId: null, hasResult: false });
   const overviewButton = useRef<HTMLButtonElement>(null);
+  const confluenceLink = useRef<HTMLAnchorElement>(null);
+  const backFromConfluence = useRef<HTMLAnchorElement>(null);
+  const wasConfluence = useRef(false);
   const restoreFocus = useRef(false);
   const onViewState = useCallback((state: ModelViewState) => setViewState(state), []);
   useEffect(() => {
     const navigate = () => {
+      if (location.hash === "#model/confluence") {
+        setOverview(false);
+        setVisitedConfluence(true);
+        setConfluence(true);
+        return;
+      }
       if (location.hash === "#model/legacy" || location.hash === "#model") {
+        setConfluence(false);
         setSnapshot(undefined);
         setRequestedReach(undefined);
         setOverview(false);
@@ -46,22 +59,31 @@ export default function ModelWorkspace() {
     return () => window.removeEventListener("hashchange", navigate);
   }, []);
   useEffect(() => {
+    if (confluence) backFromConfluence.current?.focus({ preventScroll: true });
+    else if (wasConfluence.current) confluenceLink.current?.focus({ preventScroll: true });
+    wasConfluence.current = confluence;
+  }, [confluence]);
+  useEffect(() => {
     if (!overview && restoreFocus.current) {
       restoreFocus.current = false;
       overviewButton.current?.focus({ preventScroll: true });
     }
   }, [overview]);
-  const viewProps = { workspaceVisible: !overview, onViewState, requestedReach, returnResultVersion };
-  function open(value: Restore, next: boolean) {
-    if (next !== multiple) setRequestedReach(undefined);
-    setSnapshot(value);
+  const viewProps = { workspaceVisible: !overview && !confluence, onViewState, requestedReach, returnResultVersion };
+  function changeModel(next: boolean) {
+    if (next === multiple) return;
+    setRequestedReach(undefined);
+    window.history.replaceState(window.history.state, "", next ? "#model" : "#model/legacy");
     setMultiple(next);
+  }
+  function open(value: Restore, next: boolean) {
+    setSnapshot(value);
+    changeModel(next);
   }
   function switchModel(next: boolean) {
     if (next !== multiple) {
       setSnapshot(undefined);
-      setRequestedReach(undefined);
-      setMultiple(next);
+      changeModel(next);
     }
   }
   function closeOverview() {
@@ -74,7 +96,7 @@ export default function ModelWorkspace() {
   }
   return (
     <div className={`model-choice-workspace${multiple ? "" : " is-legacy"}`}>
-      <nav className="model-choice" aria-label="Расчётная постановка" hidden={overview} inert={overview}>
+      <nav className="model-choice" aria-label="Расчётная постановка" hidden={overview || confluence} inert={overview || confluence}>
         <button
           type="button"
           aria-label="Один источник · прежняя модель"
@@ -104,9 +126,10 @@ export default function ModelWorkspace() {
         >
           Обзор области
         </button>}
+        {multiple && <a className="model-confluence-link" ref={confluenceLink} href="#model/confluence">Слияние рек</a>}
         <span>Сохраните условия перед сменой модели.</span>
       </nav>
-      <div className="model-view" hidden={overview} inert={overview}>
+      <div className="model-view" hidden={overview || confluence} inert={overview || confluence}>
         <Suspense fallback={<p role="status">Открываем расчётную модель…</p>}>
           {multiple ? (
             <MultipleSimulation
@@ -142,6 +165,16 @@ export default function ModelWorkspace() {
             }}
           />
         </Suspense>
+      )}
+      {visitedConfluence && (
+        <div className="confluence-view" hidden={!confluence} inert={!confluence}>
+          <nav className="model-choice" aria-label="Навигация пилота">
+            <a className="model-confluence-link" ref={backFromConfluence} href={multiple ? "#model" : "#model/legacy"}>← К прежней модели</a>
+          </nav>
+          <Suspense fallback={<p role="status">Открываем пилот слияния…</p>}>
+            <Confluence visible={confluence} />
+          </Suspense>
+        </div>
       )}
     </div>
   );

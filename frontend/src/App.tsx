@@ -3,6 +3,7 @@ import './styles.css';
 import ObservationPoints from './ObservationPoints';
 import ModelWorkspace from './ModelWorkspace';
 const DischargeData = lazy(() => import('./DischargeData'));
+const modelRoutes = ['#model', '#model/legacy', '#model/confluence'];
 
 const kinds = { river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
 type WaterBody = { id: string; name: string; kind: keyof typeof kinds; is_synthetic: boolean };
@@ -27,7 +28,7 @@ function isWaterPage(value: unknown): value is WaterPage {
 }
 
 export default function App() {
-  const [modelOpen, setModelOpen] = useState(() => ['#model', '#model/legacy'].includes(location.hash));
+  const [modelOpen, setModelOpen] = useState(() => modelRoutes.includes(location.hash));
   const [dataOpen, setDataOpen] = useState(() => location.hash === '#discharge-data');
   const [waterBodyId, setWaterBodyId] = useState(() => location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null);
   const returnTarget = useRef<HTMLButtonElement | null>(null);
@@ -45,9 +46,10 @@ export default function App() {
     function navigate() {
       const id = location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null;
       setWaterBodyId(id);
-      setModelOpen(['#model', '#model/legacy'].includes(location.hash));
+      const modeling = modelRoutes.includes(location.hash);
+      setModelOpen(modeling);
       setDataOpen(location.hash === '#discharge-data');
-      if (!id && !['#model', '#model/legacy'].includes(location.hash) && location.hash !== '#discharge-data') window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
+      if (!id && !modeling && location.hash !== '#discharge-data') window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
     }
     window.addEventListener('hashchange', navigate);
     return () => window.removeEventListener('hashchange', navigate);
