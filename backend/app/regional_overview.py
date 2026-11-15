@@ -82,6 +82,7 @@ def validate_overview(document, reach_ids):
         require(isinstance(points, list) and len(points) >= (4 if ring else 2))
         for point in points:
             coordinate(point)
+        require(all(a != b for a, b in zip(points, points[1:])))
         require(not ring or points[0] == points[-1])
 
     def polygon(rings):
@@ -104,6 +105,8 @@ def validate_overview(document, reach_ids):
         require(isinstance(elements, list) and 1 <= len(elements) <= 10000)
         for element in elements:
             require(isinstance(element, dict) and _text(element.get('type'), 40))
+            if 'version' in element:
+                require(type(element['version']) is int and element['version'] > 0)
             element_id = element.get('id')
             require(not isinstance(element_id, bool) and (isinstance(element_id, int) and element_id > 0
                     or isinstance(element_id, str) and _identifier(element_id)))

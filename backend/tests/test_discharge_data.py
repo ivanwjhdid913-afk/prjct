@@ -6,7 +6,8 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.discharge_data import Catalog, DATA_PATH, load_catalog
+from app.discharge_data import Catalog, DATA_PATH, PreparedReach, load_catalog
+from app.river import prepared_reaches
 from app.main import app
 from app.db import get_session
 
@@ -52,6 +53,13 @@ def test_explicit_unknown_values_remain_null(valid_catalog):
     assert catalog.items[0].coordinates is None
     assert catalog.items[0].evidence[0].quantity is None
     assert catalog.sources[0].published_on is None
+
+
+def test_valid_documentary_match_accepts_every_prepared_reach():
+    for reach in prepared_reaches():
+        assert PreparedReach(status='matched', reach_id=reach['id'], explanation='Verified match.').reach_id == reach['id']
+    with pytest.raises(ValidationError):
+        PreparedReach(status='matched', reach_id='missing', explanation='Unknown reach.')
 
 
 def test_empty_catalog_is_explicit_and_does_not_invent_evidence(valid_catalog):

@@ -23,7 +23,6 @@ const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFi
 const date = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
   && v.slice(0, 4) !== '0000' && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
 const literal = <T extends string>(v: unknown, values: readonly T[]): v is T => typeof v === 'string' && values.includes(v as T);
-const reachIds = ['don-olkhovets', 'voronezh-zheltye-peski'] as const;
 
 function period(v: unknown, checkedOn: string): v is string {
   if (!text(v)) return false;
@@ -56,7 +55,7 @@ function source(v: unknown): v is Source {
     && safeSourceUrl(v.url) && date(v.checked_on) && (v.published_on === null || date(v.published_on) && v.published_on <= v.checked_on)
     && (v.sha256 === null || typeof v.sha256 === 'string' && /^[a-f0-9]{64}$/.test(v.sha256));
 }
-export function validDischargeCatalog(v: unknown): v is DischargeCatalog {
+export function validDischargeCatalog(v: unknown, reachIds?: ReadonlySet<string>): v is DischargeCatalog {
   if (!shape(v, ['format_version','checked_on','sources','items']) || v.format_version !== 1 || !date(v.checked_on)
     || !Array.isArray(v.sources) || v.sources.length > 50 || !v.sources.every(source)
     || !Array.isArray(v.items) || v.items.length > 50) return false;
@@ -78,7 +77,10 @@ export function validDischargeCatalog(v: unknown): v is DischargeCatalog {
       || !Array.isArray(i.evidence) || !i.evidence.length || i.evidence.length > 100 || !i.evidence.every(evidence)
       || !Array.isArray(i.missing) || !i.missing.every(text) || typeof i.readiness !== 'string' || !Object.hasOwn(readinessLabels, i.readiness)
       || !shape(i.prepared_reach, ['status','reach_id','explanation']) || !literal(i.prepared_reach.status, ['not_established','outside','matched']) || !text(i.prepared_reach.explanation)
-      || !(i.prepared_reach.status === 'matched' ? literal(i.prepared_reach.reach_id, reachIds) : i.prepared_reach.reach_id === null)
+      || !(i.prepared_reach.status === 'matched'
+        ? typeof i.prepared_reach.reach_id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(i.prepared_reach.reach_id)
+          && (!reachIds || reachIds.has(i.prepared_reach.reach_id))
+        : i.prepared_reach.reach_id === null)
       || !shape(i.matrix, Object.keys(matrixLabels))) return false;
     const cellsValid = Object.keys(matrixLabels).every(k => {
       const cell = (i.matrix as Record<string, unknown>)[k];

@@ -146,7 +146,7 @@ test('draft river preview keeps the completed result and A/B geometry immutable'
   lineShape(path!).forEach((value, index) => expect(shape[index]).toBeCloseTo(value, 2));
   await expect(page.getByLabel('Время от начала сценария')).toBeEnabled();
   await page.locator('.simulation-segment').first().dispatchEvent('click');
-  await expect(page.getByLabel('Положение сценарного источника, м')).toHaveValue('0');
+  await expect(page.getByLabel('Положение сценарного источника, м')).toBeEmpty();
 });
 
 test('numeric preview follows the same WGS84 distance as the real Don API', async ({ page, request }) => {

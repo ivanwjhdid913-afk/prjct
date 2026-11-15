@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { matrixLabels, safeSourceUrl, validDischargeCatalog } from '../src/dischargeCatalog';
+import { matrixLabels, safeSourceUrl, validDischargeCatalog as validate } from '../src/dischargeCatalog';
 import type { Coordinate, DischargeCatalog } from '../src/dischargeCatalog';
 
 const checkedIn: DischargeCatalog = JSON.parse(readFileSync('../backend/data/discharges/catalog.v1.json', 'utf8'));
+const prepared = new Set(['don-olkhovets', 'voronezh-zheltye-peski', 'voronezh-below-kuzminka']);
+const validDischargeCatalog = (value: unknown) => validate(value, prepared);
 
 function fixture(): DischargeCatalog {
   const source = { ...checkedIn.sources[0], id: 'source' };
@@ -52,6 +54,9 @@ test('rejects false ready on an incomplete item without an outfall or matched re
 test('accepts a complete documented known-reach outfall and preserves enterprise meaning', () => {
   expect(validDischargeCatalog(fixture())).toBe(true);
   expect(validDischargeCatalog(readyFixture())).toBe(true);
+  const kuzminka = readyFixture();
+  kuzminka.items[0].prepared_reach.reach_id = 'voronezh-below-kuzminka';
+  expect(validDischargeCatalog(kuzminka)).toBe(true);
   const enterprise = fixture();
   enterprise.items[0].coordinates = coordinate('enterprise');
   expect(validDischargeCatalog(enterprise)).toBe(true);

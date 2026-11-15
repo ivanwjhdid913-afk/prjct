@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { basisLabels, cellLabels, matrixLabels, readinessLabels, validDischargeCatalog, type DischargeCatalog, type DischargeItem, type MatrixKey, type Source } from './dischargeCatalog';
+import { validReach } from './multipleSources';
 import './dischargeData.css';
 
 const dateLabel = (date: string) => date.split('-').reverse().join('.');
@@ -71,6 +72,13 @@ export default function DischargeData() {
       if (!response.ok) throw new Error('Не удалось загрузить паспорта данных. Проверьте соединение и повторите запрос.');
       const data: unknown = await response.json();
       if (!validDischargeCatalog(data)) throw new Error('Некорректный набор исходных данных. Обновите приложение или повторите запрос.');
+      if (data.items.some(item => item.prepared_reach.status === 'matched')) {
+        const registry = await fetch('/api/v1/river-reaches', { signal: abort.signal });
+        if (!registry.ok) throw new Error('Не удалось сверить паспорта с реестром подготовленных участков.');
+        const { items } = await registry.json();
+        if (!Array.isArray(items) || !items.every(validReach) || !validDischargeCatalog(data, new Set(items.map(reach => reach.id))))
+          throw new Error('Некорректное сопоставление с реестром подготовленных участков.');
+      }
       if (active) setState({ status: 'ready', data });
     }).catch(error => { if (active) setState({ status: 'error', message: abort.signal.aborted ? 'Не удалось загрузить паспорта: время ожидания истекло.' : error instanceof Error ? error.message : 'Не удалось загрузить паспорта данных.' }); }).finally(() => window.clearTimeout(timeout));
     return () => { active = false; abort.abort(); window.clearTimeout(timeout); };

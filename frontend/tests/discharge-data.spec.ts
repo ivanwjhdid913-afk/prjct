@@ -71,6 +71,21 @@ test('document text is literal and malicious source links are rejected', async (
   await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0);
 });
 
+test('a documented outfall must match a reach from the current registry', async ({ page }) => {
+  const data = dataset();
+  const reachId = 'voronezh-below-kuzminka';
+  data.items[0].coordinates = { longitude: 39.73, latitude: 52.73, crs: 'EPSG:4326',
+    kind: 'outfall', description: 'Проверочный выпуск', source_id: 'primary', locator: 'p. 1' };
+  Object.assign(data.items[0].prepared_reach, { status: 'matched', reach_id: reachId, explanation: 'Тестовое сопоставление.' });
+  await page.route('**/api/v1/discharge-data', route => route.fulfill({ json: data }));
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.goto('/#discharge-data');
+  await expect(page.getByTestId('discharge-card')).toHaveCount(1);
+  await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [] } }));
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Некорректное сопоставление');
+});
+
 for (const kind of ['invalid-coordinate','bad-reference','bad-period','null-number','unknown-version','false-ready','unsupported-match','unsourced-data','invalid-evidence-period','array-kind','raw-url-control']) test(`invalid data is rejected: ${kind}`, async ({ page }) => {
   const data: any = dataset();
   if (kind === 'invalid-coordinate') data.items[0].coordinates = { longitude: 400, latitude: 52, crs: 'EPSG:4326', kind: 'enterprise', description: 'test', source_id: 'primary', locator: 'p1' };

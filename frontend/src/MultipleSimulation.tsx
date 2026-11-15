@@ -349,10 +349,8 @@ export default function MultipleSimulation({
   useEffect(() => {
     if (!workspaceVisible) setPlaying(false);
   }, [workspaceVisible]);
-  useEffect(() => {
-    if (!requestedReach || appliedReach.current === requestedReach) return;
-    appliedReach.current = requestedReach;
-    if (requestedReach.id === reachId) {
+  function selectReach(target: Reach) {
+    if (target.id === reachId) {
       const completedReachId = (latest ?? baseline)?.reach_id;
       if (completedReachId && completedReachId !== reachId) setPreview(true);
       return;
@@ -360,12 +358,17 @@ export default function MultipleSimulation({
     geometryRevision.current++;
     stopPending();
     stopPicking();
-    setReaches((items) => items.some((item) => item.id === requestedReach.id) ? items : [...items, requestedReach]);
-    setReachId(requestedReach.id);
+    setReaches((items) => items.some((item) => item.id === target.id) ? items : [...items, target]);
+    setReachId(target.id);
     setSources((items) => items.map((source) => ({ ...source, source_distance_m: "" })));
     setPreview(true);
     setParametersCollapsed(false);
     setNotice("Участок изменён. Задайте положения источников заново. Контрольные точки остаются привязаны к прежней геометрии.");
+  }
+  useEffect(() => {
+    if (!requestedReach || appliedReach.current === requestedReach) return;
+    appliedReach.current = requestedReach;
+    selectReach(requestedReach);
   }, [requestedReach, reachId, latest, baseline]);
   useEffect(() => {
     if (handledReturn.current === returnResultVersion) return;
@@ -561,6 +564,10 @@ export default function MultipleSimulation({
       ? reach
       : (reaches.find((r) => r.id === result.reach_id) ?? null);
   const displayReachId = displayReach?.id ?? null;
+  const sourcePositionsReady = !!reach && sources.every(({ source_distance_m }) => {
+    const position = Number(source_distance_m);
+    return !!source_distance_m.trim() && Number.isFinite(position) && position >= 0 && position <= reach.length_m - 100;
+  });
   const hasResult = !!result;
   useEffect(() => onViewState?.({ currentReachId: displayReachId, hasResult }), [displayReachId, hasResult, onViewState]);
   const mapScope = geometryScope(displayReach);
@@ -1100,11 +1107,8 @@ export default function MultipleSimulation({
                 id="multiple-reach"
                 value={reachId}
                 onChange={(e) => {
-                  geometryRevision.current++;
-                  stopPicking();
-                  setReachId(e.target.value);
-                  setPreview(true);
-                  setPlaying(false);
+                  const target = reaches.find((item) => item.id === e.target.value);
+                  if (target) selectReach(target);
                 }}
               >
                 {reaches.map((r) => (
@@ -1339,7 +1343,7 @@ export default function MultipleSimulation({
               </section>
             </div>
             <div className="simulation-actions">
-              <button type="submit" disabled={status === "loading" || !reach}>
+              <button type="submit" disabled={status === "loading" || !sourcePositionsReady}>
                 Рассчитать
               </button>
               {status === "loading" && (

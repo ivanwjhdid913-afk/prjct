@@ -72,6 +72,8 @@ test('malformed provenance and unsupported prepared-waterbody mappings are rejec
     { ...fixture, metadata: { ...fixture.metadata, sources: [{ ...source, url: 'https://name:password@example.org' }] } },
     { ...fixture, metadata: { ...fixture.metadata, obtained_on: '2026-02-30' } },
     { ...fixture, features: fixture.features.filter(feature => feature.properties.kind !== 'boundary') },
+    { ...fixture, features: fixture.features.map(feature => feature.properties.id === 'don' ? { ...feature, properties: { ...feature.properties, source_elements: [{ type: 'way', id: 1, version: true }] } } : feature) },
+    { ...fixture, features: fixture.features.map(feature => feature.properties.id === 'don' ? { ...feature, geometry: { type: 'LineString', coordinates: [[39.2, 52.5], [39.2, 52.5], [39.21, 52.51]] } } : feature) },
     { ...fixture, features: fixture.features.map(feature => feature.properties.kind === 'lake' ? { ...feature, properties: { ...feature.properties, prepared_reach_ids: [reach.id] } } : feature) },
   ]) {
     await page.route('https://tile.openstreetmap.org/**', route => route.abort());

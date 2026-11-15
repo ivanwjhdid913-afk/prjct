@@ -9,6 +9,8 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.river import prepared_reaches
+
 
 def nonempty(value: str) -> str:
     if not value.strip() or any(ord(c) < 32 and c not in '\n\t' for c in value):
@@ -30,7 +32,6 @@ ISODate = Annotated[Text, AfterValidator(iso_date)]
 MatrixKey = Literal['outfall_position', 'channel', 'river_flow', 'effluent_flow',
                     'background', 'substance_load', 'time_regime', 'velocity_dispersion', 'observations']
 MATRIX_KEYS = set(MatrixKey.__args__)
-REACH_IDS = {'don-olkhovets', 'voronezh-zheltye-peski'}
 DATA_PATH = Path(__file__).resolve().parents[1] / 'data' / 'discharges' / 'catalog.v1.json'
 router = APIRouter(prefix='/api/v1/discharge-data', tags=['discharge evidence'])
 
@@ -138,7 +139,7 @@ class PreparedReach(StrictModel):
     @model_validator(mode='after')
     def consistent_reference(self):
         if self.status == 'matched':
-            if self.reach_id not in REACH_IDS:
+            if not any(reach['id'] == self.reach_id for reach in prepared_reaches()):
                 raise ValueError('Matched reach must exist in the prepared registry.')
         elif self.reach_id is not None:
             raise ValueError('Unmatched evidence must not select a substitute reach.')
