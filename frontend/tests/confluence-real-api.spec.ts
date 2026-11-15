@@ -101,10 +101,40 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 375, height: 667 
     expect(rows.filter(row => row[0] === 'balance')).toHaveLength(result.times_hours.length * 4);
     expect(Number(rows.at(-1)![header.indexOf('time_hours')])).toBe(duration);
     expect(rows.at(-1)![header.indexOf('branch_id')]).toBe('network');
-    expect(Number(rows.at(-1)![header.indexOf('input_kg')])).toBeCloseTo(72, 10);
-    expect(Number(rows.at(-2)![header.indexOf('output_kg')])).toBeCloseTo(72, 5);
+    expect(Number(rows.at(-1)![header.indexOf('input_delta_from_background_kg')])).toBeCloseTo(72, 10);
+    expect(Number(rows.at(-2)![header.indexOf('output_delta_from_background_kg')])).toBeCloseTo(72, 5);
     expect(pageErrors).toEqual([]);
     await page.getByRole('link', { name: /К прежней модели/ }).click();
     await expect(oldSource).toHaveValue('100');
   });
 }
+
+test('the actual pilot exports a zero-concentration pulse as a signed deficit', async ({ page }) => {
+  await page.route('**/api/v1/confluence/**', async route => {
+    const url = new URL(route.request().url());
+    await route.fulfill({ response: await route.fetch({ url: api + url.pathname }) });
+  });
+  await page.goto('/#model/confluence');
+  await page.getByRole('spinbutton', { name: 'Концентрация на входе A', exact: true }).fill('0');
+  const completed = page.waitForResponse(response => response.url().endsWith('/api/v1/confluence/simulations'));
+  await button(page, 'Рассчитать слияние').click();
+  const response = await completed;
+  expect(response.status()).toBe(200);
+  const result: Result = await response.json();
+  expect(result.inputs.background_mg_l).toBe(10);
+  expect(result.inputs.branches.find(branch => branch.id === 'a')).toMatchObject({
+    flow_m3_s: 8, load_duration_minutes: 15, concentration_mg_l: 0,
+  });
+  expect(result.balance_kg.input.at(-1)).toBeCloseTo(-72, 10);
+
+  const [download] = await Promise.all([page.waitForEvent('download'), button(page, 'Скачать CSV').click()]);
+  const [header, ...rows] = (await downloadText(download)).trimEnd().split(/\r?\n/).map(row => row.split(','));
+  const metadata = rows.find(row => row[0] === 'metadata')!;
+  expect(metadata[header.indexOf('csv_schema_version')]).toBe('2');
+  expect(metadata[header.indexOf('background_mg_l')]).toBe('10');
+  expect(metadata[header.indexOf('balance_reference')]).toBe('relative_to_background');
+  const end = rows.at(-1)!;
+  expect(end[header.indexOf('branch_id')]).toBe('network');
+  expect(Number(end[header.indexOf('input_delta_from_background_kg')])).toBeCloseTo(-72, 10);
+  expect(Number(end[header.indexOf('output_delta_from_background_kg')])).toBeCloseTo(-72, 5);
+});

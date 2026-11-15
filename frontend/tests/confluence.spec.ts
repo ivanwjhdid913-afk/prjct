@@ -39,7 +39,27 @@ test('CSV records each branch balance once per saved time', async () => {
   expect(rows.every(row => row.length === header.length)).toBe(true);
   const balanceRows = rows.filter(row => row[0] === 'balance' && Number(row[1]) === 2.5);
   expect(balanceRows.map(row => row[2])).toEqual(['a', 'b', 'out', 'network']);
-  expect(Number(balanceRows[3][header.indexOf('input_kg')])).toBe(8);
+  expect(Number(balanceRows[3][header.indexOf('input_delta_from_background_kg')])).toBe(8);
+  const metadata = rows.find(row => row[0] === 'metadata')!;
+  expect(metadata[header.indexOf('csv_schema_version')]).toBe('2');
+  expect(metadata[header.indexOf('background_mg_l')]).toBe('0.2');
+  expect(metadata[header.indexOf('balance_reference')]).toBe('relative_to_background');
+});
+
+test('CSV preserves a signed deficit against the saved background', async () => {
+  const deficit = { input: [0, -72, -72], output: [0, 0, -72], stored: [0, -72, 0], residual: [0, 0, 0] };
+  const inputs = { ...defaults, background_mg_l: 10, branches: [
+    { ...defaults.branches[0], flow_m3_s: 8, load_duration_minutes: 15, concentration_mg_l: 0 },
+    { ...defaults.branches[1], flow_m3_s: 2, concentration_mg_l: 10 },
+  ] };
+  const csv = resultCsv({ ...result, inputs, times_hours: [0, .25, 2.5],
+    flows_m3_s: { a: 8, b: 2, out: 10 }, balance_kg: deficit } as Result);
+  const [header, ...rows] = (await csv.text()).trimEnd().split('\r\n').map(row => row.split(','));
+  expect(rows[0][header.indexOf('background_mg_l')]).toBe('10');
+  const network = rows.filter(row => row[0] === 'balance' && row[2] === 'network');
+  expect(network.map(row => Number(row[header.indexOf('input_delta_from_background_kg')]))).toEqual([0, -72, -72]);
+  expect(Number(network[1][header.indexOf('stored_delta_from_background_kg')])).toBe(-72);
+  expect(Number(network[2][header.indexOf('output_delta_from_background_kg')])).toBe(-72);
 });
 
 async function openPilot(page: Page) {

@@ -1,7 +1,7 @@
 """Conservative 1-D transport on the three synthetic reaches of the confluence pilot."""
 
 from dataclasses import dataclass
-from math import ceil, fsum, hypot, inf, isfinite, nextafter
+from math import ceil, fsum, hypot, inf, isfinite, nextafter, ulp
 from threading import Lock
 from typing import Literal
 
@@ -226,6 +226,18 @@ def solve(inputs: Inputs, *, target_cell_m: float = 25, max_step_seconds: float 
     # C - background in mg/L. Its signed flux and storage track the change from
     # the ambient condition without subtracting two large absolute inventories.
     background = inputs.background_mg_l
+    roundoff_floor = -8 * ulp(background)
+
+    def absolute_concentration(deviation: float) -> float:
+        concentration = background + deviation
+        if concentration >= 0:
+            return concentration
+        # The flux update and node mixing can leave a few ULPs after cancellation
+        # at physical zero. Apply this tolerance only to reported concentrations.
+        if concentration >= roundoff_floor:
+            return 0.0
+        raise ArithmeticError("Negative absolute concentration exceeds the roundoff allowance")
+
     states = {key: [0.0] * branch.cells for key, branch in grid.items()}
     histories = {key: [[background] * branch.cells] for key, branch in grid.items()}
     junction = {key: [background] for key in grid}
@@ -251,17 +263,17 @@ def solve(inputs: Inputs, *, target_cell_m: float = 25, max_step_seconds: float 
             for key, branch in grid.items():
                 state = _advance(states[key], branch, incoming[key], outgoing[key], dt_seconds)
                 states[key] = state
-                histories[key].append([background + value for value in state])
+                histories[key].append([absolute_concentration(value) for value in state])
                 conversion = dt_seconds * _KG_PER_M3_MG_L
                 branch_balances[key].integrate(
                     incoming[key] * conversion,
                     outgoing[key] * conversion,
                     fsum(state) * branch.volume_m3 * _KG_PER_M3_MG_L,
                 )
-            junction["a"].append(background + states["a"][-1])
-            junction["b"].append(background + states["b"][-1])
+            junction["a"].append(histories["a"][-1][-1])
+            junction["b"].append(histories["b"][-1][-1])
             junction["out"].append(
-                background + fsum(flows[key] * states[key][-1] for key in upstream) / flows["out"]
+                absolute_concentration(fsum(flows[key] * states[key][-1] for key in upstream) / flows["out"])
             )
             global_balance.record(
                 fsum(branch_balances[key].input[-1] for key in upstream),

@@ -130,6 +130,46 @@ def test_nonzero_anomalies_from_both_branches_are_combined_at_every_frame():
     assert all(4 <= value <= 20 for frames in result["concentrations_mg_l"].values() for frame in frames for value in frame)
 
 
+def test_zero_inlets_do_not_report_negative_absolute_concentration():
+    inputs = pilot.pilot_definition()["defaults"]
+    inputs.update(background_mg_l=111.1, duration_hours=5)
+    for branch in inputs["branches"]:
+        branch.update(velocity_m_s=1.2, dispersion_m2_s=0, concentration_mg_l=0, load_duration_minutes=None)
+    inputs["downstream"].update(velocity_m_s=1.5, dispersion_m2_s=0)
+    result = pilot.solve(pilot.Inputs.model_validate(inputs))
+    for frames in result["concentrations_mg_l"].values():
+        assert min(value for frame in frames for value in frame) >= 0
+        assert max(frames[-1]) == pytest.approx(0, abs=1e-12)
+    assert all(min(series) >= 0 for series in result["junction_mg_l"].values())
+    balance = result["balance_kg"]
+    assert balance["input"][-1] == pytest.approx(-19_998, abs=1e-8)
+    assert balance["output"][-1] < 0
+    assert balance["stored"][-1] < 0
+    assert max(map(abs, balance["residual"])) < 1e-8
+
+
+def test_zero_concentration_pulse_has_negative_mass_relative_to_background():
+    inputs = pilot.pilot_definition()["defaults"]
+    inputs["branches"][0]["concentration_mg_l"] = 0
+    result = pilot.solve(pilot.Inputs.model_validate(inputs))
+    pulse_end = result["times_hours"].index(0.25)
+    balance = result["balance_kg"]
+    assert all(value == pytest.approx(-72, abs=1e-10) for value in balance["input"][pulse_end:])
+    assert balance["output"][-1] == pytest.approx(-72, abs=1e-5)
+    assert max(map(abs, balance["residual"])) < 1e-10
+
+
+def test_negative_absolute_concentration_outside_roundoff_budget_is_rejected(monkeypatch):
+    inputs = pilot.Inputs.model_validate(pilot.pilot_definition()["defaults"])
+
+    def broken_advance(concentration, *_):
+        return [-inputs.background_mg_l - 1] * len(concentration)
+
+    monkeypatch.setattr(pilot, "_advance", broken_advance)
+    with pytest.raises(ArithmeticError, match="Negative absolute concentration"):
+        pilot.solve(inputs)
+
+
 def test_uniform_background_and_order_independent_inputs():
     inputs = pilot.pilot_definition()["defaults"]
     inputs["branches"][0]["concentration_mg_l"] = 10

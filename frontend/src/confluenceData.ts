@@ -225,8 +225,9 @@ export function segments(branch: Branch, count: number): Segment[] {
 
 export function resultCsv(result: Result): Blob {
   const header = ['record_type', 'time_hours', 'branch_id', 'segment_id', 'distance_start_m', 'distance_end_m',
-    'concentration_mg_l', 'flow_m3_s', 'junction_concentration_mg_l', 'input_kg', 'output_kg', 'stored_kg',
-    'residual_kg', 'model_id', 'model_format_version', 'geometry_id'];
+    'concentration_mg_l', 'flow_m3_s', 'junction_concentration_mg_l', 'input_delta_from_background_kg',
+    'output_delta_from_background_kg', 'stored_delta_from_background_kg', 'residual_delta_from_background_kg',
+    'model_id', 'model_format_version', 'geometry_id', 'csv_schema_version', 'background_mg_l', 'balance_reference'];
   const parts: string[] = [];
   let part = `${header.join(',')}\r\n`;
   function append(row: (string | number)[]) {
@@ -240,7 +241,8 @@ export function resultCsv(result: Result): Blob {
     append(['balance', time, id, '', '', '', '', flow, concentration,
       balance.input[frame], balance.output[frame], balance.stored[frame], balance.residual[frame]]);
   }
-  append(['metadata', ...Array<string>(header.indexOf('model_id') - 1).fill(''), result.model_id, result.format_version, result.geometry.id]);
+  append(['metadata', ...Array<string>(header.indexOf('model_id') - 1).fill(''),
+    result.model_id, result.format_version, result.geometry.id, 2, result.inputs.background_mg_l, 'relative_to_background']);
   const branches = result.geometry.branches.map(branch => ({ id: branch.id, cells: segments(branch, result.grid.cells[branch.id]) }));
   result.times_hours.forEach((time, frame) => {
     for (const { id, cells } of branches) {
