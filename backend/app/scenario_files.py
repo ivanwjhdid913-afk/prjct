@@ -5,7 +5,8 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_serializer, model_validator
 
-from app.scenarios import AnalysisSettings, Compatibility, ScenarioCreate, conditions_compatibility, validate_analysis_format, validate_versioned_load
+from app.input_provenance import InputProvenance
+from app.scenarios import AnalysisSettings, Compatibility, ScenarioCreate, conditions_compatibility, validate_analysis_format, validate_provenance_format, validate_versioned_load
 from app.simulation import SimulationRequest
 from app.multiple_simulation import MultipleSimulationRequest
 from app.scenario_versions import FORMAT_VERSION
@@ -29,10 +30,13 @@ class ConditionsDocument(BaseModel):
     geometry_source: dict[str, str | int | float | bool | None]
     conditions: SimulationRequest | MultipleSimulationRequest
     analysis_settings: AnalysisSettings | None = None
+    input_provenance: InputProvenance | None = None
 
     @model_validator(mode='after')
     def matching_analysis_format(self):
         validate_analysis_format(self.format_version, self.conditions, self.analysis_settings)
+        validate_provenance_format(self.format_version, self.conditions, self.input_provenance,
+                                   provided='input_provenance' in self.model_fields_set)
         return self
 
     @field_validator('name', mode='before')
@@ -68,6 +72,8 @@ class ConditionsDocument(BaseModel):
         value = handler(self)
         if 'analysis_settings' not in self.model_fields_set:
             value.pop('analysis_settings', None)
+        if 'input_provenance' not in self.model_fields_set:
+            value.pop('input_provenance', None)
         if isinstance(self.conditions, MultipleSimulationRequest):
             return value
         if self.format_version == 1 and 'load_intervals' not in self.conditions.model_fields_set:

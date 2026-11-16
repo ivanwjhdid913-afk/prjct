@@ -1,5 +1,6 @@
 import { SCENARIO_FORMAT, MULTIPLE_FORMAT, ANALYSIS_FORMAT, isMultipleConditions, validScenarioConditions, type ScenarioConditions, type Conditions, type MultipleConditions } from './scenarioStorage';
 import { validAnalysisSettings, type AnalysisSettings } from './analysisSettings';
+import { PASSPORT_FORMAT, validProvenance, type InputProvenance } from './inputProvenance';
 
 export const MAX_CONDITIONS_FILE_BYTES = 8192;
 export type ConditionsDocument = {
@@ -7,7 +8,7 @@ export type ConditionsDocument = {
   geometry_mode: 'river' | 'synthetic'; geometry_version: string;
   geometry_sha256: string | null; downstream_geometry_sha256: string | null;
   reach_id: string | null; reach_name: string; geometry_source: Record<string, unknown>;
-  conditions: ScenarioConditions; analysis_settings?: AnalysisSettings | null;
+  conditions: ScenarioConditions; analysis_settings?: AnalysisSettings | null; input_provenance?: InputProvenance;
 };
 export type DocumentValidation = { document: ConditionsDocument; compatibility: { compatible: boolean; reasons: string[] } };
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -20,13 +21,15 @@ export function validDocument(v: unknown): v is ConditionsDocument {
     || typeof v.geometry_version !== 'string' || !v.geometry_version || v.geometry_version.length > 64
     || typeof v.reach_name !== 'string' || !v.reach_name || v.reach_name.length > 200
     || !record(v.geometry_source) || !validScenarioConditions(v.conditions)) return false;
-  if (v.format_version === ANALYSIS_FORMAT ? !isMultipleConditions(v.conditions) || !validAnalysisSettings(v.analysis_settings)
+  const withProvenance = v.format_version === PASSPORT_FORMAT;
+  if (withProvenance ? !isMultipleConditions(v.conditions) || !validProvenance(v.input_provenance, v.conditions) : v.input_provenance != null) return false;
+  if (withProvenance || v.format_version === ANALYSIS_FORMAT ? !isMultipleConditions(v.conditions) || !validAnalysisSettings(v.analysis_settings)
       : v.analysis_settings != null) return false;
   if (isMultipleConditions(v.conditions)) {
     if (v.format_version === 1 || v.format_version === SCENARIO_FORMAT) return false;
   } else if ((v.format_version === 1 && v.conditions.load_mode === 'profile')
     || (v.format_version === SCENARIO_FORMAT && !Object.hasOwn(v.conditions, 'load_intervals'))
-    || (v.format_version === MULTIPLE_FORMAT || v.format_version === ANALYSIS_FORMAT)) return false;
+    || (v.format_version === MULTIPLE_FORMAT || v.format_version === ANALYSIS_FORMAT || withProvenance)) return false;
   return v.geometry_mode === 'synthetic'
     ? v.reach_id === null && v.geometry_sha256 === null && v.downstream_geometry_sha256 === null && v.conditions.reach_id == null
     : v.geometry_mode === 'river' && typeof v.reach_id === 'string' && v.reach_id === v.conditions.reach_id
@@ -52,6 +55,7 @@ export function documentFromSaved(v: unknown): ConditionsDocument {
     reach_id: v.reach_id ?? v.conditions.reach_id ?? null, reach_name: v.reach_name,
     geometry_source: structuredClone(v.geometry_source ?? {}), conditions,
     ...(v.analysis_settings != null ? { analysis_settings: structuredClone(v.analysis_settings) } : {}),
+    ...(v.input_provenance != null ? { input_provenance: structuredClone(v.input_provenance) } : {}),
   };
   if (!validDocument(document)) throw new Error('Сохранённая запись не содержит полного переносимого набора условий.');
   return document;

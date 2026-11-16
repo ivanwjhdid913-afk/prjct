@@ -56,6 +56,10 @@ class SavedScenario(Base):
                         name='saved_scenario_source_size'),
         CheckConstraint("analysis_settings IS NULL OR (jsonb_typeof(analysis_settings) = 'object' "
                         "AND octet_length(analysis_settings::text) <= 4096)", name='saved_scenario_analysis_size'),
+        CheckConstraint("(format_version <> 5 AND input_provenance IS NULL) OR "
+                        "(format_version = 5 AND input_provenance IS NOT NULL "
+                        "AND jsonb_typeof(input_provenance) = 'object' "
+                        "AND octet_length(input_provenance::text) <= 4096)", name='saved_scenario_input_provenance'),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -71,5 +75,6 @@ class SavedScenario(Base):
     load_mode: Mapped[str] = mapped_column(String(16))
     conditions: Mapped[dict] = mapped_column(JSONB)
     analysis_settings: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    input_provenance: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     geometry_source: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

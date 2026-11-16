@@ -9,9 +9,9 @@
 .discharge-map-absent { font-size: 13px; line-height: 1.6; color: var(--muted); padding: 14px 0; margin: 0 0 12px; }
 .discharge-passports { display: grid; gap: 12px; }
 .discharge-card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; scroll-margin-top: 20px; }
-.discharge-card summary { display: flex; align-items: center; gap: 20px; padding: 20px 24px; cursor: pointer; min-height: 88px; }
-.discharge-card summary::after { content: '+'; font-size: 24px; color: var(--muted); margin-left: auto; }
-.discharge-card[open] summary::after { content: '−'; }
+.discharge-card > summary { display: flex; align-items: center; gap: 20px; padding: 20px 24px; cursor: pointer; min-height: 88px; }
+.discharge-card > summary::after { content: '+'; font-size: 24px; color: var(--muted); margin-left: auto; }
+.discharge-card[open] > summary::after { content: '−'; }
 .discharge-card-name { font-size: 18px; font-weight: 600; max-width: 62%; }
 .discharge-card-name small { display: block; font-size: 12px; font-weight: 400; margin-top: 6px; color: var(--muted); }
 .discharge-status { font-size: 12px; font-weight: 550; background: #f1eee5; color: #6b5229; padding: 6px 10px; border-radius: 4px; margin-left: auto; }
@@ -32,7 +32,6 @@
 .discharge-quantity strong { font-size: 20px; font-weight: 550; font-variant-numeric: tabular-nums; }
 .discharge-quantity small, .discharge-citation, .discharge-conversion { font-size: 12px; color: var(--muted); }
 .discharge-limitations { padding: 0 18px 12px; border-left: 3px solid #a9946b; }
-.discharge-no-calc { font-size: 12px; color: var(--muted); }
 .discharge-matrix { margin-top: 40px; }
 .discharge-matrix > p, .discharge-sources > p { font-size: 14px; line-height: 1.65; color: var(--muted); }
 .discharge-table-scroll { overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: white; max-height: 580px; }
@@ -61,9 +60,9 @@
 @media(max-width:760px) {
   .discharge-section { padding-top: 24px; }
   .discharge-heading h1 { letter-spacing: -.8px; }
-  .discharge-card summary { padding: 17px 16px; flex-wrap: wrap; gap: 12px; }
+  .discharge-card > summary { padding: 17px 16px; flex-wrap: wrap; gap: 12px; }
   .discharge-card-name { max-width: calc(100% - 28px); font-size: 17px; flex-basis: calc(100% - 28px); order: 0; }
-  .discharge-card summary::after { order: 1; }
+  .discharge-card > summary::after { order: 1; }
   .discharge-status { order: 2; margin-left: 0; }
   .discharge-card-body { padding: 18px 16px; }
   .discharge-facts { grid-template-columns: 1fr; gap: 8px; }

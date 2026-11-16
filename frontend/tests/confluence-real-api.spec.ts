@@ -115,6 +115,7 @@ test('the actual pilot exports a zero-concentration pulse as a signed deficit', 
     await route.fulfill({ response: await route.fetch({ url: api + url.pathname }) });
   });
   await page.goto('/#model/confluence');
+  await page.locator('#confluence-inputs > details > summary').click();
   await page.getByRole('spinbutton', { name: 'Концентрация на входе A', exact: true }).fill('0');
   const completed = page.waitForResponse(response => response.url().endsWith('/api/v1/confluence/simulations'));
   await button(page, 'Рассчитать слияние').click();

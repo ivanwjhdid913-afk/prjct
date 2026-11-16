@@ -1,20 +1,11 @@
-import type { AnalysisSettings } from "./analysisSettings";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import type { Reach } from "./multipleSources";
-import type { ScenarioConditions } from "./scenarioStorage";
+import type { Reach, RestorableConditions } from "./multipleSources";
 import "./modelWorkspace.css";
 
 const Simulation = lazy(() => import("./Simulation"));
 const RegionalOverview = lazy(() => import("./RegionalOverview"));
 const MultipleSimulation = lazy(() => import("./MultipleSimulation"));
 const Confluence = lazy(() => import("./Confluence"));
-type Restore = {
-  name?: string;
-  analysis_settings?: AnalysisSettings | null;
-  conditions: ScenarioConditions;
-  geometry_sha256: string | null;
-  downstream_geometry_sha256?: string | null;
-};
 export type ModelViewState = { currentReachId: string | null; hasResult: boolean };
 export type ModelViewProps = {
   workspaceVisible?: boolean;
@@ -23,9 +14,9 @@ export type ModelViewProps = {
   returnResultVersion?: number;
 };
 
-export default function ModelWorkspace() {
+export default function ModelWorkspace({ initialScenario }: { initialScenario?: RestorableConditions }) {
   const [multiple, setMultiple] = useState(location.hash !== "#model/legacy");
-  const [snapshot, setSnapshot] = useState<Restore>();
+  const [snapshot, setSnapshot] = useState(initialScenario);
   const [overview, setOverview] = useState(false);
   const [visitedOverview, setVisitedOverview] = useState(false);
   const [confluence, setConfluence] = useState(location.hash === "#model/confluence");
@@ -76,7 +67,7 @@ export default function ModelWorkspace() {
     window.history.replaceState(window.history.state, "", next ? "#model" : "#model/legacy");
     setMultiple(next);
   }
-  function open(value: Restore, next: boolean) {
+  function open(value: RestorableConditions, next: boolean) {
     setSnapshot(value);
     changeModel(next);
   }

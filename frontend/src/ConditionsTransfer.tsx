@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { responseData, isMultipleConditions, type ScenarioConditions, type Conditions, type ScenarioSource } from './scenarioStorage';
 import { downloadConditions, MAX_CONDITIONS_FILE_BYTES, validDocumentValidation, type ConditionsDocument, type DocumentValidation } from './scenarioExchange';
 import type { AnalysisSettings } from './analysisSettings';
+import { ProvenanceFields } from './DischargePassport';
 
 type Props = { name: string; draftKey: string; interactionKey: number;
   getDocument: (name: string) => ConditionsDocument; onApply: (document: ConditionsDocument) => void; onAppliedName: (name: string) => void };
@@ -77,6 +78,9 @@ export default function ConditionsTransfer({ name, draftKey, interactionKey, get
       <p>Модель / формат: {preview.document.model_id} / {preview.document.format_version}</p>
       <ConditionPreview conditions={preview.document.conditions} synthetic={preview.document.geometry_mode==='synthetic'} />
       {isMultipleConditions(preview.document.conditions) && <AnalysisPreview settings={preview.document.analysis_settings} />}
+      {preview.document.input_provenance && <details className="model-provenance">
+        <summary>Происхождение параметров из файла</summary><ProvenanceFields provenance={preview.document.input_provenance} />
+      </details>}
       <p>{preview.compatibility.compatible ? 'Совместимо с текущей моделью и геометрией.' : preview.compatibility.reasons.join(' ')}</p>
       <button type="button" disabled={!preview.compatibility.compatible} onClick={apply}>Применить к форме</button>
       <button type="button" onClick={() => { setPreview(null); setError(''); setNotice('Предварительный просмотр закрыт. Условия формы не изменены.'); }}>Закрыть просмотр</button>

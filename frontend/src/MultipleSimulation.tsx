@@ -22,6 +22,8 @@ import {
   validLoadProfile,
 } from "./loadProfile";
 import { valuesAtHour, sharedScale } from "./scenarioComparison";
+import { PASSPORT_FORMAT, validProvenance, type InputProvenance } from "./inputProvenance";
+import { ProvenanceFields } from "./DischargePassport";
 import {
   ANALYSIS_FORMAT,
   MULTIPLE_MODEL_ID,
@@ -298,6 +300,7 @@ export default function MultipleSimulation({
     [message, setMessage] = useState(""),
     [notice, setNotice] = useState(""),
     [interaction, setInteraction] = useState(0);
+  const [passport, setPassport] = useState<RestorableConditions>();
   const [hour, setHour] = useState(0),
     [speed, setSpeed] = useState(1),
     [playing, setPlaying] = useState(false),
@@ -309,6 +312,7 @@ export default function MultipleSimulation({
     controller = useRef<AbortController | null>(null),
     snapRequest = useRef(0),
     snapController = useRef<AbortController | null>(null),
+    title = useRef<HTMLHeadingElement>(null),
     form = useRef<HTMLFormElement>(null),
     parameterButton = useRef<HTMLButtonElement>(null),
     closeButton = useRef<HTMLButtonElement>(null),
@@ -333,6 +337,13 @@ export default function MultipleSimulation({
   const draftKey = JSON.stringify([shared, reachId, sources]);
   const build = () =>
     buildMultipleConditions(shared, reachId, reach?.length_m ?? NaN, sources);
+  function draftProvenance(conditions: MultipleConditions) {
+    if (passport?.input_provenance && reach && passport.conditions.reach_id === reach.id
+        && passport.geometry_sha256 === reach.metadata.geometry_sha256
+        && passport.downstream_geometry_sha256 === reach.metadata.downstream_geometry_sha256
+        && validProvenance(passport.input_provenance, conditions)) return passport.input_provenance;
+    return undefined;
+  }
   function stopPending() {
     request.current++;
     controller.current?.abort();
@@ -505,9 +516,12 @@ export default function MultipleSimulation({
     setReachId(conditions.reach_id);
     setSources(draftsFromSources(conditions.sources));
     setChosen(conditions.sources[0].id);
+    setPassport(scenario.input_provenance ? scenario : undefined);
     setPreview(true);
     setNotice(
-      "Открыты сохранённые условия. Нажмите «Рассчитать» для нового результата; сохранённая запись не изменена.",
+      scenario.input_provenance
+        ? "Применены условия учебного паспорта. Нажмите «Рассчитать» для нового результата."
+        : "Открыты сохранённые условия. Нажмите «Рассчитать» для нового результата; сохранённая запись не изменена.",
     );
   }
   useEffect(() => {
@@ -518,6 +532,7 @@ export default function MultipleSimulation({
     ) {
       lastInitial.current = initialScenario;
       applyConditions(initialScenario);
+      if (initialScenario.input_provenance) title.current?.focus({ preventScroll: true });
     }
   }, [initialScenario, reaches]);
   const draftReason =
@@ -758,6 +773,7 @@ export default function MultipleSimulation({
     setSources([a, b]);
     setChosen(a.id);
     setReachId(target.id);
+    setPassport(undefined);
     setVariant(false);
     setBaseline(null);
     setLatest(null);
@@ -907,8 +923,13 @@ export default function MultipleSimulation({
   function savePayload(): SavePayload {
     const conditions = build();
     if (!reach) throw new Error("Выберите участок.");
+    const inputProvenance = draftProvenance(conditions);
     return {
-      format_version: ANALYSIS_FORMAT,
+      format_version: inputProvenance ? PASSPORT_FORMAT : ANALYSIS_FORMAT,
+      ...(inputProvenance ? {
+        input_provenance: inputProvenance,
+        downstream_geometry_sha256: String(reach.metadata.downstream_geometry_sha256),
+      } : {}),
       analysis_settings: analysis.forSave(geometryScope(reach)),
       model_id: MULTIPLE_MODEL_ID,
       geometry_version: RIVER_VERSION,
@@ -932,8 +953,10 @@ export default function MultipleSimulation({
     };
   }
   let previewLoad = null;
+  let activeProvenance: InputProvenance | undefined;
   try {
     const checked = build();
+    activeProvenance = draftProvenance(checked);
     const source = checked.sources.find((s) => s.id === selectedSource.id)!;
     if (validLoadProfile(sourceLoad(source, checked)))
       previewLoad = sourceLoad(source, checked);
@@ -960,9 +983,9 @@ export default function MultipleSimulation({
     >
       <header className="model-heading">
         <div>
-          <h1>Несколько сценарных источников</h1>
-          <span className="scenario-badge">
-            Синтетические условия · хлориды
+          <h1 ref={title} tabIndex={-1}>Несколько сценарных источников</h1>
+          <span className={`scenario-badge${activeProvenance ? ' passport-badge' : ''}`}>
+            {activeProvenance ? "Учебный паспорт · хлориды" : "Синтетические условия · хлориды"}
           </span>
         </div>
         <div className="workspace-tools">
@@ -1053,7 +1076,7 @@ export default function MultipleSimulation({
             <div className="parameter-scroll">
               <SavedScenarios
                 initialName={initialScenario?.name}
-                draftKey={JSON.stringify([draftKey, analysis.draftKey])}
+                draftKey={JSON.stringify([draftKey, analysis.draftKey, activeProvenance])}
                 interactionKey={interaction}
                 getConditions={savePayload}
                 getDocument={conditionsDocument}
@@ -1067,6 +1090,11 @@ export default function MultipleSimulation({
                   {notice}
                 </p>
               )}
+              {activeProvenance && <details className="model-provenance">
+                <summary>Происхождение параметров</summary><ProvenanceFields provenance={activeProvenance} />
+                <a href="#discharge-data">К паспортам выпусков</a>
+              </details>}
+              {passport && !activeProvenance && <p className="model-provenance" role="status">Условия отличаются от паспорта. При сохранении текущего варианта сведения исходного набора не приписываются новым значениям.</p>}
               <section
                 className="scenario-comparison-controls"
                 aria-label="Сценарии текущего сеанса"

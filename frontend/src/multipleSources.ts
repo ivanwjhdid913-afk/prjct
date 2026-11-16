@@ -3,8 +3,9 @@ import { intervalDrafts, validateIntervalDraft, type IntervalDraft } from './loa
 import { validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
 import { validTimes, validTemporalResolution, type TemporalResolution } from './temporalResolution';
 import type { ScenarioConditions } from './scenarioStorage';
+import type { InputProvenance } from './inputProvenance';
 
-export type RestorableConditions = { name?: string; analysis_settings?: AnalysisSettings | null; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
+export type RestorableConditions = { name?: string; analysis_settings?: AnalysisSettings | null; input_provenance?: InputProvenance; conditions: ScenarioConditions; geometry_sha256: string | null; downstream_geometry_sha256?: string | null };
 export type ScenarioSource = { id: string; name: string; source_distance_m: number; effluent_flow_m3_s: number; effluent_mg_l: number | null; load_mode: LoadMode; load_duration_hours: number | null; load_intervals: LoadInterval[] | null };
 export type MultipleInputs = {river_flow_m3_s:number;background_mg_l:number;velocity_m_s:number;dispersion_m2_s:number;duration_hours:number;reach_id:string;sources:ScenarioSource[]};
 export type SharedKey='river_flow_m3_s'|'background_mg_l'|'velocity_m_s'|'dispersion_m2_s'|'duration_hours';

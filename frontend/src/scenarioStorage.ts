@@ -2,6 +2,7 @@
 // Changing the implementation requires an explicit compatibility decision.
 import { validLoadProfile, type LoadMode, type LoadInterval } from './loadProfile';
 import { validAnalysisSettings, type AnalysisSettings } from './analysisSettings';
+import { PASSPORT_FORMAT, validProvenance, type InputProvenance } from './inputProvenance';
 
 export const SCENARIO_FORMAT = 2;
 export const MODEL_ID = 'conservative-1d-advection-dispersion-v1';
@@ -34,6 +35,7 @@ export function isMultipleConditions(v: ScenarioConditions | unknown): v is Mult
 export type SavePayload = {
   format_version: number; model_id: string; geometry_version: string;
   geometry_sha256: string | null; conditions: ScenarioConditions; analysis_settings?: AnalysisSettings | null;
+  downstream_geometry_sha256?: string | null; input_provenance?: InputProvenance;
 };
 export type ScenarioSummary = {
   id: string; name: string; reach_name: string; geometry_mode: 'river' | 'synthetic';
@@ -104,9 +106,13 @@ export function validScenarioConditions(v: unknown): v is ScenarioConditions {
 export function validSaved(v: unknown): v is SavedScenario {
   if (!validCompatibility(v)) return false;
   const multiple = isMultipleConditions(v.conditions);
-  if (v.format_version === ANALYSIS_FORMAT ? !multiple || !validAnalysisSettings(v.analysis_settings)
+  const withProvenance = v.format_version === PASSPORT_FORMAT;
+  if (withProvenance ? !isMultipleConditions(v.conditions) || !validMultipleConditions(v.conditions)
+      || !validProvenance(v.input_provenance, v.conditions) || typeof v.downstream_geometry_sha256 !== 'string'
+      || !/^[0-9a-f]{64}$/.test(v.downstream_geometry_sha256) : v.input_provenance != null) return false;
+  if (withProvenance || v.format_version === ANALYSIS_FORMAT ? !multiple || !validAnalysisSettings(v.analysis_settings)
       : v.analysis_settings != null) return false;
-  if (multiple ? ![MULTIPLE_FORMAT, ANALYSIS_FORMAT].includes(v.format_version) || v.model_id!==MULTIPLE_MODEL_ID || v.load_mode!=='multiple' || !validMultipleConditions(v.conditions)
+  if (multiple ? ![MULTIPLE_FORMAT, ANALYSIS_FORMAT, PASSPORT_FORMAT].includes(v.format_version) || v.model_id!==MULTIPLE_MODEL_ID || v.load_mode!=='multiple' || !validMultipleConditions(v.conditions)
       : !((v.format_version===1 || v.format_version===SCENARIO_FORMAT) && v.model_id===MODEL_ID && validConditions(v.conditions)
           && v.load_mode===v.conditions.load_mode && (v.format_version===1 ? v.conditions.load_mode!=='profile' : Object.hasOwn(v.conditions,'load_intervals')))) return false;
   return v.conditions.reach_id == null

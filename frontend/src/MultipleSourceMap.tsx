@@ -289,9 +289,10 @@ export default function MultipleSourceMap({
           (other) =>
             Math.abs(other.source_distance_m - source.source_distance_m) < 0.01,
         ).length;
-      return L.marker([lat, lon], {
+      const title = `Сценарный источник ${sourceNumber}: ${source.name}`;
+      const marker = L.marker([lat, lon], {
         keyboard: true,
-        title: `Сценарный источник ${sourceNumber}: ${source.name}`,
+        title,
         alt: `Выбрать источник ${sourceNumber}`,
         zIndexOffset: source.id === selectedSource ? 1000 : 0,
         icon: L.divIcon({
@@ -306,6 +307,8 @@ export default function MultipleSourceMap({
           calls.current.onSource(source.id);
           L.DomEvent.stopPropagation(event);
         });
+      marker.getElement()?.setAttribute('aria-label', title);
+      return marker;
     });
     return () => {
       pins.current.forEach((pin) => pin.remove());
@@ -325,9 +328,10 @@ export default function MultipleSourceMap({
         reach.distances_m,
         (reach.length_m * (point.segment_index + 0.5)) / 100,
       );
-      return L.marker([lat, lon], {
+      const title = `Контрольная точка К${index + 1}: ${point.name}`;
+      const marker = L.marker([lat, lon], {
         keyboard: true,
-        title: `Контрольная точка К${index + 1}: ${point.name}`,
+        title,
         alt: `Выбрать контрольную точку К${index + 1}`,
         zIndexOffset: point.id === selectedControlPointId ? 1200 : 200,
         icon: L.divIcon({
@@ -344,6 +348,8 @@ export default function MultipleSourceMap({
           else calls.current.onSegment(point.segment_index);
           L.DomEvent.stopPropagation(event);
         });
+      marker.getElement()?.setAttribute('aria-label', title);
+      return marker;
     });
     return () => {
       pointPins.current.forEach((pin) => pin.remove());

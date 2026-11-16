@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import './styles.css';
 import ObservationPoints from './ObservationPoints';
 import ModelWorkspace from './ModelWorkspace';
+import type { RestorableConditions } from './multipleSources';
 const DischargeData = lazy(() => import('./DischargeData'));
 const modelRoutes = ['#model', '#model/legacy', '#model/confluence'];
 
@@ -30,6 +31,7 @@ function isWaterPage(value: unknown): value is WaterPage {
 export default function App() {
   const [modelOpen, setModelOpen] = useState(() => modelRoutes.includes(location.hash));
   const [dataOpen, setDataOpen] = useState(() => location.hash === '#discharge-data');
+  const [passportScenario, setPassportScenario] = useState<RestorableConditions>();
   const [waterBodyId, setWaterBodyId] = useState(() => location.hash.startsWith('#water-body/') ? location.hash.slice(12) : null);
   const returnTarget = useRef<HTMLButtonElement | null>(null);
   const returnId = useRef<string | null>(null);
@@ -48,6 +50,7 @@ export default function App() {
       setWaterBodyId(id);
       const modeling = modelRoutes.includes(location.hash);
       setModelOpen(modeling);
+      if (!modeling) setPassportScenario(undefined);
       setDataOpen(location.hash === '#discharge-data');
       if (!id && !modeling && location.hash !== '#discharge-data') window.setTimeout(() => { returnTarget.current?.focus({ preventScroll: true }); window.scrollTo(0, catalogScroll.current); }, 0);
     }
@@ -120,7 +123,7 @@ export default function App() {
       </header>
       <main id="content" tabIndex={-1} className={modelOpen ? 'model-main' : undefined}>
         <nav className="section-nav" aria-label="Разделы приложения"><a href="#" aria-current={!modelOpen && !dataOpen ? 'page' : undefined}>Каталог</a><a href="#model" aria-current={modelOpen ? 'page' : undefined}>Моделирование</a><a href="#discharge-data" aria-current={dataOpen ? 'page' : undefined}>Исходные данные</a></nav>
-        {modelOpen ? <ModelWorkspace /> : dataOpen ? <Suspense fallback={<p role="status">Загружаем паспорта данных…</p>}><DischargeData /></Suspense> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
+        {modelOpen ? <ModelWorkspace initialScenario={passportScenario} /> : dataOpen ? <Suspense fallback={<p role="status">Загружаем паспорта данных…</p>}><DischargeData onApply={scenario => { setPassportScenario(scenario); location.hash = 'model'; }} /></Suspense> : waterBodyId ? <ObservationPoints key={waterBodyId} waterBodyId={waterBodyId} onBack={() => { location.hash = ''; }} /> : <>
         <section className="introduction" aria-labelledby="page-title">
           <p className="eyebrow">Реестр / Водные объекты</p>
           <h1 id="page-title">Водные объекты<span className="title-dot">.</span></h1>

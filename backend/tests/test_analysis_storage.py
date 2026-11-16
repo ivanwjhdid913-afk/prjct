@@ -154,7 +154,7 @@ def test_0006_nullable_jsonb_bound_and_downgrade_guard_preserve_records():
             assert rejected.returncode != 0
             assert 'saved analysis settings or format-4 scenarios exist' in rejected.stderr
         with engine.connect() as connection:
-            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0006'
+            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0007'
             stored = connection.scalar(text('SELECT analysis_settings FROM saved_scenarios WHERE id=:id'), {'id': ids[0]})
             assert stored == analysis_settings()
             assert connection.scalar(text("SELECT is_nullable FROM information_schema.columns WHERE table_name='saved_scenarios' AND column_name='analysis_settings'")) == 'YES'

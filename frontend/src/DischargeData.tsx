@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { basisLabels, cellLabels, matrixLabels, readinessLabels, validDischargeCatalog, type DischargeCatalog, type DischargeItem, type MatrixKey, type Source } from './dischargeCatalog';
-import { validReach } from './multipleSources';
+import { validReach, type RestorableConditions } from './multipleSources';
+import { CoskPassport, DemoPassport } from './DischargePassport';
 import './dischargeData.css';
 
 const dateLabel = (date: string) => date.split('-').reverse().join('.');
@@ -44,23 +45,29 @@ function EvidenceMap({ items }: { items: DischargeItem[] }) {
 }
 function Passport({ item, sources }: { item: DischargeItem; sources: Source[] }) {
   const point = item.coordinates;
+  const isCosk = item.id === 'rvk-lipetsk-cosk';
+  const evidence = <ul className="discharge-evidence">{item.evidence.map((fact, index) => <li key={index}>
+    <p>{fact.statement}</p>
+    {fact.quantity && <p className="discharge-quantity"><strong>{fact.quantity.value.toLocaleString('ru-RU', { maximumFractionDigits: 15 })} {fact.quantity.unit}</strong><span>{fact.quantity.parameter} · {basisLabels[fact.quantity.basis]}</span><small>{fact.quantity.scope}</small></p>}
+    <p className="discharge-citation"><span>Период: {fact.period}. {fact.locator}.</span> <Reference source={sources.find(s => s.id === fact.source_id)!} /></p>
+    {fact.conversion && <p className="discharge-conversion">{fact.conversion}</p>}
+  </li>)}</ul>;
   return <details className="discharge-card" id={`discharge-${item.id}`} data-testid="discharge-card">
     <summary><span className="discharge-card-name">{item.name}<small>{item.kind}</small></span><span className={`discharge-status ${item.readiness}`}>{readinessLabels[item.readiness]}</span></summary>
     <div className="discharge-card-body">
-      <p className="discharge-conclusion">{item.discharge_summary}</p>
-      <dl className="discharge-facts"><div><dt>Положение объекта</dt><dd>{item.location_description}</dd></div><div><dt>Принимающий водный объект</dt><dd>{item.receiver ?? 'Не установлен'}<small>{item.receiver_note}</small></dd></div><div><dt>Координаты</dt><dd>{point ? <><strong>{coordinateLabel(item)}</strong><br />{point.longitude}, {point.latitude} · {point.crs}, долгота, широта<small>{point.description} · {point.locator}</small><Reference source={sources.find(s => s.id === point.source_id)!} /></> : 'Координаты не установлены'}</dd></div></dl>
-      <h3>Что подтверждено документами</h3>
-      <ul className="discharge-evidence">{item.evidence.map((fact, index) => <li key={index}>
-        <p>{fact.statement}</p>
-        {fact.quantity && <p className="discharge-quantity"><strong>{fact.quantity.value.toLocaleString('ru-RU', { maximumFractionDigits: 15 })} {fact.quantity.unit}</strong><span>{fact.quantity.parameter} · {basisLabels[fact.quantity.basis]}</span><small>{fact.quantity.scope}</small></p>}
-        <p className="discharge-citation"><span>Период: {fact.period}. {fact.locator}.</span> <Reference source={sources.find(s => s.id === fact.source_id)!} /></p>
-        {fact.conversion && <p className="discharge-conversion">{fact.conversion}</p>}
-      </li>)}</ul>
-      <div className="discharge-limitations"><h3>Готовность к моделированию</h3><p><strong>{readinessLabels[item.readiness]}.</strong> {item.readiness_reason}</p><p>{item.prepared_reach.explanation}</p><h4>Недостающие сведения</h4><ul>{item.missing.map((value, index) => <li key={index}>{value}</li>)}</ul><p className="discharge-no-calc">Паспорт не подставляет параметры в модель. Сценарный расчёт доступен независимо в разделе «Моделирование».</p></div>
+      {isCosk ? <>
+        <CoskPassport item={item} sources={sources} />
+        <details className="passport-more"><summary>Все исходные сведения, включая 12 месяцев 2022 года</summary>{evidence}</details>
+      </> : <>
+        <p className="discharge-conclusion">{item.discharge_summary}</p>
+        <dl className="discharge-facts"><div><dt>Положение объекта</dt><dd>{item.location_description}</dd></div><div><dt>Принимающий водный объект</dt><dd>{item.receiver ?? 'Не установлен'}<small>{item.receiver_note}</small></dd></div><div><dt>Координаты</dt><dd>{point ? <><strong>{coordinateLabel(item)}</strong><br />{point.longitude}, {point.latitude} · {point.crs}, долгота, широта<small>{point.description} · {point.locator}</small><Reference source={sources.find(s => s.id === point.source_id)!} /></> : 'Координаты не установлены'}</dd></div></dl>
+        <h3>Что подтверждено документами</h3>{evidence}
+        <div className="discharge-limitations"><h3>Готовность к моделированию</h3><p><strong>{readinessLabels[item.readiness]}.</strong> {item.readiness_reason}</p><p>{item.prepared_reach.explanation}</p><h4>Недостающие сведения</h4><ul>{item.missing.map((value, index) => <li key={index}>{value}</li>)}</ul></div>
+      </>}
     </div>
   </details>;
 }
-export default function DischargeData() {
+export default function DischargeData({ onApply }: { onApply: (scenario: RestorableConditions) => void }) {
   const [state, setState] = useState<{ status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: DischargeCatalog }>({ status: 'loading' });
   const [revision, setRevision] = useState(0);
   const title = useRef<HTMLHeadingElement>(null);
@@ -93,6 +100,7 @@ export default function DischargeData() {
       <div className="discharge-overview"><span><strong>{data.items.length}</strong> исследованных объектов</span><span><strong>{data.items.filter(item => item.readiness === 'ready').length}</strong> готовых постановок расчёта</span><span>Проверено {dateLabel(data.checked_on)}<small>Набор v{data.format_version} · периоды указаны в паспортах</small></span></div>
       {data.items.some(item => item.coordinates !== null) ? <EvidenceMap items={data.items} /> : <p className="discharge-map-absent">Проверенных координат для маркеров в этом наборе нет. Адреса предприятий не приняты за координаты выпусков.</p>}
       {!data.items.length ? <p className="state">Паспортов пока нет</p> : <div className="discharge-passports" aria-label="Паспорта исследованных объектов">{data.items.map(item => <Passport key={item.id} item={item} sources={data.sources} />)}</div>}
+      <DemoPassport onApply={onApply} />
       {!!data.items.length && <section className="discharge-matrix"><h2>Что есть для модели</h2><p>«Есть сведения» означает наличие документа, а не подтверждённую точность. Для расчёта хлоридов нужны согласованные условия одного выпуска и периода.</p><div role="region" aria-label="Матрица наличия данных" tabIndex={0} className="discharge-table-scroll"><table aria-label="Матрица наличия данных"><thead><tr><th scope="col">Параметр</th>{data.items.map(item => <th scope="col" key={item.id}>{item.name}</th>)}</tr></thead><tbody>{(Object.keys(matrixLabels) as MatrixKey[]).map(key => <tr key={key}><th scope="row">{matrixLabels[key]}</th>{data.items.map(item => <td key={item.id}><span className={`matrix-state ${item.matrix[key].status}`}>{cellLabels[item.matrix[key].status]}</span><small>{item.matrix[key].note}</small></td>)}</tr>)}<tr><th scope="row">Подготовленные участки</th>{data.items.map(item => <td key={item.id}><strong>{item.prepared_reach.status === 'matched' ? 'Сопоставлен' : item.prepared_reach.status === 'outside' ? 'Вне участка' : 'Не сопоставлен'}</strong><small>{item.prepared_reach.explanation}</small></td>)}</tr></tbody></table></div></section>}
       <section className="discharge-sources"><h2>Источники и воспроизводимость</h2><p>Оригиналы не перепубликуются. Для скачанных документов указана SHA-256; если скачивание недоступно, это отмечено отдельно. Содержимое внешних сайтов может измениться.</p>{data.sources.map(source => <details key={source.id}><summary>{source.publisher} · {source.title}</summary><div><Reference source={source} /><dl><dt>Документ / идентификатор</dt><dd>{source.document_id}</dd><dt>Публикация</dt><dd>{source.published_on ? dateLabel(source.published_on) : 'Точный день не установлен'}. {source.publication_note}</dd><dt>Проверка</dt><dd>{dateLabel(source.checked_on)}</dd><dt>Получение</dt><dd>{source.acquisition}</dd><dt>SHA-256</dt><dd className="discharge-sha">{source.sha256 ?? 'Не вычислена: локальный оригинал не скачан'}</dd><dt>Распространение</dt><dd>{source.redistribution}</dd></dl></div></details>)}</section>
       <aside className="discharge-next"><h2>Следующий шаг к реальному расчёту</h2><p>Запросить паспорт конкретного выпуска и синхронный ряд по хлоридам: координаты, расход стоков и реки, фон и концентрацию на выпуске. Проверить подходящую геометрию и гидрологию отдельно. Подготовленный перечень запроса находится в документации проекта; сообщения никому не отправлялись.</p></aside>

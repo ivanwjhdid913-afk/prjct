@@ -1,0 +1,24 @@
+.demo-passport { margin-top: 16px; }
+.outfall-passport { border: 1px solid var(--line); border-radius: 6px; background: #f6f8f3; padding: 16px; }
+.passport-top { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 10px 16px; margin-bottom: 10px; }
+.outfall-passport .passport-top h3 { margin: 0; }
+.passport-top p { margin: 3px 0 0; color: var(--muted); }
+.passport-top .discharge-status { margin: 0; }
+.passport-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; margin: 8px 0 16px; }
+.passport-fields > div { min-width: 0; border-top: 1px solid var(--line); padding: 9px 0; }
+.passport-fields dt { color: var(--muted); font-size: 12px; margin: 0 0 3px; }
+.passport-fields dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.passport-fields strong { font-variant-numeric: tabular-nums; font-weight: 650; }
+.passport-fields span { display: block; line-height: 1.45; color: var(--muted); }
+.passport-note { margin: 0 0 12px; }
+.passport-ready { color: #315e51; font-size: 13px; margin: 0; }
+.passport-unavailable { background: #f4efe2; padding: 10px 12px; margin-bottom: 12px; }
+.passport-unavailable p { margin: 0 0 8px; }
+.passport-more { margin-top: 14px; }
+.passport-more > summary, .model-provenance > summary { cursor: pointer; padding: 8px 0; }
+.model-provenance { border-left: 2px solid var(--accent); padding: 0 9px; margin: 10px 0 14px; font-size: 12px; }
+.model-provenance .passport-fields { grid-template-columns: minmax(0, 1fr); margin: 0 0 8px; }
+.model-provenance > p { margin: 0 0 8px; }
+.model-provenance .passport-fields > div { padding: 6px 0; }
+.multiple-simulation .scenario-badge.passport-badge { display: block; }
+@media (max-width: 760px) { .passport-fields { grid-template-columns: minmax(0, 1fr); } }
