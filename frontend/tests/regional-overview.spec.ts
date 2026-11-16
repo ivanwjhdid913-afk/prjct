@@ -12,14 +12,41 @@ const fixture = { type: 'FeatureCollection', metadata: { format_version: 1, name
   { type: 'Feature', properties: props('lake', 'Озеро Долгое', 'lake'), geometry: { type: 'Polygon', coordinates: [[[39.4, 52.7], [39.5, 52.7], [39.5, 52.8], [39.4, 52.7]]] } },
 ] };
 
-async function open(page: Page) {
+async function open(page: Page, overview = fixture) {
   let overviewLoads = 0, reachLoads = 0;
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
-  await page.route('**/api/v1/regional-overview', route => { overviewLoads++; return route.fulfill({ json: fixture }); });
+  await page.route('**/api/v1/regional-overview', route => { overviewLoads++; return route.fulfill({ json: overview }); });
   await page.route('**/api/v1/river-reaches', route => { reachLoads++; return route.fulfill({ json: { items: [reach] } }); });
   await page.goto('/tests/regional-harness.html');
   return () => ({ overviewLoads, reachLoads });
 }
+
+test('whole-area types and homonyms can be narrowed and each selection highlights its own geometry', async ({ page }) => {
+  const homonyms = ['north', 'south'].map((suffix, index) => ({ type: 'Feature',
+    properties: { ...props(`kamenka-${suffix}`, 'Каменка', 'stream'), named: true },
+    geometry: { type: 'LineString', coordinates: [[39.25, 52.5 + index * .5], [39.3, 52.55 + index * .5]] },
+  }));
+  const pond = { ...fixture.features[3], properties: props('study-pond', 'Каменка', 'pond') };
+  await open(page, { ...fixture, features: [...fixture.features, ...homonyms, pond] });
+  const filter = page.getByLabel('Тип водного объекта');
+  await filter.selectOption('stream');
+  await page.getByTestId('regional-search').fill('КаМеНкА');
+  const matches = page.getByRole('button', { name: /Каменка · Ручей/u });
+  await expect(matches).toHaveCount(2);
+  const names = await matches.evaluateAll(rows => rows.map(row => row.getAttribute('aria-label')));
+  expect(new Set(names).size).toBe(2);
+  await matches.nth(1).click();
+  await expect(matches.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('regional-object-card')).toContainText('Направление течения');
+  await expect(page.getByTestId('regional-object-card')).toContainText('Не проверено для расчёта');
+  await expect(page.locator('[data-regional-feature="kamenka-south"]')).toBeVisible();
+  await filter.selectOption('pond');
+  await expect(matches).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Каменка · Пруд/u })).toBeVisible();
+  await expect(page.getByTestId('regional-object-card')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Вся область', exact: true }).click();
+  await expect(page.locator('[data-regional-feature="boundary"]')).toBeVisible();
+});
 
 test('search and object selection show a passport; applying is a separate action and data is reused', async ({ page }) => {
   const counts = await open(page);

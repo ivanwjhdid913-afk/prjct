@@ -1,4 +1,5 @@
 """A bounded static cartographic catalog is separate from simulation topology."""
+from collections import Counter
 from copy import deepcopy
 import json
 import pytest
@@ -27,6 +28,18 @@ def test_valid_static_overview_retains_disconnected_parts_without_joining():
     assert validate_overview(document, {'test-reach'}) == before
     assert document == before
     assert len(document['features'][1]['geometry']['coordinates']) == 2
+
+
+def test_whole_area_overview_distinguishes_streams_ponds_and_unclassified_water():
+    document = fixture_document()
+    for kind, template in [('stream', 1), ('pond', 2), ('water', 2)]:
+        feature = deepcopy(document['features'][template])
+        feature['properties'].update(id=kind, kind=kind, prepared_reach_ids=[], named=False)
+        document['features'].append(feature)
+    assert validate_overview(document, {'test-reach'}) == document
+    document['features'][-1]['properties']['named'] = 'false'
+    with pytest.raises(ValueError):
+        validate_overview(document, {'test-reach'})
 
 
 @pytest.mark.parametrize('change', ['nan','coordinate_order','ring','duplicate','missing_source','sha','unsafe_url',
@@ -66,7 +79,13 @@ async def test_saved_overview_endpoint_does_not_need_database_or_remote_download
     assert response.status_code==200,response.text
     document=response.json()
     assert document['metadata']['format_version']==1
-    assert len(document['features'])>10
+    assert len(document['features']) > 1000
+    actual_counts = Counter(feature['properties']['kind'] for feature in document['features'])
+    assert actual_counts == document['metadata']['preparation']['feature_counts']
+    assert set(actual_counts) == {'boundary', 'river', 'stream', 'lake', 'pond', 'reservoir', 'water'}
+    assert {reach for feature in document['features'] for reach in feature['properties']['prepared_reach_ids']} == {
+        'don-olkhovets', 'voronezh-zheltye-peski', 'voronezh-below-kuzminka',
+    }
     assert response.headers['etag']
     repeated=await client.get('/api/v1/regional-overview',headers={'If-None-Match':response.headers['etag']})
     assert repeated.status_code==304

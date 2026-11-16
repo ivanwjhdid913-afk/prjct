@@ -11,7 +11,8 @@
 .regional-sidebar { min-width: 0; background: #fff; border-right: 1px solid #dce2d9; display: flex; flex-direction: column; }
 .regional-search { padding: 16px; border-bottom: 1px solid #dce2d9; }
 .regional-search label,.regional-reach-choice label { display: block; font-size: 12px; font-weight: 650; margin-bottom: 7px; }
-.regional-search input,.regional-reach-choice select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #99aca1; border-radius: 5px; font: inherit; color: #203e38; background: #fff; padding: 9px 10px; font-size: 14px; }
+.regional-search input,.regional-search select,.regional-reach-choice select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #99aca1; border-radius: 5px; font: inherit; color: #203e38; background: #fff; padding: 9px 10px; font-size: 14px; }
+.regional-search select { margin-bottom: 12px; }
 .regional-object-list { padding: 0 8px 8px; border-bottom: 1px solid #dce2d9; }
 .regional-list-count { padding: 10px 8px 7px; margin: 0; display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #64756a; }
 .regional-list-count span { font-size: 10px; }
@@ -21,6 +22,10 @@
 .regional-object-list button > span { font-size: 14px; display: block; font-weight: 600; }
 .regional-object-list small { display: block; margin-top: 4px; color: #64756a; font-size: 10px; }
 .regional-object-list em { font-style: normal; }
+.regional-pages { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 4px 0 0; font-size: 11px; color: #536b60; }
+.regional-pages button { width: 44px; min-height: 44px; text-align: center; }
+.regional-map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 12px; background: #f4f7f1; border-bottom: 1px solid #dce2d9; font-size: 12px; font-weight: 650; }
+.regional-map-toolbar button { padding: 4px 9px; min-height: 38px; font-size: 12px; }
 .regional-object-list .is-prepared { color: #965023; }
 .regional-no-match { font-size: 12px; padding: 8px; line-height: 1.5; color: #64756a; }
 .regional-object-card { padding: 18px 16px; overflow-wrap: anywhere; }
@@ -54,7 +59,8 @@
 .regional-legend input { accent-color: #38684e; margin: 0; }
 .regional-swatch { display: inline-block; width: 23px; border-top: 2px solid #628999; }
 .regional-swatch-boundary { border-top: 2px dashed #6a7868; }
-.regional-swatch-lake,.regional-swatch-reservoir { height: 8px; border: 1px solid #547f94; background: #8aafbd80; }
+.regional-swatch-stream { border-top: 1px solid #82aabb; }
+.regional-swatch-lake,.regional-swatch-pond,.regional-swatch-reservoir,.regional-swatch-water { height: 8px; border: 1px solid #547f94; background: #8aafbd80; }
 .regional-swatch-prepared { border-top: 5px solid #a55420; }
 .regional-map-note { background: #f4f6ef; margin: 0; padding: 10px 15px; min-height: 45px; font-size: 10px; line-height: 1.6; color: #5a6c59; border-top: 1px solid #d8e1d1; }
 .regional-data-note { padding: 10px 20px; background: #fff; border-top: 1px solid #dce2d9; color: #657462; font-size: 10px; line-height: 1.6; }
@@ -68,6 +74,8 @@
   .regional-heading { padding: 12px; gap: 10px; }.regional-heading h2 { font-size: 22px; }.regional-kicker { font-size: 9px; letter-spacing: .7px; }.regional-heading button { padding: 8px 10px; font-size: 11px; max-width: 140px; }
   .regional-status { padding: 8px 12px; font-size: 10px; }.regional-workspace { display: flex; flex-direction: column; }.regional-sidebar { display: contents; }
   .regional-search { order: 0; padding: 12px; background: #fff; }.regional-map-column { order: 1; }.regional-object-list { order: 2; background: #fff; padding: 5px 10px 10px; }.regional-object-list ul { max-height: 150px; }
+  .regional-search { display: grid; grid-template-columns: minmax(95px, .8fr) minmax(0, 1.2fr); grid-template-rows: auto auto; gap: 5px 8px; }
+  .regional-search label { grid-row: 1; margin: 0; }.regional-search input,.regional-search select { grid-row: 2; margin: 0; }
   .regional-object-card,.regional-card-placeholder { order: 3; background: #fff; padding: 16px; }.regional-map { min-height: 370px; height: 44vh; flex: auto; }
   .regional-legend { position: static; display: flex; flex-wrap: wrap; gap: 0 12px; margin: 6px 9px; padding: 3px 8px 7px; box-shadow: none; }
   .regional-legend label { min-height: 32px; }.regional-data-note { padding: 10px 12px; }

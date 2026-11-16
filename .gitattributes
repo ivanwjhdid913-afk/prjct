@@ -4,5 +4,6 @@ backend/data/*.geojson text eol=lf
 backend/data/reaches/*.geojson text eol=lf
 backend/data/regional/raw/* -text
 backend/data/regional/raw/overview.overpassql whitespace=cr-at-eol
+backend/data/regional/raw/whole-area.overpassql whitespace=cr-at-eol
 backend/data/regional/*.geojson text eol=lf
 backend/data/regional/*.sha256 text eol=lf

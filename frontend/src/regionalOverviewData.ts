@@ -1,13 +1,24 @@
 import { validReach, type Reach } from './multipleSources';
 
-export type RegionalKind = 'boundary' | 'river' | 'lake' | 'reservoir';
+export const waterKinds = ['river', 'stream', 'lake', 'pond', 'reservoir', 'water'] as const;
+export type WaterKind = (typeof waterKinds)[number];
+export type RegionalKind = 'boundary' | WaterKind;
 export type RegionalSource = { id: string; name: string; url: string; license: string; attribution: string; obtained_on: string; raw_sha256: string };
-export type RegionalProperties = { id: string; name: string; kind: RegionalKind; source_id: string; source_elements: { type: string; id: number | string; version?: number }[]; prepared_reach_ids: string[]; limitation: string };
+export type RegionalProperties = { id: string; name: string; kind: RegionalKind; named?: boolean; source_id: string; source_elements: { type: string; id: number | string; version?: number }[]; prepared_reach_ids: string[]; limitation: string };
 export type RegionalFeature = GeoJSON.Feature<GeoJSON.LineString | GeoJSON.MultiLineString | GeoJSON.Polygon | GeoJSON.MultiPolygon, RegionalProperties>;
 export type RegionalData = { type: 'FeatureCollection'; features: RegionalFeature[]; metadata: { format_version: 1; name: string; obtained_on: string; crs: string; coordinate_order: string; coverage_note: string; sources: RegionalSource[]; preparation: Record<string, unknown> } };
-export const kindLabel: Record<RegionalKind, string> = { boundary: 'Граница области', river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
-export const readiness = (feature: RegionalFeature) => feature.properties.kind === 'lake' || feature.properties.kind === 'reservoir' ? 'Расчёт не подключён' : feature.properties.prepared_reach_ids.length ? 'Есть подготовленный участок' : 'Только обзор';
-export const normalizedName = (value: string) => value.toLocaleLowerCase('ru').replaceAll('ё', 'е').trim();
+export const kindLabel: Record<RegionalKind, string> = { boundary: 'Граница области', river: 'Река', stream: 'Ручей', lake: 'Озеро', pond: 'Пруд', reservoir: 'Водохранилище', water: 'Водоём без уточнения' };
+export const isWatercourse = (kind: RegionalKind) => kind === 'river' || kind === 'stream';
+export const readiness = (feature: RegionalFeature) => feature.properties.prepared_reach_ids.length ? 'Есть подготовленный участок' : isWatercourse(feature.properties.kind) ? 'Только обзор' : 'Расчёт не подключён';
+export const normalizedName = (value: string) => value.toLocaleLowerCase('ru').replaceAll('ё', 'е').trim().replace(/\s+/g, ' ');
+
+export function positionLabel(feature: RegionalFeature): string {
+  const geometry = feature.geometry;
+  const [lon, lat] = geometry.type === 'LineString' ? geometry.coordinates[0]
+    : geometry.type === 'MultiPolygon' ? geometry.coordinates[0][0][0] : geometry.coordinates[0][0];
+  const format = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 });
+  return `${format.format(lat)}° с. ш., ${format.format(lon)}° в. д.`;
+}
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown, max = 4000): value is string => typeof value === 'string' && value.length <= max;
 const safeId = (value: unknown): value is string => text(value, 128) && /^[A-Za-z0-9_-]+$/.test(value);
@@ -33,18 +44,18 @@ export function validRegionalData(value: unknown): value is RegionalData {
   const valid = value.features.every(feature => {
     if (!record(feature) || feature.type !== 'Feature' || !record(feature.properties) || !record(feature.geometry)) return false;
     const p = feature.properties, g = feature.geometry;
-    if (!safeId(p.id) || ids.has(p.id) || !text(p.name, 300) || !p.name.trim() || !['boundary', 'river', 'lake', 'reservoir'].includes(p.kind as string) || !text(p.source_id) || !sourceIds.has(p.source_id) || !text(p.limitation) || !Array.isArray(p.prepared_reach_ids) || p.prepared_reach_ids.length > 100 || !p.prepared_reach_ids.every(safeId) || new Set(p.prepared_reach_ids).size !== p.prepared_reach_ids.length || !Array.isArray(p.source_elements) || p.source_elements.length < 1 || p.source_elements.length > 10000 || !p.source_elements.every(item => record(item) && (!Object.hasOwn(item, 'version') || typeof item.version === 'number' && Number.isSafeInteger(item.version) && item.version > 0) && text(item.type, 40) && /^[A-Za-z][A-Za-z0-9_-]*$/.test(item.type) && ((typeof item.id === 'number' && Number.isSafeInteger(item.id) && item.id > 0) || (text(item.id, 128) && /^[A-Za-z0-9_.:/-]+$/.test(item.id))))) return false;
+    if (!safeId(p.id) || ids.has(p.id) || !text(p.name, 300) || !p.name.trim() || !['boundary', ...waterKinds].includes(p.kind as string) || (Object.hasOwn(p, 'named') && typeof p.named !== 'boolean') || !text(p.source_id) || !sourceIds.has(p.source_id) || !text(p.limitation) || !Array.isArray(p.prepared_reach_ids) || p.prepared_reach_ids.length > 100 || !p.prepared_reach_ids.every(safeId) || new Set(p.prepared_reach_ids).size !== p.prepared_reach_ids.length || !Array.isArray(p.source_elements) || p.source_elements.length < 1 || p.source_elements.length > 10000 || !p.source_elements.every(item => record(item) && (!Object.hasOwn(item, 'version') || typeof item.version === 'number' && Number.isSafeInteger(item.version) && item.version > 0) && text(item.type, 40) && /^[A-Za-z][A-Za-z0-9_-]*$/.test(item.type) && ((typeof item.id === 'number' && Number.isSafeInteger(item.id) && item.id > 0) || (text(item.id, 128) && /^[A-Za-z0-9_.:/-]+$/.test(item.id))))) return false;
     if (p.kind !== 'river' && p.prepared_reach_ids.length) return false;
     if (p.kind === 'boundary') boundaries++;
     ids.add(p.id);
-    if (p.kind === 'river') return g.type === 'LineString' ? line(g.coordinates) : g.type === 'MultiLineString' && Array.isArray(g.coordinates) && g.coordinates.length > 0 && g.coordinates.every(points => line(points));
+    if (p.kind === 'river' || p.kind === 'stream') return g.type === 'LineString' ? line(g.coordinates) : g.type === 'MultiLineString' && Array.isArray(g.coordinates) && g.coordinates.length > 0 && g.coordinates.every(points => line(points));
     return g.type === 'Polygon' ? polygon(g.coordinates) : g.type === 'MultiPolygon' && Array.isArray(g.coordinates) && g.coordinates.length > 0 && g.coordinates.every(polygon);
   });
   return valid && boundaries === 1;
 }
 
 async function boundedJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20_000) });
   if (!response.ok) throw new Error('Не удалось загрузить сохранённые данные.');
   const maxBytes = 16 * 1024 * 1024;
   if (Number(response.headers.get('Content-Length')) > maxBytes) throw new Error('Набор превышает допустимый размер.');

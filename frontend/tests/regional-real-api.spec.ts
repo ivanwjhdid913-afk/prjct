@@ -1,4 +1,5 @@
 import { expect, test, type Download, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
 
 const api = process.env.SCENARIO_TEST_API;
 const reachId = 'voronezh-below-kuzminka';
@@ -18,7 +19,10 @@ async function showParameters(page: Page) {
 async function chooseRiver(page: Page, name: string, id: string) {
   const search = page.getByTestId('regional-search');
   await search.fill(name);
+  const answer = page.getByRole('button', { name: `${name} · Река · Есть подготовленный участок`, exact: true });
+  await expect(answer).toBeVisible();
   await search.press('Tab');
+  await expect(answer).toBeFocused();
   await page.keyboard.press('Enter');
   const card = page.getByTestId('regional-object-card');
   await expect(card).toContainText(name);
@@ -73,9 +77,11 @@ for (const width of [1280, 375]) {
     await expect(map.locator('[data-regional-reach]')).toHaveCount(3);
     const openingMs = Math.round(performance.now() - start);
     expect(response.status()).toBe(200);
-    const bytes = (await response.body()).byteLength;
-    expect(bytes).toBe(484913);
-    expect(response.headers().etag).toMatch(/^"[a-f0-9]{64}"$/);
+    const raw = await response.body();
+    const bytes = raw.byteLength;
+    expect(bytes).toBeGreaterThan(1_000_000);
+    expect(bytes).toBeLessThan(16 * 1024 * 1024);
+    expect(response.headers().etag).toBe(`"${createHash('sha256').update(raw).digest('hex')}"`);
     await expect(page.getByTestId('regional-load-status')).toContainText('Подложка недоступна');
     if (width === 375) {
       const overview = page.getByTestId('regional-overview');

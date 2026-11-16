@@ -150,6 +150,11 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
               setRequestedReach({ ...reach });
               closeOverview();
             }}
+            onOpenDemo={(scenario) => {
+              setRequestedReach(undefined);
+              open(scenario, true);
+              closeOverview();
+            }}
             onReturnResult={() => {
               setReturnResultVersion((version) => version + 1);
               closeOverview();

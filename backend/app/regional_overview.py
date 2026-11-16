@@ -10,8 +10,10 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException, Request, Response
 from app.river import prepared_reaches
 
-DATA_PATH = Path(__file__).resolve().parents[1] / 'data' / 'regional' / 'overview.geojson'
+DATA_PATH = Path(__file__).resolve().parents[1] / 'data' / 'regional' / 'whole-area.geojson'
 MAX_BYTES = 16 * 1024 * 1024
+LINE_KINDS = ('river', 'stream')
+POLYGON_KINDS = ('boundary', 'lake', 'pond', 'reservoir', 'water')
 router = APIRouter(prefix='/api/v1/regional-overview', tags=['regional cartography'])
 
 
@@ -99,7 +101,8 @@ def validate_overview(document, reach_ids):
                 and _identifier(p.get('source_id')) and p['source_id'] in source_ids and _text(p.get('limitation')))
         ids.add(p['id'])
         kind = p.get('kind')
-        require(kind in ('boundary', 'river', 'lake', 'reservoir'))
+        require(kind in LINE_KINDS + POLYGON_KINDS)
+        require('named' not in p or type(p['named']) is bool)
         boundaries += kind == 'boundary'
         elements = p.get('source_elements')
         require(isinstance(elements, list) and 1 <= len(elements) <= 10000)
@@ -116,7 +119,7 @@ def validate_overview(document, reach_ids):
                 and not (set(prepared) & mapped_reaches) and (kind == 'river' or not prepared))
         mapped_reaches.update(prepared)
         shape, coordinates = geometry.get('type'), geometry.get('coordinates')
-        if kind == 'river':
+        if kind in LINE_KINDS:
             require(shape in ('LineString', 'MultiLineString'))
             if shape == 'LineString':
                 line(coordinates)
