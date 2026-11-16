@@ -206,8 +206,11 @@ def current_geometry(conditions: SimulationRequest | MultipleSimulationRequest, 
         raise ValueError('Геометрия участка изменилась. Сохранение отменено; обновите участок и проверьте источник.')
     if isinstance(conditions, MultipleSimulationRequest):
         validate_multiple_geometry(conditions)
-        if provenance is not None and provenance.fields.discharge_coordinates.value != line.point_at(conditions.sources[0].source_distance_m):
-            raise ValueError('Координаты выпуска не соответствуют положению источника на подготовленной линии.')
+        if provenance is not None:
+            if provenance.fields.receiver.value != reach['name']:
+                raise ValueError('Принимающий участок в паспорте не соответствует подготовленному руслу.')
+            if provenance.fields.discharge_coordinates.value != line.point_at(conditions.sources[0].source_distance_m):
+                raise ValueError('Координаты выпуска не соответствуют положению источника на подготовленной линии.')
         return reach
     if line.length_m - conditions.source_distance_m < 100:
         raise ValueError('Ниже сценарного источника должно оставаться не менее 100 м подготовленного русла.')

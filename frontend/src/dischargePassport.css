@@ -14,6 +14,7 @@
 .passport-ready { color: #315e51; font-size: 13px; margin: 0; }
 .passport-unavailable { background: #f4efe2; padding: 10px 12px; margin-bottom: 12px; }
 .passport-unavailable p { margin: 0 0 8px; }
+.demo-passport button.primary:disabled { background: #e3ebe4; border-color: #cbd7cc; color: #53645d; }
 .passport-more { margin-top: 14px; }
 .passport-more > summary, .model-provenance > summary { cursor: pointer; padding: 8px 0; }
 .model-provenance { border-left: 2px solid var(--accent); padding: 0 9px; margin: 10px 0 14px; font-size: 12px; }

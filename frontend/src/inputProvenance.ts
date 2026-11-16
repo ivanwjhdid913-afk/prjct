@@ -4,7 +4,7 @@ import type { MultipleConditions } from './scenarioStorage';
 export const PASSPORT_FORMAT = 5;
 const fields = {
   discharge_coordinates: ['Сценарная точка', 'EPSG:4326'],
-  receiver: ['Принимающая река', ''],
+  receiver: ['Принимающий участок', ''],
   source_distance_m: ['Положение вдоль русла', 'м'],
   effluent_flow_m3_s: ['Расход стоков', 'м³/с'],
   effluent_mg_l: ['Хлориды в стоках', 'мг/л'],
@@ -51,8 +51,8 @@ export function validProvenance(value: unknown, conditions: MultipleConditions):
       const coords = entry.value;
       return Array.isArray(coords) && coords.length === 2 && coords.every(finite) && Math.abs(coords[0]) <= 180 && Math.abs(coords[1]) <= 90;
     }
-    if (key === 'receiver') return text(entry.value, 160);
-    return entry.value === expected[key];
+    if (key === 'receiver') return entry.basis === 'prepared_geometry' && text(entry.value, 160);
+    return (key === 'source_distance_m' || entry.basis === 'synthetic') && entry.value === expected[key];
   });
 }
 
@@ -95,7 +95,7 @@ export function dischargeDemo(reaches: Reach[]): RestorableConditions & { input_
     analysis_settings: { points: [{ id: 'discharge-demo-control', name: 'Учебный створ ниже источника', segment_index: 45 }], threshold_mg_l: null },
     input_provenance: { schema_version: 1, passport_id: 'synthetic-continuous-don-v1', kind: 'synthetic', fields: {
       discharge_coordinates: synthetic(coordinate, 'Условная точка выбрана на вершине подготовленной линии Дона. Порядок: долгота, широта.'),
-      receiver: geometry('Дон', 'Реестр подготовленных участков, don-olkhovets.'),
+      receiver: geometry(reach.name, 'Реестр подготовленных участков, don-olkhovets.'),
       source_distance_m: synthetic(distance, 'Расстояние по подготовленной линии до выбранной условной точки.'),
       effluent_flow_m3_s: synthetic(source.effluent_flow_m3_s), effluent_mg_l: synthetic(source.effluent_mg_l),
       river_flow_m3_s: synthetic(shared.river_flow_m3_s), background_mg_l: synthetic(shared.background_mg_l),

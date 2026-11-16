@@ -26,7 +26,7 @@ def document():
     river = {'river_flow_m3_s': 10., 'background_mg_l': 10., 'velocity_m_s': .25, 'dispersion_m2_s': 5., 'duration_hours': 2.5}
     fields = {key: {'basis': 'synthetic', 'source': 'Учебное допущение', 'value': value}
               for key, value in (river | {key: source[key] for key in ('source_distance_m', 'effluent_flow_m3_s', 'effluent_mg_l', 'load_mode')}).items()}
-    for key, value in {'receiver': 'Дон', 'discharge_coordinates': line.point_at(source['source_distance_m']),
+    for key, value in {'receiver': reach['name'], 'discharge_coordinates': line.point_at(source['source_distance_m']),
                        'source_distance_m': source['source_distance_m']}.items():
         fields[key] = {'basis': 'prepared_geometry', 'source': 'Подготовленная линия Дона', 'value': value}
     return {
@@ -69,6 +69,8 @@ def test_format_five_shape_roundtrips_complete_provenance():
     lambda sent: sent['input_provenance']['fields']['background_mg_l'].update(value=10.000001),
     lambda sent: sent['input_provenance']['fields']['duration_hours'].update(value='2.5'),
     lambda sent: sent['input_provenance']['fields']['velocity_m_s'].update(value=True),
+    lambda sent: sent['input_provenance']['fields']['velocity_m_s'].update(basis='prepared_geometry'),
+    lambda sent: sent['input_provenance']['fields']['receiver'].update(basis='synthetic'),
     lambda sent: sent['input_provenance']['fields']['discharge_coordinates'].update(value=[-181, 52]),
     lambda sent: sent['conditions']['sources'][0].update(load_mode='finite', load_duration_hours=.1),
     lambda sent: sent['conditions']['sources'].append(deepcopy(sent['conditions']['sources'][0]) | {'id': 'second'}),
@@ -84,10 +86,12 @@ def test_strict_field_shape_and_canonical_input_binding(change):
 
 
 def test_portable_mismatch_preserves_document_but_blocks_application():
-    for field in ('geometry_sha256', 'downstream_geometry_sha256', 'coordinates'):
+    for field in ('geometry_sha256', 'downstream_geometry_sha256', 'coordinates', 'receiver'):
         sent = document()
         if field == 'coordinates':
             sent['input_provenance']['fields']['discharge_coordinates']['value'][0] += .0001
+        elif field == 'receiver':
+            sent['input_provenance']['fields']['receiver']['value'] = 'Воронеж'
         else:
             sent[field] = '0' * 64
         transfer = ConditionsDocument.model_validate(sent)
@@ -106,10 +110,12 @@ def test_utf8_size_is_checked_across_provenance_fields():
 @pytest.mark.anyio
 async def test_saved_record_has_full_provenance_and_rejects_mismatched_geometry(client):
     sent = document()
-    for key in ('geometry_sha256', 'downstream_geometry_sha256', 'coordinates'):
+    for key in ('geometry_sha256', 'downstream_geometry_sha256', 'coordinates', 'receiver'):
         changed = save_payload(deepcopy(sent))
         if key == 'coordinates':
             changed['input_provenance']['fields']['discharge_coordinates']['value'][0] += .0001
+        elif key == 'receiver':
+            changed['input_provenance']['fields']['receiver']['value'] = 'Воронеж'
         else:
             changed[key] = '0' * 64
         assert (await client.post('/api/v1/scenarios', json=changed)).status_code == 422

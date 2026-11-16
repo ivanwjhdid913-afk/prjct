@@ -51,6 +51,15 @@ class ProvenanceFields(BaseModel):
     duration_hours: ProvenanceField[float]
     load_mode: ProvenanceField[Literal['continuous']]
 
+    @model_validator(mode='after')
+    def matching_basis(self):
+        if self.receiver.basis != 'prepared_geometry':
+            raise ValueError('Принимающий участок должен быть взят из реестра подготовленной геометрии.')
+        geometry_fields = {'receiver', 'discharge_coordinates', 'source_distance_m'}
+        if any(getattr(self, key).basis != 'synthetic' for key in type(self).model_fields.keys() - geometry_fields):
+            raise ValueError('Расходы, концентрации, гидрология, горизонт и режим учебного паспорта должны быть помечены как синтетические.')
+        return self
+
 
 class InputProvenance(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)

@@ -341,6 +341,7 @@ export default function MultipleSimulation({
     if (passport?.input_provenance && reach && passport.conditions.reach_id === reach.id
         && passport.geometry_sha256 === reach.metadata.geometry_sha256
         && passport.downstream_geometry_sha256 === reach.metadata.downstream_geometry_sha256
+        && passport.input_provenance.fields.receiver.value === reach.name
         && validProvenance(passport.input_provenance, conditions)) return passport.input_provenance;
     return undefined;
   }
@@ -493,7 +494,8 @@ export default function MultipleSimulation({
       !target ||
       scenario.geometry_sha256 !== target.metadata.geometry_sha256 ||
       scenario.downstream_geometry_sha256 !==
-        target.metadata.downstream_geometry_sha256
+        target.metadata.downstream_geometry_sha256 ||
+      (scenario.input_provenance && scenario.input_provenance.fields.receiver.value !== target.name)
     ) {
       setMessage(
         "Геометрия сохранённых условий не совпадает с подготовленным участком. Условия не применены.",

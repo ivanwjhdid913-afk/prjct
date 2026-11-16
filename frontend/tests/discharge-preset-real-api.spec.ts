@@ -70,7 +70,10 @@ for (const width of [1280, 375]) test(`constant discharge passport, run, control
   expect(value).toBeGreaterThan(10.5);
   await expect(page.getByTestId('temporal-current')).toHaveText(`${value.toLocaleString('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} мг/л`);
   await expect(path).not.toHaveAttribute('stroke', before!);
-  if (media) await page.screenshot({ path: info.outputPath(`control-${width}.png`) });
+  if (media) {
+    if (width === 375) await page.getByTestId('temporal-current').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath(`control-${width}.png`) });
+  }
 
   await openLibrary(page);
   const name = `Учебный паспорт ${width} ${Date.now()}`;
@@ -110,6 +113,13 @@ for (const width of [1280, 375]) test(`constant discharge passport, run, control
   await expect(ce).toHaveValue('100');
   await expect(page.getByText('Происхождение параметров', { exact: true })).toBeVisible();
   expect(runs).toBe(1);
+
+  const wrongReceiver = JSON.parse(exported);
+  wrongReceiver.input_provenance.fields.receiver.value = 'Воронеж';
+  await page.getByLabel('Импортировать условия JSON').setInputFiles({ name: 'other-river.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(wrongReceiver)) });
+  await expect(preview).toContainText('Принимающий участок в паспорте не соответствует подготовленному руслу.');
+  await expect(button(page, 'Применить к форме')).toBeDisabled();
+  if (media) await preview.screenshot({ path: info.outputPath(`receiver-blocked-${width}.png`) });
 
   await page.getByLabel('Импортировать условия JSON').setInputFiles({ name: 'format4.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(editedDocument)) });
   await expect(preview).toContainText('Совместимо с текущей моделью и геометрией.');
