@@ -25,6 +25,7 @@ function OverviewMap({ data, reaches, visible, selectedId, selectedReachId, laye
   const byFeature = useRef(new Map<string, MapEntry[]>());
   const previousSelection = useRef('');
   const boundary = useRef<L.LatLngBounds | undefined>(undefined);
+  const initialFit = useRef(false);
   const select = useRef(onSelect), tileError = useRef(onTileError);
   select.current = onSelect; tileError.current = onTileError;
   useEffect(() => {
@@ -75,7 +76,7 @@ function OverviewMap({ data, reaches, visible, selectedId, selectedReachId, laye
     }
     entries.current = added;
     boundary.current = added.find(entry => entry.kind === 'boundary')?.group.getBounds();
-    if (boundary.current?.isValid()) instance.fitBounds(boundary.current, { padding: [22, 22], animate: false });
+    initialFit.current = false;
     return () => { entries.current = []; byFeature.current.clear(); previousSelection.current = ''; map.current = null; instance.remove(); };
   }, [data, reaches]);
   useEffect(() => {
@@ -92,11 +93,19 @@ function OverviewMap({ data, reaches, visible, selectedId, selectedReachId, laye
   useEffect(() => {
     if (!visible || !map.current) return;
     const instance = map.current;
-    const timer = window.setTimeout(() => instance.invalidateSize({ pan: false }), 0);
-    const observer = new ResizeObserver(() => instance.invalidateSize({ pan: false }));
+    const resize = () => {
+      if (!element.current?.clientWidth || !element.current.clientHeight) return;
+      instance.invalidateSize({ pan: false });
+      if (!initialFit.current && boundary.current?.isValid()) {
+        initialFit.current = true;
+        instance.fitBounds(boundary.current, { padding: [22, 22], animate: false });
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
     if (element.current) observer.observe(element.current);
-    return () => { clearTimeout(timer); observer.disconnect(); };
-  }, [visible, data]);
+    return () => observer.disconnect();
+  }, [visible, data, reaches]);
   useEffect(() => {
     const instance = map.current;
     const selected = byFeature.current.get(selectedId);
@@ -190,7 +199,9 @@ export default function RegionalOverview({ visible, currentReachId, hasResult, o
         </div>
         <div className="regional-object-list" aria-label="Водные объекты"><p className="regional-list-count">{query || type ? `Найдено: ${listed.length}` : 'Водные объекты'}</p><ul ref={list}>{listed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(({ feature, name }) => {
           const { id, kind } = feature.properties;
-          const context = (homonyms.get(`${kind}:${name}`) ?? 0) > 1 ? positionLabel(feature) : '';
+          const origin = feature.properties.source_elements[0];
+          const context = (homonyms.get(`${kind}:${name}`) ?? 0) > 1
+            ? `${positionLabel(feature)} · OSM ${origin.type}/${origin.id}` : '';
           return <li key={id}><button aria-label={[feature.properties.name, kindLabel[kind], readiness(feature), context].filter(Boolean).join(' · ')} aria-pressed={selectedId === id} onClick={() => selectObject(id)}><span>{feature.properties.name}</span><small>{kindLabel[kind]} · <em className={feature.properties.prepared_reach_ids.length ? 'is-prepared' : ''}>{readiness(feature)}</em></small>{context && <small>{context}</small>}</button></li>;
         })}</ul>{listed.length > PAGE_SIZE && <nav className="regional-pages" aria-label="Страницы результатов"><button type="button" aria-label="Предыдущая страница" disabled={!page} onClick={() => setPage(value => value - 1)}>←</button><span>{page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, listed.length)} из {listed.length}</span><button type="button" aria-label="Следующая страница" disabled={(page + 1) * PAGE_SIZE >= listed.length} onClick={() => setPage(value => value + 1)}>→</button></nav>}{!!data && !listed.length && <p className="regional-no-match">Совпадений нет. Измените название или тип.</p>}</div>
         {selected ? <article data-testid="regional-object-card" className="regional-object-card" aria-label={`Паспорт: ${selected.properties.name}`}>

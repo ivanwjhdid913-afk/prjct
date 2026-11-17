@@ -250,6 +250,8 @@ test('legacy overview retains A/B and never displays an unassigned source on a n
   await button(page, 'Показать А').click();
   await clock(page).fill('0.6');
   await button(page, 'Обзор области').click();
+  const don = await chooseRiver(page, 'Дон', 'don-olkhovets');
+  await expect(don.getByRole('button', { name: 'Учебный расчёт на Дону', exact: true })).toHaveCount(0);
   await chooseRiver(page, 'Воронеж', reachId);
   await button(page, 'К выбранному участку').click();
   const position = field(page, 'Положение сценарного источника, м');

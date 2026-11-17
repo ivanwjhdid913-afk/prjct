@@ -150,11 +150,11 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
               setRequestedReach({ ...reach });
               closeOverview();
             }}
-            onOpenDemo={(scenario) => {
+            onOpenDemo={multiple ? (scenario) => {
               setRequestedReach(undefined);
-              open(scenario, true);
+              setSnapshot(scenario);
               closeOverview();
-            }}
+            } : undefined}
             onReturnResult={() => {
               setReturnResultVersion((version) => version + 1);
               closeOverview();

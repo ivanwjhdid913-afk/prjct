@@ -23,8 +23,8 @@ async function open(page: Page, overview = fixture) {
 
 test('whole-area types and homonyms can be narrowed and each selection highlights its own geometry', async ({ page }) => {
   const homonyms = ['north', 'south'].map((suffix, index) => ({ type: 'Feature',
-    properties: { ...props(`kamenka-${suffix}`, 'Каменка', 'stream'), named: true },
-    geometry: { type: 'LineString', coordinates: [[39.25, 52.5 + index * .5], [39.3, 52.55 + index * .5]] },
+    properties: { ...props(`kamenka-${suffix}`, 'Каменка', 'stream'), named: true, source_elements: [{ type: 'way', id: 101 + index }] },
+    geometry: { type: 'LineString', coordinates: [[39.25, 52.5 + index * .00001], [39.3, 52.55 + index * .00001]] },
   }));
   const pond = { ...fixture.features[3], properties: props('study-pond', 'Каменка', 'pond') };
   await open(page, { ...fixture, features: [...fixture.features, ...homonyms, pond] });
@@ -46,6 +46,26 @@ test('whole-area types and homonyms can be narrowed and each selection highlight
   await expect(page.getByTestId('regional-object-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Вся область', exact: true }).click();
   await expect(page.locator('[data-regional-feature="boundary"]')).toBeVisible();
+});
+
+test('a regional download that finishes behind the model fits the whole oblast on reopening', async ({ page }) => {
+  let release: (() => void) | undefined;
+  await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/api/v1/regional-overview', async route => {
+    await new Promise<void>(resolve => { release = resolve; });
+    await route.fulfill({ json: fixture });
+  });
+  await page.route('**/api/v1/river-reaches', route => route.fulfill({ json: { items: [reach] } }));
+  await page.goto('/tests/regional-harness.html');
+  await expect.poll(() => !!release).toBe(true);
+  const toggle = page.getByRole('button', { name: 'Переключить обзор' });
+  await toggle.click();
+  await expect(page.getByTestId('regional-overview')).toBeHidden();
+  release!();
+  const scale = page.getByTestId('regional-map').locator('.leaflet-control-scale-line');
+  await expect(scale).toBeAttached();
+  await toggle.click();
+  await expect(scale).toHaveText(/^\d{2,} km$/);
 });
 
 test('search and object selection show a passport; applying is a separate action and data is reused', async ({ page }) => {
