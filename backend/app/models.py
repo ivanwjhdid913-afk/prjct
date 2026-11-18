@@ -78,3 +78,22 @@ class SavedScenario(Base):
     input_provenance: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     geometry_source: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class NetworkScenario(Base):
+    __tablename__ = "network_scenarios"
+    __table_args__ = (
+        CheckConstraint("length(trim(name)) > 0", name="network_scenario_name"),
+        CheckConstraint("format_version = 1", name="network_scenario_version"),
+        CheckConstraint("model_id = 'conservative-1d-network-v1'", name="network_scenario_model"),
+        CheckConstraint("jsonb_typeof(conditions) = 'object' AND octet_length(conditions::text) <= 8192", name="network_scenario_conditions"),
+        CheckConstraint("jsonb_typeof(network_snapshot) = 'object' AND octet_length(network_snapshot::text) <= 131072", name="network_scenario_snapshot"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120))
+    model_id: Mapped[str] = mapped_column(String(80))
+    format_version: Mapped[int] = mapped_column(Integer)
+    conditions: Mapped[dict] = mapped_column(JSONB)
+    network_snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

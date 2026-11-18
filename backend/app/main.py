@@ -12,6 +12,8 @@ from app.db import get_session
 from app.models import ObservationPoint, WaterBody
 from app.simulation import router as simulation_router
 from app.scenarios import router as scenarios_router
+from app.river_network import router as river_network_router
+import app.network_scenarios
 from app.scenario_files import router as scenario_files_router
 from app.discharge_data import router as discharge_data_router
 from app.regional_overview import router as regional_overview_router
@@ -24,6 +26,7 @@ app.include_router(scenario_files_router)
 app.include_router(discharge_data_router)
 app.include_router(regional_overview_router)
 app.include_router(confluence_router)
+app.include_router(river_network_router)
 
 
 class WaterBodyView(BaseModel):

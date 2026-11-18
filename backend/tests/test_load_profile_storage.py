@@ -135,7 +135,7 @@ def test_0004_preserves_legacy_rows_and_blocks_destructive_profile_downgrade():
         assert downgrade.returncode != 0
         assert 'saved load profiles exist' in downgrade.stderr
         with engine.connect() as connection:
-            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0007'
+            assert connection.scalar(text('SELECT version_num FROM alembic_version')) == '0008'
             assert connection.scalar(text('SELECT conditions FROM saved_scenarios WHERE id=:id'), {'id': ids[1]}) == sent['conditions']
             assert connection.scalar(text('SELECT count(*) FROM saved_scenarios')) == 2
     finally:
