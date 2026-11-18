@@ -4,7 +4,7 @@ import ObservationPoints from './ObservationPoints';
 import ModelWorkspace from './ModelWorkspace';
 import type { RestorableConditions } from './multipleSources';
 const DischargeData = lazy(() => import('./DischargeData'));
-const modelRoutes = ['#model', '#model/legacy', '#model/confluence'];
+const modelRoutes = ['#model', '#model/legacy', '#model/confluence', '#model/network'];
 
 const kinds = { river: 'Река', lake: 'Озеро', reservoir: 'Водохранилище' };
 type WaterBody = { id: string; name: string; kind: keyof typeof kinds; is_synthetic: boolean };

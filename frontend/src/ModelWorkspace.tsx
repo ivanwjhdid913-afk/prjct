@@ -6,6 +6,7 @@ const Simulation = lazy(() => import("./Simulation"));
 const RegionalOverview = lazy(() => import("./RegionalOverview"));
 const MultipleSimulation = lazy(() => import("./MultipleSimulation"));
 const Confluence = lazy(() => import("./Confluence"));
+const RiverNetwork = lazy(() => import("./RiverNetwork"));
 export type ModelViewState = { currentReachId: string | null; hasResult: boolean };
 export type ModelViewProps = {
   workspaceVisible?: boolean;
@@ -21,6 +22,10 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
   const [visitedOverview, setVisitedOverview] = useState(false);
   const [confluence, setConfluence] = useState(location.hash === "#model/confluence");
   const [visitedConfluence, setVisitedConfluence] = useState(confluence);
+  const [network, setNetwork] = useState(location.hash === '#model/network');
+  const [visitedNetwork, setVisitedNetwork] = useState(network);
+  const networkWasOpen = useRef(network);
+  const networkReturnHash = useRef('#model');
   const [requestedReach, setRequestedReach] = useState<Reach>();
   const [returnResultVersion, setReturnResultVersion] = useState(0);
   const [viewState, setViewState] = useState<ModelViewState>({ currentReachId: null, hasResult: false });
@@ -31,7 +36,27 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
   const restoreFocus = useRef(false);
   const onViewState = useCallback((state: ModelViewState) => setViewState(state), []);
   useEffect(() => {
-    const navigate = () => {
+    const navigate = (event: HashChangeEvent) => {
+      // Rapid Back may arrive before the previous hashchange is dispatched.
+      // Ignore that superseded navigation and use the event's actual origin.
+      if (new URL(event.newURL).hash !== location.hash) return;
+      const leavingNetwork = new URL(event.oldURL).hash === '#model/network';
+      if (location.hash === '#model/network') {
+        setOverview(false);
+        setConfluence(false);
+        networkWasOpen.current = true;
+        setVisitedNetwork(true);
+        setNetwork(true);
+        return;
+      }
+      setNetwork(false);
+      if ((networkWasOpen.current || leavingNetwork) && (location.hash === '#model' || location.hash === '#model/legacy')) {
+        networkWasOpen.current = false;
+        setVisitedOverview(true);
+        setOverview(true);
+        return;
+      }
+      networkWasOpen.current = false;
       if (location.hash === "#model/confluence") {
         setOverview(false);
         setVisitedConfluence(true);
@@ -60,7 +85,7 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
       overviewButton.current?.focus({ preventScroll: true });
     }
   }, [overview]);
-  const viewProps = { workspaceVisible: !overview && !confluence, onViewState, requestedReach, returnResultVersion };
+  const viewProps = { workspaceVisible: !overview && !confluence && !network, onViewState, requestedReach, returnResultVersion };
   function changeModel(next: boolean) {
     if (next === multiple) return;
     setRequestedReach(undefined);
@@ -87,7 +112,7 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
   }
   return (
     <div className={`model-choice-workspace${multiple ? "" : " is-legacy"}`}>
-      <nav className="model-choice" aria-label="Расчётная постановка" hidden={overview || confluence} inert={overview || confluence}>
+      <nav className="model-choice" aria-label="Расчётная постановка" hidden={overview || confluence || network} inert={overview || confluence || network}>
         <button
           type="button"
           aria-label="Один источник · прежняя модель"
@@ -120,7 +145,7 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
         {multiple && <a className="model-confluence-link" ref={confluenceLink} href="#model/confluence">Слияние рек</a>}
         <span>Сохраните условия перед сменой модели.</span>
       </nav>
-      <div className="model-view" hidden={overview || confluence} inert={overview || confluence}>
+      <div className="model-view" hidden={overview || confluence || network} inert={overview || confluence || network}>
         <Suspense fallback={<p role="status">Открываем расчётную модель…</p>}>
           {multiple ? (
             <MultipleSimulation
@@ -146,6 +171,10 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
             visible={overview}
             currentReachId={viewState.currentReachId}
             hasResult={viewState.hasResult}
+            onOpenNetwork={() => {
+              networkReturnHash.current = multiple ? '#model' : '#model/legacy';
+              location.hash = 'model/network';
+            }}
             onApplyReach={(reach) => {
               setRequestedReach({ ...reach });
               closeOverview();
@@ -172,6 +201,14 @@ export default function ModelWorkspace({ initialScenario }: { initialScenario?: 
           </Suspense>
         </div>
       )}
+      {visitedNetwork && <div className="network-view" hidden={!network} inert={!network}>
+        <nav className="model-choice" aria-label="Навигация речной сети">
+          <button type="button" onClick={() => { location.hash = networkReturnHash.current; }}>К обзору области</button>
+        </nav>
+        <Suspense fallback={<p role="status">Открываем речную сеть…</p>}>
+          <RiverNetwork visible={network} />
+        </Suspense>
+      </div>}
     </div>
   );
 }

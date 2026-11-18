@@ -26,6 +26,9 @@
 .regional-pages button { width: 44px; min-height: 44px; text-align: center; }
 .regional-map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 12px; background: #f4f7f1; border-bottom: 1px solid #dce2d9; font-size: 12px; font-weight: 650; }
 .regional-map-toolbar button { padding: 4px 9px; min-height: 38px; font-size: 12px; }
+.regional-map-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.network-view { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.network-view[hidden] { display: none; }
 .regional-object-list .is-prepared { color: #965023; }
 .regional-no-match { font-size: 12px; padding: 8px; line-height: 1.5; color: #64756a; }
 .regional-object-card { padding: 18px 16px; overflow-wrap: anywhere; }

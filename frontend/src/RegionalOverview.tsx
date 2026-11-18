@@ -6,7 +6,7 @@ import { dischargeDemo } from './inputProvenance';
 import { isWatercourse, kindLabel, loadRegionalOverview, loadRegionalReaches, normalizedName, positionLabel, readiness, safeSourceUrl, waterKinds, type RegionalData, type RegionalFeature, type RegionalKind, type WaterKind } from './regionalOverviewData';
 import './regionalOverview.css';
 
-type Props = { visible: boolean; currentReachId: string | null; hasResult: boolean; onApplyReach: (reach: Reach) => void; onReturnResult: () => void; onOpenDemo?: (scenario: RestorableConditions) => void };
+type Props = { visible: boolean; currentReachId: string | null; hasResult: boolean; onApplyReach: (reach: Reach) => void; onReturnResult: () => void; onOpenDemo?: (scenario: RestorableConditions) => void; onOpenNetwork?: () => void };
 type LayerKey = RegionalKind | 'prepared';
 const initialLayers: Record<LayerKey, boolean> = { boundary: true, river: true, stream: true, lake: true, pond: true, reservoir: true, water: true, prepared: true };
 const layerLabels: Record<LayerKey, string> = { boundary: 'Граница области', river: 'Реки', stream: 'Ручьи', lake: 'Озёра', pond: 'Пруды', reservoir: 'Водохранилища', water: 'Без уточнения', prepared: 'Подготовленные участки' };
@@ -118,7 +118,7 @@ function OverviewMap({ data, reaches, visible, selectedId, selectedReachId, laye
   return <div ref={element} data-testid="regional-map" data-selected-feature={selectedId} className="regional-map" role="region" aria-label="Карта поверхностных вод Липецкой области. Для выбора с клавиатуры используйте список объектов." />;
 }
 
-export default function RegionalOverview({ visible, currentReachId, hasResult, onApplyReach, onReturnResult, onOpenDemo }: Props) {
+export default function RegionalOverview({ visible, currentReachId, hasResult, onApplyReach, onReturnResult, onOpenDemo, onOpenNetwork }: Props) {
   const [data, setData] = useState<RegionalData | null>(null), [reaches, setReaches] = useState<Reach[]>([]);
   const [error, setError] = useState(''), [reachError, setReachError] = useState(''), [loading, setLoading] = useState(false), [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState(''), [selectedId, setSelectedId] = useState(''), [selectedReachId, setSelectedReachId] = useState('');
@@ -214,7 +214,7 @@ export default function RegionalOverview({ visible, currentReachId, hasResult, o
           {!!selected.properties.prepared_reach_ids.length && !available.length && <p className="regional-limitation">Подготовленные участки не найдены в загруженном реестре. Переход к расчёту недоступен.</p>}
         </article> : <div className="regional-card-placeholder"><span aria-hidden="true">↗</span><h3>Выберите реку или водоём</h3><p>На карте или в списке. Паспорт покажет источник геометрии и доступность моделирования.</p></div>}
       </aside>
-      <div className="regional-map-column"><div className="regional-map-toolbar"><span>Гидрография области</span><button type="button" disabled={!data} onClick={() => setReset(value => value + 1)}>Вся область</button></div>{data ? <OverviewMap data={data} reaches={reaches} visible={visible} selectedId={selectedId} selectedReachId={selectedReachId} reset={reset} layers={shownLayers} onSelect={selectObject} onTileError={() => setTileFailed(true)} /> : <div data-testid="regional-map" className="regional-map regional-map-empty">{error ? 'Обзорная геометрия недоступна' : 'Подготовка карты…'}</div>}
+      <div className="regional-map-column"><div className="regional-map-toolbar"><span>Гидрография области</span><div className="regional-map-actions">{onOpenNetwork && <button type="button" onClick={onOpenNetwork}>Сеть Воронеж — Кузьминка</button>}<button type="button" disabled={!data} onClick={() => setReset(value => value + 1)}>Вся область</button></div></div>{data ? <OverviewMap data={data} reaches={reaches} visible={visible} selectedId={selectedId} selectedReachId={selectedReachId} reset={reset} layers={shownLayers} onSelect={selectObject} onTileError={() => setTileFailed(true)} /> : <div data-testid="regional-map" className="regional-map regional-map-empty">{error ? 'Обзорная геометрия недоступна' : 'Подготовка карты…'}</div>}
         <fieldset className="regional-legend"><legend>Слои карты</legend>{(Object.keys(initialLayers) as LayerKey[]).map(key => <label key={key}><input type="checkbox" checked={layers[key]} onChange={event => setLayers(value => ({ ...value, [key]: event.target.checked }))} /><span aria-hidden="true" className={`regional-swatch regional-swatch-${key}`} />{layerLabels[key]}</label>)}</fieldset>
         <p className="regional-map-note">Обзорная гидрография — картографический слой. Расчёт доступен только на выделенных подготовленных участках; соседство линий не подтверждает гидравлическую связь.</p>
       </div>
